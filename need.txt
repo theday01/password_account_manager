@@ -1,0 +1,22 @@
+make database path far from main program directory
+
+
+
+
+
+remove totp codes from the code
+
+
+
+
+
+
+
+make screenshot not able to be taken from the app
+
+
+
+
+
+
+make sure to check if the program is already running before opening a new instance
