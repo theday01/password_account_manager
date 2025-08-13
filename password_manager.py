@@ -1322,7 +1322,6 @@ class ModernPasswordManagerGUI:
                         if self.database.force_integrity_reset():
                             messagebox.showinfo("Success", 
                                             "Integrity issue fixed! Please try logging in again.")
-                            # Clear the integrity error flag
                             self.database.last_integrity_error = False
                             return
                         else:
@@ -1726,36 +1725,10 @@ Permissions Secure: {'✅ Yes' if status.get('permissions_secure', False) else '
         ctk.CTkButton(main_frame, text="Close", 
                     command=status_window.destroy, height=40).pack(pady=20)
 
-    def fix_integrity_issues(self):
-        """Fix database integrity issues by resetting the integrity signature"""
-        if not self.database:
-            messagebox.showinfo("Info", "Please log in first to access this feature.")
-            return
-        
-        result = messagebox.askyesno(
-            "Fix Integrity Issues", 
-            "This will reset the database integrity signature.\n\n"
-            "This action is safe and will not affect your stored passwords.\n\n"
-            "Do you want to continue?"
-        )
-        
-        if result:
-            try:
-                if self.database.force_integrity_reset():
-                    messagebox.showinfo("Success", 
-                                    "Database integrity signature has been reset successfully!\n\n"
-                                    "You should now be able to log in without integrity errors.")
-                else:
-                    messagebox.showerror("Error", 
-                                       "Failed to reset integrity signature.\n\n"
-                                       "Please try logging in again or contact support.")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to fix integrity issues: {str(e)}")
-
     def show_settings(self):
         settings_window = ctk.CTkToplevel(self.root)
         settings_window.title("Password Vault Settings")
-        settings_window.geometry("500x700")
+        settings_window.geometry("500x400")
         settings_window.grab_set()
         settings_window.resizable(False, False)
         
@@ -1765,7 +1738,6 @@ Permissions Secure: {'✅ Yes' if status.get('permissions_secure', False) else '
         ctk.CTkLabel(main_frame, text="🔐 Security Settings", 
                     font=ctk.CTkFont(size=24, weight="bold")).pack(pady=20)
         
-        # Security status section
         security_frame = ctk.CTkFrame(main_frame)
         security_frame.pack(fill="x", pady=10)
         
@@ -1776,11 +1748,6 @@ Permissions Secure: {'✅ Yes' if status.get('permissions_secure', False) else '
                     command=self.show_security_status,
                     height=40).pack(pady=10)
         
-        ctk.CTkButton(security_frame, text="🔧 Fix Integrity Issues",
-                    command=self.fix_integrity_issues,
-                    height=40).pack(pady=10)
-        
-        # Password section
         password_frame = ctk.CTkFrame(main_frame)
         password_frame.pack(fill="x", pady=10)
         
@@ -1790,30 +1757,6 @@ Permissions Secure: {'✅ Yes' if status.get('permissions_secure', False) else '
         ctk.CTkButton(password_frame, text="Change Master Password",
                     command=self.change_master_password_dialog,
                     height=40).pack(pady=10)
-        
-        # Recovery section
-        recovery_frame = ctk.CTkFrame(main_frame)
-        recovery_frame.pack(fill="x", pady=10)
-        
-        ctk.CTkLabel(recovery_frame, text="Password Recovery", 
-                    font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
-        
-        self.recovery_enabled_var = tk.BooleanVar(value=self.settings.get('recovery_enabled', False))
-        ctk.CTkCheckBox(recovery_frame, text="Enable Password Recovery",
-                        variable=self.recovery_enabled_var).pack(pady=5)
-        
-        self.recovery_email_var = tk.StringVar(value=self.settings.get('recovery_email', ''))
-        ctk.CTkEntry(recovery_frame, textvariable=self.recovery_email_var,
-                    placeholder_text="Recovery Email", width=300).pack(pady=10)
-        
-        # Buttons
-        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        button_frame.pack(pady=20)
-        
-        ctk.CTkButton(button_frame, text="Cancel", 
-                    command=settings_window.destroy).pack(side="left", padx=10)
-        ctk.CTkButton(button_frame, text="Save Settings", 
-                    command=lambda: self.save_settings(settings_window)).pack(side="right", padx=10)
 
     def save_settings(self, settings_window):
         if not hasattr(self, 'settings'):
@@ -1827,143 +1770,138 @@ Permissions Secure: {'✅ Yes' if status.get('permissions_secure', False) else '
         settings_window.destroy()
 
     def change_master_password_dialog(self):
-        """Enhanced password change dialog with proper validation and feedback"""
-        
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("Change Master Password")
-        dialog.geometry("450x400")
+        dialog.geometry("450x530")
+        dialog.resizable(False, False)
         dialog.grab_set()
-        #dialog.resizable(False, False)
         
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        ctk.CTkLabel(main_frame, text="🔐 Change Master Password",
+        ctk.CTkLabel(main_frame, text="🔑 Change Master Password",
                     font=ctk.CTkFont(size=20, weight="bold")).pack(pady=20)
         
-        # Current password
         ctk.CTkLabel(main_frame, text="Current Password:", 
                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
         current_entry = ctk.CTkEntry(main_frame, placeholder_text="Enter current password", 
                                     show="*", width=350, height=40)
         current_entry.pack(padx=20, pady=(0, 10))
         
-        # New password
         ctk.CTkLabel(main_frame, text="New Password:", 
                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
         new_entry = ctk.CTkEntry(main_frame, placeholder_text="Enter new password", 
                                 show="*", width=350, height=40)
         new_entry.pack(padx=20, pady=(0, 10))
         
-        # Confirm new password
         ctk.CTkLabel(main_frame, text="Confirm New Password:", 
                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
         confirm_entry = ctk.CTkEntry(main_frame, placeholder_text="Confirm new password", 
                                     show="*", width=350, height=40)
         confirm_entry.pack(padx=20, pady=(0, 15))
         
-        # Progress label
         progress_label = ctk.CTkLabel(main_frame, text="", font=ctk.CTkFont(size=12))
         progress_label.pack(pady=5)
         
         def validate_and_change_password():
-            # Clear any previous messages
-            progress_label.configure(text="", text_color="white")
+            try:
+                progress_label.configure(text="", text_color="white")
+            except:
+                return
             
-            # Get input values
             current = current_entry.get().strip()
             new = new_entry.get().strip()
             confirm = confirm_entry.get().strip()
             
-            # Validate inputs
             if not current:
-                progress_label.configure(text="❌ Current password is required", text_color="#FF4444")
+                try:
+                    progress_label.configure(text="❌ Current password is required", text_color="#FF4444")
+                except:
+                    messagebox.showerror("Error", "Current password is required")
+                    return
                 current_entry.focus()
                 return
                 
             if not new:
-                progress_label.configure(text="❌ New password is required", text_color="#FF4444")
+                try:
+                    progress_label.configure(text="❌ New password is required", text_color="#FF4444")
+                except:
+                    messagebox.showerror("Error", "New password is required")
+                    return
                 new_entry.focus()
                 return
                 
             if len(new) < 8:
-                progress_label.configure(text="❌ New password must be at least 8 characters", text_color="#FF4444")
+                try:
+                    progress_label.configure(text="❌ New password must be at least 8 characters", text_color="#FF4444")
+                except:
+                    messagebox.showerror("Error", "New password must be at least 8 characters")
+                    return
                 new_entry.focus()
                 return
                 
             if new != confirm:
-                progress_label.configure(text="❌ New passwords don't match", text_color="#FF4444")
+                try:
+                    progress_label.configure(text="❌ New passwords don't match", text_color="#FF4444")
+                except:
+                    messagebox.showerror("Error", "New passwords don't match")
+                    return
                 confirm_entry.focus()
                 return
                 
             if current == new:
-                progress_label.configure(text="❌ New password must be different from current", text_color="#FF4444")
+                try:
+                    progress_label.configure(text="❌ New password must be different from current", text_color="#FF4444")
+                except:
+                    messagebox.showerror("Error", "New password must be different from current")
+                    return
                 new_entry.focus()
                 return
             
-            # Show progress
-            progress_label.configure(text="🔄 Changing password...", text_color="#FFAA44")
-            dialog.update()
+            try:
+                progress_label.configure(text="🔄 Changing password...", text_color="#FFAA44")
+                dialog.update()
+            except:
+                pass
             
             try:
-                # Attempt to change password
                 self.database.change_master_password(current, new)
                 
-                # Success feedback
-                progress_label.configure(text="✅ Password changed successfully!", text_color="#00FF00")
-                dialog.update()
+                try:
+                    progress_label.configure(text="✅ Password changed successfully!", text_color="#00FF00")
+                    dialog.update()
+                except:
+                    pass
                 
-                # Show success message
                 messagebox.showinfo("Success", 
                                 "Master password changed successfully!\n\n"
                                 "Your new password is now active and all data has been re-encrypted.")
-                
-                # Close dialog
                 dialog.destroy()
-                
-                # Optional: Test the new password immediately
-                self.test_new_password(new)
+                self.verify_new_password(new)
                 
             except ValueError as ve:
                 error_msg = str(ve)
                 if "Current password is incorrect" in error_msg:
-                    progress_label.configure(text="❌ Current password is incorrect", text_color="#FF4444")
+                    try:
+                        progress_label.configure(text="❌ Current password is incorrect", text_color="#FF4444")
+                    except:
+                        messagebox.showerror("Error", "Current password is incorrect")
                     current_entry.focus()
                     current_entry.select_range(0, tk.END)
                 else:
-                    progress_label.configure(text=f"❌ {error_msg}", text_color="#FF4444")
+                    try:
+                        progress_label.configure(text=f"❌ {error_msg}", text_color="#FF4444")
+                    except:
+                        messagebox.showerror("Error", error_msg)
                     
             except Exception as e:
                 error_msg = f"Password change failed: {str(e)}"
                 print(f"❌ PASSWORD CHANGE ERROR: {error_msg}")
-                progress_label.configure(text="❌ Password change failed", text_color="#FF4444")
-                messagebox.showerror("Error", error_msg)
+                try:
+                    progress_label.configure(text="❌ Password change failed", text_color="#FF4444")
+                except:
+                    messagebox.showerror("Error", "Password change failed")
         
-        def test_new_password(new_password):
-            """Test that the new password works correctly"""
-            try:
-                print("🧪 TESTING: Verifying new password works...")
-                
-                # Create a temporary database instance to test authentication
-                temp_db = DatabaseManager(self.database.db_path, self.crypto, self.secure_file_manager)
-                
-                if temp_db.authenticate(new_password):
-                    print("✅ TESTING: New password verification successful")
-                    messagebox.showinfo("Verification", 
-                                    "Password change verified successfully!\n"
-                                    "Your new password is working correctly.")
-                else:
-                    print("❌ TESTING: New password verification failed")
-                    messagebox.showwarning("Verification Warning", 
-                                        "Password was changed but verification failed.\n"
-                                        "Please try logging in again.")
-                    
-            except Exception as e:
-                print(f"❌ TESTING: Password verification error: {e}")
-                messagebox.showwarning("Verification Warning", 
-                                    f"Password was changed but couldn't verify: {str(e)}")
-        
-        # Buttons
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
         
@@ -1977,17 +1915,37 @@ Permissions Secure: {'✅ Yes' if status.get('permissions_secure', False) else '
                                 font=ctk.CTkFont(size=16, weight="bold"))
         change_btn.pack(side="right", padx=15)
         
-        # Bind Enter key to password change
         def on_enter(event):
             validate_and_change_password()
         
         current_entry.bind('<Return>', on_enter)
         new_entry.bind('<Return>', on_enter)
         confirm_entry.bind('<Return>', on_enter)
-        
-        # Focus on current password field
         current_entry.focus()
-        
+
+    def verify_new_password(self, new_password):
+        """Test that the new password works correctly"""
+        try:
+            print("🧪 TESTING: Verifying new password works...")
+            
+            temp_db = DatabaseManager(self.database.db_path, self.crypto, self.secure_file_manager)
+            
+            if temp_db.authenticate(new_password):
+                print("✅ TESTING: New password verification successful")
+                messagebox.showinfo("Verification", 
+                                "Password change verified successfully!\n"
+                                "Your new password is working correctly.")
+            else:
+                print("❌ TESTING: New password verification failed")
+                messagebox.showwarning("Verification Warning", 
+                                    "Password was changed but verification failed.\n"
+                                    "Please try logging in again.")
+                
+        except Exception as e:
+            print(f"❌ TESTING: Password verification error: {e}")
+            messagebox.showwarning("Verification Warning", 
+                                f"Password was changed but couldn't verify: {str(e)}")
+                                        
     def show_passwords(self):
         for widget in self.main_panel.winfo_children():
             widget.destroy()
