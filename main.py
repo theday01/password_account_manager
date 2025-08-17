@@ -20,8 +20,45 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 from secure_file_manager import SecureFileManager, SecureVaultSetup, SecurityMonitor, setup_secure_vault
-from secure_backup_manager import SecureBackupManager, BackupGUI, BackupScheduler
+from backup_manager import BackupManager, BackupError
+from PIL import Image
 
+restore_icon = ctk.CTkImage(
+    light_image=Image.open("icons/backup.png"),   # path to your icon
+    size=(24, 24)  # adjust size
+)
+log = ctk.CTkImage(
+    light_image=Image.open("icons/log.png"),   # path to your icon
+    size=(24, 24)  # adjust size
+)
+logout = ctk.CTkImage(
+    light_image=Image.open("icons/logout.png"),   # path to your icon
+    size=(24, 24)  # adjust size
+)
+password = ctk.CTkImage(
+    light_image=Image.open("icons/password.png"),   # path to your icon
+    size=(24, 24)  # adjust size
+)
+security = ctk.CTkImage(
+    light_image=Image.open("icons/security.png"),   # path to your icon
+    size=(24, 24)  # adjust size
+)
+settings = ctk.CTkImage(
+    light_image=Image.open("icons/settings.png"),   # path to your icon
+    size=(24, 24)  # adjust size
+)
+upload = ctk.CTkImage(
+    light_image=Image.open("icons/upload.png"),   # path to your icon
+    size=(24, 24)  # adjust size
+)
+user = ctk.CTkImage(
+    light_image=Image.open("icons/user.png"),   # path to your icon
+    size=(24, 24)  # adjust size
+)
+save = ctk.CTkImage(
+    light_image=Image.open("icons/save.png"),   # path to your icon
+    size=(24, 24)  # adjust size
+)
 class SecurityLevel(Enum):
     LOW = 1
     MEDIUM = 2
@@ -678,75 +715,6 @@ class DatabaseManager:
         """, (datetime.now().isoformat(), action, entity_type, entity_id, details))
         metadata_conn.commit()
         metadata_conn.close()
-
-class BackupManager:
-    def __init__(self, crypto_manager: CryptoManager, secure_file_manager=None):
-        self.crypto = crypto_manager
-        self.secure_file_manager = secure_file_manager
-    
-    def create_backup(self, db_path: str, backup_path: str, master_password: str) -> bool:
-        try:
-            backup_salt = self.crypto.generate_salt()
-            backup_key = self.crypto.generate_key_from_password(master_password, backup_salt)
-            if hasattr(self, 'secure_file_manager') and self.secure_file_manager:
-                files_to_backup = [
-                    self.secure_file_manager.get_metadata_db_path(),
-                    self.secure_file_manager.get_sensitive_db_path(),
-                    self.secure_file_manager.get_salt_path(),
-                    self.secure_file_manager.get_integrity_path()
-                ]
-            else:
-                files_to_backup = [
-                    f"{db_path}_metadata.db",
-                    f"{db_path}_sensitive.db",
-                    f"{db_path}_salt",
-                    f"{db_path}_integrity"
-                ]
-            backup_data = {
-                'timestamp': datetime.now().isoformat(),
-                'version': '1.0',
-                'files': {}
-            }
-            for file_path in files_to_backup:
-                if os.path.exists(file_path):
-                    with open(file_path, 'rb') as f:
-                        file_data = f.read()
-                    encrypted_file = self.crypto.encrypt_data(
-                        base64.b64encode(file_data).decode(), 
-                        backup_key
-                    )
-                    backup_data['files'][os.path.basename(file_path)] = base64.b64encode(encrypted_file).decode()
-            backup_json = json.dumps(backup_data)
-            final_encrypted_backup = self.crypto.encrypt_data(backup_json, backup_key)
-            with open(backup_path, 'wb') as f:
-                f.write(backup_salt + final_encrypted_backup)
-            return True
-        except Exception as e:
-            print(f"Backup creation failed: {e}")
-            return False
-    
-    def restore_backup(self, backup_path: str, restore_path: str, master_password: str) -> bool:
-        try:
-            with open(backup_path, 'rb') as f:
-                backup_content = f.read()
-            backup_salt = backup_content[:32]
-            encrypted_backup = backup_content[32:]
-            backup_key = self.crypto.generate_key_from_password(master_password, backup_salt)
-            decrypted_json = self.crypto.decrypt_data(encrypted_backup, backup_key)
-            backup_data = json.loads(decrypted_json)
-            for filename, encrypted_file_data in backup_data['files'].items():
-                encrypted_file = base64.b64decode(encrypted_file_data.encode())
-                decrypted_file_data = self.crypto.decrypt_data(encrypted_file, backup_key)
-                file_data = base64.b64decode(decrypted_file_data.encode())
-                
-                restore_file_path = os.path.join(restore_path, filename)
-                with open(restore_file_path, 'wb') as f:
-                    f.write(file_data)
-            return True
-        except Exception as e:
-            print(f"Backup restoration failed: {e}")
-            return False
-
 class ModernPasswordManagerGUI:
     def __init__(self):
         self.crypto = CryptoManager()
@@ -754,7 +722,6 @@ class ModernPasswordManagerGUI:
         self.database = None
         self.secure_file_manager = None
         self.security_monitor = None
-        self.backup_manager = BackupManager(self.crypto)
         ctk.set_appearance_mode("dark")  
         self.root = ctk.CTk()
         self.root.title("Secure Password Manager")
@@ -770,17 +737,6 @@ class ModernPasswordManagerGUI:
         self.validate_lockout_integrity()
         self.setup_ui()
         self.start_lockout_validation_timer()
-        self.backup_gui = None
-        self._initialize_backup_system()
-
-    def _initialize_backup_system(self):
-        try:
-            print("🔧 BACKUP: Initializing enhanced backup system...")
-            self.backup_gui = BackupGUI(self)
-            print("✅ BACKUP: Enhanced backup system initialized successfully")
-        except Exception as e:
-            print(f"❌ BACKUP: Failed to initialize backup system: {e}")
-            self.backup_gui = None
 
     def _setup_secure_file_manager(self):
         try:
@@ -1203,7 +1159,7 @@ class ModernPasswordManagerGUI:
             return False
         
         try:
-            temp_db = DatabaseManager(self.database.db_path, self.crypto)
+            temp_db = DatabaseManager(self.database.db_path, self.crypto, self.secure_file_manager)
             if temp_db.authenticate(result["password"]):
                 return True
             else:
@@ -1311,21 +1267,47 @@ class ModernPasswordManagerGUI:
         
         ctk.CTkButton(
             toolbar, 
-            text="🔒 Logout", 
+            text="Logout", 
             width=100, 
             height=55,
+            image=logout,
+            compound="left",  # icon on the left, text on the right
             command=self.lock_vault,
             font=ctk.CTkFont(size=18)
         ).pack(side="right", padx=10, pady=8)
         
         ctk.CTkButton(
             toolbar, 
-            text="⚙️ Settings", 
+            text="Settings", 
             width=120, 
             height=55,
+            image=settings,
+            compound="left",  # icon on the left, text on the right
             command=self.show_settings,
             font=ctk.CTkFont(size=18)
         ).pack(side="right", padx=10, pady=8)
+
+        ctk.CTkButton(
+            toolbar,
+            text="Backup",
+            width=120,
+            height=55,
+            image=save,
+            compound="left",  # icon on the left, text on the right            
+            command=self.show_backup_dialog,
+            font=ctk.CTkFont(size=18)
+        ).pack(side="right", padx=10, pady=8)
+
+        ctk.CTkButton(
+            toolbar,
+            text="Restore old backup",
+            width=160,
+            height=55,
+            image=restore_icon,
+            compound="left",  # icon on the left, text on the right
+            command=self.show_restore_dialog,
+            font=ctk.CTkFont(size=16)
+        ).pack(side="right", padx=8, pady=8)
         
         content_frame = ctk.CTkFrame(self.main_frame)
         content_frame.pack(fill="both", expand=True, padx=10, pady=10)
@@ -1335,6 +1317,393 @@ class ModernPasswordManagerGUI:
         self.main_panel.pack(side="right", fill="both", expand=True, padx=10, pady=10)
         self.show_passwords()
 
+    def show_restore_dialog(self):
+        import glob, os, tempfile, shutil, json, sys
+        from datetime import datetime
+        import tkinter as tk
+        import tkinter.simpledialog as simpledialog
+        from tkinter import messagebox
+        from backup_manager import BackupManager, BackupError
+
+        if not getattr(self, "database", None):
+            messagebox.showerror("Error", "Database not available. Please log in first.")
+            return
+
+        backup_folder = os.path.join(os.getcwd(), "backups")
+        os.makedirs(backup_folder, exist_ok=True)
+        backups = sorted(glob.glob(os.path.join(backup_folder, "*.svbk")), reverse=True)
+
+        if not backups:
+            messagebox.showinfo("No backups found", "No backup files were found in ./backups/")
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title("Restore Backup")
+        win.geometry("820x480")
+        win.resizable(True, True)
+
+        top_frame = tk.Frame(win)
+        top_frame.pack(fill="x", padx=12, pady=(12,6))
+
+        tk.Label(top_frame, text="Available backups (most recent first):", anchor="w", font=("TkDefaultFont", 10, "bold")).pack(anchor="w")
+
+        info_label = tk.Label(top_frame, text="Select a backup to see details", anchor="w", justify="left")
+        info_label.pack(fill="x", pady=(6,0))
+
+        listbox_frame = tk.Frame(win)
+        listbox_frame.pack(fill="both", expand=False, padx=12, pady=(8,6))
+
+        scrollbar = tk.Scrollbar(listbox_frame)
+        scrollbar.pack(side="right", fill="y")
+
+        listbox = tk.Listbox(listbox_frame, yscrollcommand=scrollbar.set, width=120, height=10)
+        for i, path in enumerate(backups):
+            fname = os.path.basename(path)
+            listbox.insert("end", f"{i+1}. {fname}")
+        listbox.pack(side="left", fill="both", expand=True)
+        scrollbar.config(command=listbox.yview)
+
+        preview_lbl = tk.Label(win, text="Preview / Manifest (enter code to view):", anchor="w")
+        preview_lbl.pack(fill="x", padx=12)
+        preview_text = tk.Text(win, height=10, wrap="word")
+        preview_text.pack(fill="both", padx=12, pady=(4,8), expand=True)
+        preview_text.configure(state="disabled")
+
+        btn_frame = tk.Frame(win)
+        btn_frame.pack(fill="x", padx=12, pady=(6,12))
+
+        status_var = tk.StringVar(value="")
+        status_label = tk.Label(win, textvariable=status_var, anchor="w", fg="blue")
+        status_label.pack(fill="x", padx=12, pady=(0,8))
+
+        def on_selection(event=None):
+            sel = listbox.curselection()
+            if not sel:
+                info_label.config(text="Select a backup to see details")
+                return
+            idx = sel[0]
+            path = backups[idx]
+            try:
+                size = os.path.getsize(path)
+                mtime = datetime.utcfromtimestamp(os.path.getmtime(path)).strftime("%Y-%m-%d %H:%M:%SZ")
+                info_text = f"File: {os.path.basename(path)}\nPath: {path}\nSize: {size:,} bytes\nLast modified (UTC): {mtime}\n\nTip: Use 'Preview contents' to view the manifest (requires backup code)."
+                info_label.config(text=info_text)
+            except Exception as e:
+                info_label.config(text=f"Error reading file info: {e}")
+
+        listbox.bind("<<ListboxSelect>>", on_selection)
+        on_selection()
+
+        def preview_contents():
+            sel = listbox.curselection()
+            if not sel:
+                messagebox.showerror("No selection", "Please select a backup to preview.")
+                return
+            idx = sel[0]
+            backup_path = backups[idx]
+
+            code = simpledialog.askstring("Backup Code", "Enter the backup code to preview this backup:", parent=win, show="*")
+            if code is None:
+                return
+
+            status_var.set("Previewing backup (decrypting)... this may take a moment")
+            win.update_idletasks()
+            tempdir = tempfile.mkdtemp(prefix="sv_preview_")
+            try:
+                bm = BackupManager(
+                    metadata_db_path=getattr(self.database, "metadata_db", os.path.join(os.getcwd(), "metadata.db")),
+                    sensitive_db_path=getattr(self.database, "sensitive_db", os.path.join(os.getcwd(), "sensitive.db")),
+                    salt_path=getattr(self.database, "salt_path", os.path.join(os.getcwd(), "salt_file")),
+                    integrity_path=getattr(self.database, "integrity_path", os.path.join(os.getcwd(), "integrity_file")),
+                    backups_dir=backup_folder
+                )
+                try:
+                    restored = bm.restore_backup(backup_path, code, restore_to_dir=tempdir)
+                except BackupError as be:
+                    messagebox.showerror("Preview failed", f"Failed to decrypt/preview backup: {be}")
+                    return
+                except Exception as e:
+                    messagebox.showerror("Preview failed", f"Unexpected error during preview: {e}")
+                    return
+
+                manifest_path = os.path.join(tempdir, "backup_manifest.json")
+                preview_text.configure(state="normal")
+                preview_text.delete("1.0", "end")
+                if os.path.exists(manifest_path):
+                    try:
+                        with open(manifest_path, "r", encoding="utf-8") as mf:
+                            manifest = json.load(mf)
+                        pretty = json.dumps(manifest, indent=2, ensure_ascii=False)
+                        preview_text.insert("1.0", pretty)
+                    except Exception as e:
+                        preview_text.insert("1.0", f"Failed to read manifest: {e}\n\nFiles restored to temp dir:\n" + "\n".join(os.path.basename(p) for p in restored))
+                else:
+                    preview_text.insert("1.0", "No manifest found. Files contained:\n" + "\n".join(os.path.basename(p) for p in restored))
+
+                preview_text.configure(state="disabled")
+            finally:
+                try:
+                    shutil.rmtree(tempdir)
+                except Exception:
+                    pass
+                status_var.set("Preview complete")
+
+        def perform_restore():
+            sel = listbox.curselection()
+            if not sel:
+                messagebox.showerror("No selection", "Please select a backup to restore.")
+                return
+            idx = sel[0]
+            backup_path = backups[idx]
+
+            code = simpledialog.askstring("Backup Code", "Enter the backup code for this file:", parent=win, show="*")
+            if code is None:
+                return
+
+            proceed = messagebox.askyesno(
+                "Confirm restore",
+                "Restoring will overwrite the active vault files. A backup of existing files will be created (suffix .bak.TIMESTAMP). Proceed?"
+            )
+            if not proceed:
+                return
+
+            status_var.set("Restoring backup... please wait")
+            win.update_idletasks()
+            tempdir = tempfile.mkdtemp(prefix="sv_restore_")
+            try:
+                bm = BackupManager(
+                    metadata_db_path=getattr(self.database, "metadata_db", os.path.join(os.getcwd(), "metadata.db")),
+                    sensitive_db_path=getattr(self.database, "sensitive_db", os.path.join(os.getcwd(), "sensitive.db")),
+                    salt_path=getattr(self.database, "salt_path", os.path.join(os.getcwd(), "salt_file")),
+                    integrity_path=getattr(self.database, "integrity_path", os.path.join(os.getcwd(), "integrity_file")),
+                    backups_dir=backup_folder
+                )
+
+                try:
+                    restored = bm.restore_backup(backup_path, code, restore_to_dir=tempdir)
+                except BackupError as be:
+                    shutil.rmtree(tempdir, ignore_errors=True)
+                    messagebox.showerror("Restore failed", f"Failed to decrypt/restore backup: {be}")
+                    status_var.set("")
+                    return
+                except Exception as e:
+                    shutil.rmtree(tempdir, ignore_errors=True)
+                    messagebox.showerror("Restore failed", f"Unexpected error while restoring: {e}")
+                    status_var.set("")
+                    return
+
+                metadata_db_path = getattr(self.database, "metadata_db", None)
+                if metadata_db_path:
+                    vault_dir = os.path.dirname(metadata_db_path) or os.getcwd()
+                else:
+                    vault_dir = os.path.join(os.getcwd(), "secure_vault")
+                os.makedirs(vault_dir, exist_ok=True)
+
+                timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+                backups_created = []
+                moved = []
+
+                for fpath in restored:
+                    base = os.path.basename(fpath)
+                    if base == "backup_manifest.json":
+                        continue
+                    dest = os.path.join(vault_dir, base)
+                    if os.path.exists(dest):
+                        bak_name = f"{dest}.bak.{timestamp}"
+                        shutil.move(dest, bak_name)
+                        backups_created.append(bak_name)
+                    shutil.move(fpath, dest)
+                    moved.append(dest)
+
+                shutil.rmtree(tempdir, ignore_errors=True)
+                status_var.set("Restore complete")
+                message = f"Restore complete.\n\nRestored files:\n" + "\n".join(os.path.basename(p) for p in moved)
+                if backups_created:
+                    message += "\n\nBackups of previous files:\n" + "\n".join(backups_created)
+                message += ("\n\nIMPORTANT: The program must be restarted for changes to take full effect.\n"
+                            "Please save your work. Do you want to exit the program now?")
+
+                if messagebox.askyesno("Restore complete - Exit now?", message):
+                    try:
+                        try:
+                            self.root.destroy()
+                        except Exception:
+                            pass
+                        sys.exit(0)
+                    except SystemExit:
+                        raise
+                    except Exception as e:
+                        messagebox.showinfo("Exit failed", f"Automatic exit failed: {e}\nPlease close the program manually.")
+                else:
+                    messagebox.showinfo("Restore complete", "Restore complete. Please restart the program later for changes to take effect.")
+                win.destroy()
+            except Exception as e:
+                messagebox.showerror("Restore error", f"An error occurred during restore: {e}")
+                status_var.set("")
+                try:
+                    shutil.rmtree(tempdir, ignore_errors=True)
+                except Exception:
+                    pass
+
+        preview_btn = tk.Button(btn_frame, text="Preview contents", command=preview_contents, width=18)
+        preview_btn.pack(side="left", padx=(0,8))
+
+        restore_btn = tk.Button(btn_frame, text="Restore Selected Backup", command=perform_restore, width=22)
+        restore_btn.pack(side="left", padx=(0,8))
+
+        close_btn = tk.Button(btn_frame, text="Close", command=win.destroy, width=12)
+        close_btn.pack(side="right")
+
+        win.transient(self.root)
+        win.grab_set()
+        win.focus_force()
+
+    def show_backup_dialog(self):
+        import tkinter.simpledialog as simpledialog
+        if not self.database:
+            messagebox.showerror("Error", "Database is not available (not authenticated).")
+            return
+
+        dialog = ctk.CTkToplevel(self.root)
+        dialog.title("🛡️ Create Secure Backup")
+        dialog.geometry("630x730")
+        dialog.grab_set()
+        dialog.resizable(False, False)
+
+        main_frame = ctk.CTkFrame(dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(main_frame, text="🔐 Create Encrypted Backup", 
+                    font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(20, 10))
+
+        warning_frame = ctk.CTkFrame(main_frame, fg_color="#2b1515")  # Dark red background
+        warning_frame.pack(fill="x", padx=10, pady=15)
+
+        ctk.CTkLabel(warning_frame, text="⚠️ CRITICAL SECURITY WARNINGS", 
+                    font=ctk.CTkFont(size=18, weight="bold"), 
+                    text_color="#ff4444").pack(pady=(15, 10))
+
+        warnings_text = """🚨 BACKUP CODE IS EXTREMELY IMPORTANT:
+    • If you LOSE your backup code, your backup is PERMANENTLY UNUSABLE
+    • Write down your backup code on PAPER and store it SAFELY
+    • DO NOT store the backup code digitally on the same device
+    • Consider storing the code in multiple SECURE physical locations
+
+    🔒 BACKUP SECURITY BEST PRACTICES:
+    • Use a STRONG, UNIQUE backup code (minimum 12 characters)
+    • Include uppercase, lowercase, numbers, and symbols
+    • NEVER share your backup code with anyone
+    • Store backups and codes in SEPARATE secure locations
+
+    💾 BACKUP FILE SAFETY:
+    • Store backup files (.svbk) in secure, encrypted storage
+    • Make multiple copies in different safe locations
+    • Test your backup restoration periodically
+    • Keep backup codes separate from backup files"""
+
+        warning_label = ctk.CTkLabel(warning_frame, text=warnings_text, 
+                                    font=ctk.CTkFont(size=12), 
+                                    text_color="#ff6666",
+                                    justify="left")
+        warning_label.pack(padx=15, pady=(0, 15))
+
+        code_frame = ctk.CTkFrame(main_frame)
+        code_frame.pack(fill="x", padx=10, pady=10)
+
+        ctk.CTkLabel(code_frame, text="Enter Backup Code:", 
+                    font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(15, 5))
+
+        ctk.CTkLabel(code_frame, text="⚠️ Remember: This code is required to restore your backup!", 
+                    font=ctk.CTkFont(size=12), 
+                    text_color="#ff4444").pack(pady=(0, 10))
+
+        code_entry = ctk.CTkEntry(code_frame, width=400, height=40, show="*",
+                                placeholder_text="Enter a strong backup code...")
+        code_entry.pack(pady=(0, 10))
+
+        def toggle_code_visibility():
+            if code_entry.cget("show") == "*":
+                code_entry.configure(show="")
+                show_btn.configure(text="🙈 Hide")
+            else:
+                code_entry.configure(show="*")
+                show_btn.configure(text="👁️ Show")
+
+        show_btn = ctk.CTkButton(code_frame, text="👁️ Show", width=80, height=30,
+                                command=toggle_code_visibility)
+        show_btn.pack(pady=(0, 15))
+
+        def create_backup():
+            code = code_entry.get().strip()
+            if not code:
+                messagebox.showerror("Error", "⚠️ Backup code is required!")
+                return
+
+            if len(code) < 8:
+                messagebox.showerror("Error", "⚠️ Backup code must be at least 8 characters long!")
+                return
+            confirm_msg = f"""⚠️ FINAL CONFIRMATION ⚠️
+
+    You are about to create an encrypted backup with the code you entered.
+
+    🚨 CRITICAL REMINDERS:
+    • Have you written down your backup code on PAPER?
+    • Have you stored it in a SAFE, SECURE location?
+    • Do you understand that WITHOUT this code, your backup is USELESS?
+
+    Backup code length: {len(code)} characters
+
+    Are you absolutely sure you want to proceed?"""
+
+            if not messagebox.askyesno("🔐 Final Backup Confirmation", confirm_msg):
+                return
+            try:
+                if self.secure_file_manager:
+                    self.secure_file_manager.sync_all_files()
+
+                bm = BackupManager(
+                    metadata_db_path=self.database.metadata_db,
+                    sensitive_db_path=self.database.sensitive_db,
+                    salt_path=self.database.salt_path,
+                    integrity_path=self.database.integrity_path,
+                    backups_dir="backups"
+                )
+                out_path = bm.create_backup(code)
+                
+                success_msg = f"""✅ Backup Created Successfully!
+
+    📁 Backup saved to: {out_path}
+
+    🚨 IMPORTANT NEXT STEPS:
+    1. ✍️ Write your backup code on PAPER immediately
+    2. 🏦 Store the code in a SECURE location (safe, bank vault, etc.)
+    3. 💾 Copy the backup file to MULTIPLE secure locations
+    4. 🧪 Test your backup by attempting to restore it
+    5. 🔄 Create regular backups and update storage locations
+
+    ⚠️ Remember: Your backup is only as secure as your backup code storage!"""
+                
+                messagebox.showinfo("🎉 Backup Complete", success_msg)
+                dialog.destroy()
+                
+            except Exception as e:
+                messagebox.showerror("❌ Backup Failed", 
+                                f"Failed to create backup:\n\n{str(e)}\n\n"
+                                f"Please check your permissions and try again.")
+
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(pady=20)
+
+        ctk.CTkButton(button_frame, text="Cancel", 
+                    command=dialog.destroy, 
+                    width=120, height=45).pack(side="left", padx=15)
+
+        ctk.CTkButton(button_frame, text="🔐 Create Backup", 
+                    command=create_backup,
+                    width=180, height=45, 
+                    font=ctk.CTkFont(size=16, weight="bold")).pack(side="right", padx=15)
+        code_entry.focus()
+        
     def create_sidebar(self, parent):
         self.sidebar = ctk.CTkFrame(parent, width=280)
         self.sidebar.pack(side="left", fill="y", padx=10, pady=10)
@@ -1345,31 +1714,42 @@ class ModernPasswordManagerGUI:
             text="Navigation", 
             font=ctk.CTkFont(size=18, weight="bold")
         ).pack(pady=(20, 15), padx=15)
+
         self.sidebar_buttons = []
         self.active_button = None
-        
+
+        # Load sidebar icons (adjust paths to your actual icon files)
+        icon_accounts   = ctk.CTkImage(Image.open("icons/user.png"), size=(24, 24))
+        icon_generator  = ctk.CTkImage(Image.open("icons/password.png"), size=(24, 24))
+        icon_report     = ctk.CTkImage(Image.open("icons/security.png"), size=(24, 24))
+        icon_audit      = ctk.CTkImage(Image.open("icons/log.png"), size=(24, 24))
+
+        # Sidebar configs (text, icon, callback)
         sidebar_configs = [
-            ("🗝️ Your Accounts", self.show_passwords),
-            ("🛠️ Password Generator", self.show_password_generator),
-            ("🛡️ Security Report", self.show_security_report),
-            ("💾 Backup & Restore", self.show_backup_restore_enhanced),  # Enhanced backup
-            ("📜 Audit Log", self.show_audit_log),
-            ("📁 Backup Manager", self.show_backup_folder_manager)  # New backup manager
+            ("Your Accounts", icon_accounts, self.show_passwords),
+            ("Password Generator", icon_generator, self.show_password_generator),
+            ("Security Report", icon_report, self.show_security_report),
+            ("Audit Log", icon_audit, self.show_audit_log),
         ]
-        for text, command in sidebar_configs:
+
+        # Create sidebar buttons
+        for text, icon, command in sidebar_configs:
             btn = ctk.CTkButton(
-                self.sidebar, 
-                text=text, 
+                self.sidebar,
+                text=text,
+                image=icon,
+                compound="left",         # show icon + text
+                anchor="w",              # left-align content
                 command=lambda cmd=command, txt=text: self.handle_sidebar_click(cmd, txt),
                 height=60,
-                font=ctk.CTkFont(size=20),
+                font=ctk.CTkFont(size=18),
                 corner_radius=10,
                 fg_color=("gray75", "gray25"),
                 hover_color=("gray70", "gray30")
             )
             btn.pack(fill="x", padx=15, pady=10)
             self.sidebar_buttons.append(btn)
-        
+
         if self.sidebar_buttons:
             self.set_active_button(self.sidebar_buttons[0])
     
@@ -1394,133 +1774,8 @@ class ModernPasswordManagerGUI:
             )
             self.active_button = active_button
 
-
-    def show_backup_restore_enhanced(self):
-        if self.backup_gui:
-            self.backup_gui.show_backup_restore_enhanced()
-        else:
-            messagebox.showerror("Error", "Enhanced backup system is not available. Please restart the application.")
-            self.show_backup_restore_fallback()
-    
-    def show_backup_folder_manager(self):
-        if self.backup_gui:
-            self.backup_gui.open_backup_folder()
-        else:
-            messagebox.showinfo("Backup Folder", "Enhanced backup system is not available.")
-    
-    def show_backup_restore_fallback(self):
-        for widget in self.main_panel.winfo_children():
-            widget.destroy()
-        
-        header = ctk.CTkFrame(self.main_panel)
-        header.pack(fill="x", padx=15, pady=15)
-        
-        ctk.CTkLabel(header, text="♻️ Backup & Restore", 
-                     font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
-        
-        content = ctk.CTkFrame(self.main_panel)
-        content.pack(fill="both", expand=True, padx=15, pady=15)
-        
-        backup_frame = ctk.CTkFrame(content)
-        backup_frame.pack(fill="x", padx=20, pady=20)
-        
-        ctk.CTkLabel(backup_frame, text="💾 Create Backup", 
-                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
-        ctk.CTkLabel(backup_frame, text="Create an encrypted backup of all your data", 
-                     text_color="#888888").pack(pady=5)
-        ctk.CTkButton(backup_frame, text="Create Backup", 
-                      command=self.create_backup_dialog_simple, height=45,
-                      font=ctk.CTkFont(size=16)).pack(pady=15)
-        restore_frame = ctk.CTkFrame(content)
-        restore_frame.pack(fill="x", padx=20, pady=20)
-        ctk.CTkLabel(restore_frame, text="📥 Restore from Backup", 
-                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
-        ctk.CTkLabel(restore_frame, text="Restore your data from an encrypted backup file", 
-                     text_color="#888888").pack(pady=5)
-        ctk.CTkButton(restore_frame, text="Restore Backup", 
-                      command=self.restore_backup_dialog_simple, height=45,
-                      font=ctk.CTkFont(size=16)).pack(pady=15)
-    
-    def create_backup_dialog_simple(self):
-        backup_path = filedialog.asksaveasfilename(
-            title="Save Backup File",
-            defaultextension=".vault",
-            filetypes=[("Vault Backup", "*.vault"), ("All Files", "*.*")]
-        )
-        if backup_path:
-            if not self.verify_master_password_dialog():
-                return
-            master_password = self.get_master_password_for_backup()
-            if master_password:
-                try:
-                    success = self.backup_manager.create_backup(self.database.db_path, backup_path, master_password)
-                    if success:
-                        messagebox.showinfo("Success", f"Backup created successfully!\n\nSaved to: {backup_path}")
-                    else:
-                        messagebox.showerror("Error", "Failed to create backup")
-                except Exception as e:
-                    messagebox.showerror("Error", f"Backup creation failed: {str(e)}")
-
-    def restore_backup_dialog_simple(self):
-        backup_path = filedialog.askopenfilename(
-            title="Select Backup File",
-            filetypes=[("Vault Backup", "*.vault"), ("SecureVault Backup", "*.svault"), ("All Files", "*.*")]
-        )
-        if backup_path:
-            result = messagebox.askyesnocancel(
-                "Restore Backup",
-                "Restoring from backup will replace ALL current data.\n\nThis action cannot be undone!\n\nDo you want to continue?"
-            )
-            if result:
-                master_password = self.get_master_password_for_backup()
-                if master_password:
-                    try:
-                        restore_dir = os.path.dirname(self.database.db_path)
-                        success = self.backup_manager.restore_backup(backup_path, restore_dir, master_password)
-                        if success:
-                            messagebox.showinfo("Success", "Backup restored successfully!\n\nPlease restart the application.")
-                            self.root.quit()
-                        else:
-                            messagebox.showerror("Error", "Failed to restore backup")
-                    except Exception as e:
-                        messagebox.showerror("Error", f"Backup restoration failed: {str(e)}")
-    
-    def get_master_password_for_backup(self):
-        dialog = ctk.CTkToplevel(self.root)
-        dialog.title("Enter Master Password")
-        dialog.geometry("400x200")
-        dialog.grab_set()
-        result = {"password": None}
-        main_frame = ctk.CTkFrame(dialog)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        ctk.CTkLabel(main_frame, text="Enter Master Password for Backup",
-                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=15)
-        password_entry = ctk.CTkEntry(main_frame, width=300, height=40, show="*")
-        password_entry.pack(pady=15)
-        password_entry.focus()
-        
-        def on_ok():
-            result["password"] = password_entry.get()
-            dialog.destroy()
-        
-        def on_cancel():
-            dialog.destroy()
-        password_entry.bind('<Return>', lambda e: on_ok())
-        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        button_frame.pack(pady=10)
-        
-        ctk.CTkButton(button_frame, text="Cancel", command=on_cancel, width=100).pack(side="left", padx=10)
-        ctk.CTkButton(button_frame, text="OK", command=on_ok, width=100).pack(side="right", padx=10)
-        
-        dialog.wait_window()
-        return result["password"]
-    
     def lock_vault(self):
         try:
-            if self.backup_gui and hasattr(self.backup_gui, 'backup_scheduler') and self.backup_gui.backup_scheduler:
-                self.backup_gui.backup_scheduler.stop_automatic_backups()
-                print("🛑 BACKUP: Stopped automatic backups during vault lock")
             if self.secure_file_manager and self.authenticated:
                 print("🔒 SECURITY: Syncing files to secure storage before lock...")
                 self.secure_file_manager.sync_all_files()
@@ -1549,10 +1804,6 @@ class ModernPasswordManagerGUI:
         try:
             self.root.mainloop()
         finally:
-            if self.backup_gui and hasattr(self.backup_gui, 'backup_scheduler') and self.backup_gui.backup_scheduler:
-                print("🛑 BACKUP: Stopping automatic backups...")
-                self.backup_gui.backup_scheduler.stop_automatic_backups()
-            
             if self.secure_file_manager:
                 print("🧹 CLEANUP: Performing final sync and cleanup...")
                 try:
@@ -2041,9 +2292,9 @@ Permissions Secure: {'✅ Yes' if status.get('permissions_secure', False) else '
         button_frame.pack()
         buttons = [
             ("👁️ View", lambda: self.view_account_details(account)),
-            ("📋 Copy", lambda: self.copy_password_to_clipboard(account)),
-            ("✏️ Edit", lambda: self.show_account_dialog(account)),
-            ("🗑️ Delete", lambda: self.delete_account(account))
+            ("📋 Copy Password", lambda: self.copy_password_to_clipboard(account)),
+            ("✏️ Edit Data", lambda: self.show_account_dialog(account)),
+            ("🗑️ Delete Account", lambda: self.delete_account(account))
         ]
         if account['url'] and account['url'] != "No URL":
             buttons.insert(2, ("🌐 Open", lambda: self.open_website(account)))
@@ -2542,114 +2793,6 @@ Duplicate Passwords: {len(duplicate_passwords)}
             ctk.CTkLabel(content, text=f"Error generating security report: {str(e)}", 
                          text_color="#FF4444").pack(pady=20)
 
-    def show_backup_restore(self):
-        for widget in self.main_panel.winfo_children():
-            widget.destroy()
-        header = ctk.CTkFrame(self.main_panel)
-        header.pack(fill="x", padx=15, pady=15)
-        
-        ctk.CTkLabel(header, text="♻️ Backup & Restore", 
-                     font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
-        
-        content = ctk.CTkFrame(self.main_panel)
-        content.pack(fill="both", expand=True, padx=15, pady=15)
-        backup_frame = ctk.CTkFrame(content)
-        backup_frame.pack(fill="x", padx=20, pady=20)
-        
-        ctk.CTkLabel(backup_frame, text="💾 Create Backup", 
-                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
-        ctk.CTkLabel(backup_frame, text="Create an encrypted backup of all your data", 
-                     text_color="#888888").pack(pady=5)
-        ctk.CTkButton(backup_frame, text="Create Backup", 
-                      command=self.create_backup_dialog, height=45,
-                      font=ctk.CTkFont(size=16)).pack(pady=15)
-        
-        restore_frame = ctk.CTkFrame(content)
-        restore_frame.pack(fill="x", padx=20, pady=20)
-        
-        ctk.CTkLabel(restore_frame, text="📥 Restore from Backup", 
-                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
-        ctk.CTkLabel(restore_frame, text="Restore your data from an encrypted backup file", 
-                     text_color="#888888").pack(pady=5)
-        ctk.CTkButton(restore_frame, text="Restore Backup", 
-                      command=self.restore_backup_dialog, height=45,
-                      font=ctk.CTkFont(size=16)).pack(pady=15)
-
-    def create_backup_dialog(self):
-        backup_path = filedialog.asksaveasfilename(
-            title="Save Backup File",
-            defaultextension=".vault",
-            filetypes=[("Vault Backup", "*.vault"), ("All Files", "*.*")]
-        )
-        if backup_path:
-            if not self.verify_master_password_dialog():
-                return
-            master_password = self.get_master_password_for_backup()
-            if master_password:
-                try:
-                    success = self.backup_manager.create_backup(self.database.db_path, backup_path, master_password)
-                    if success:
-                        messagebox.showinfo("Success", f"Backup created successfully!\n\nSaved to: {backup_path}")
-                    else:
-                        messagebox.showerror("Error", "Failed to create backup")
-                except Exception as e:
-                    messagebox.showerror("Error", f"Backup creation failed: {str(e)}")
-
-    def restore_backup_dialog(self):
-        backup_path = filedialog.askopenfilename(
-            title="Select Backup File",
-            filetypes=[("Vault Backup", "*.vault"), ("All Files", "*.*")]
-        )
-        if backup_path:
-            result = messagebox.askyesnocancel(
-                "Restore Backup",
-                "Restoring from backup will replace ALL current data.\n\nThis action cannot be undone!\n\nDo you want to continue?"
-            )
-            if result:
-                master_password = self.get_master_password_for_backup()
-                if master_password:
-                    try:
-                        restore_dir = os.path.dirname(self.database.db_path)
-                        success = self.backup_manager.restore_backup(backup_path, restore_dir, master_password)
-                        if success:
-                            messagebox.showinfo("Success", "Backup restored successfully!\n\nPlease restart the application.")
-                            self.root.quit()
-                        else:
-                            messagebox.showerror("Error", "Failed to restore backup")
-                    except Exception as e:
-                        messagebox.showerror("Error", f"Backup restoration failed: {str(e)}")
-
-    def get_master_password_for_backup(self):
-        dialog = ctk.CTkToplevel(self.root)
-        dialog.title("Enter Master Password")
-        dialog.geometry("400x200")
-        dialog.grab_set()
-        result = {"password": None}
-        main_frame = ctk.CTkFrame(dialog)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        ctk.CTkLabel(main_frame, text="Enter Master Password for Backup",
-                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=15)
-        
-        password_entry = ctk.CTkEntry(main_frame, width=300, height=40, show="*")
-        password_entry.pack(pady=15)
-        password_entry.focus()
-        
-        def on_ok():
-            result["password"] = password_entry.get()
-            dialog.destroy()
-        
-        def on_cancel():
-            dialog.destroy()
-        password_entry.bind('<Return>', lambda e: on_ok())
-        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        button_frame.pack(pady=10)
-        
-        ctk.CTkButton(button_frame, text="Cancel", command=on_cancel, width=100).pack(side="left", padx=10)
-        ctk.CTkButton(button_frame, text="OK", command=on_ok, width=100).pack(side="right", padx=10)
-        dialog.wait_window()
-        return result["password"]
-
     def show_audit_log(self):
         for widget in self.main_panel.winfo_children():
             widget.destroy()
@@ -2843,14 +2986,11 @@ Duplicate Passwords: {len(duplicate_passwords)}
                     print(f"Cleanup error: {e}")
 
 def main():
-    """Enhanced main function with backup system and desktop integration"""
     try:
         print("🚀 STARTUP: Starting SecureVault Password Manager...")
         ModernPasswordManagerGUI.create_desktop_integration()
         app = ModernPasswordManagerGUI()
         print("✅ STARTUP: Application initialized successfully")
-        print("💾 BACKUP: Enhanced backup system ready")
-        print("📁 FOLDER: Backup folder shortcuts created")
         app.run()
         
     except Exception as e:
