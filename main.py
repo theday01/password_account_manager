@@ -236,10 +236,10 @@ class DatabaseManager:
         self.crypto = crypto_manager
         self.secure_file_manager = secure_file_manager
         if secure_file_manager:
-            self.metadata_db = secure_file_manager.get_metadata_db_path()
-            self.sensitive_db = secure_file_manager.get_sensitive_db_path()
-            self.salt_path = secure_file_manager.get_salt_path()
-            self.integrity_path = secure_file_manager.get_integrity_path()
+            self.metadata_db = secure_file_manager.metadata_db
+            self.sensitive_db = secure_file_manager.sensitive_db
+            self.salt_path = secure_file_manager.salt_path
+            self.integrity_path = secure_file_manager.signature_path
         else:
             self.metadata_db = f"{db_path}_metadata.db"
             self.sensitive_db = f"{db_path}_sensitive.db"
@@ -265,7 +265,7 @@ class DatabaseManager:
         try:
             metadata_conn = sqlite3.connect(self.metadata_db)
             metadata_conn.execute("""
-                CREATE TABLE accounts (
+                CREATE TABLE IF NOT EXISTS accounts (
                     id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
                     email TEXT,
@@ -278,7 +278,7 @@ class DatabaseManager:
                 )
             """)
             metadata_conn.execute("""
-                CREATE TABLE audit_log (
+                CREATE TABLE IF NOT EXISTS audit_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT,
                     action TEXT,
@@ -296,7 +296,7 @@ class DatabaseManager:
         try:
             sensitive_conn = sqlite3.connect(self.sensitive_db)
             sensitive_conn.execute("""
-                CREATE TABLE credentials (
+                CREATE TABLE IF NOT EXISTS credentials (
                     account_id TEXT PRIMARY KEY,
                     encrypted_username BLOB,
                     encrypted_password BLOB
@@ -905,7 +905,7 @@ class ModernPasswordManagerGUI:
     def is_vault_initialized(self):
         legacy_exists = os.path.exists("manageyouraccount_salt")
         if self.secure_file_manager:
-            secure_exists = self.secure_file_manager.file_exists('salt_file')
+            secure_exists = os.path.exists(self.secure_file_manager.salt_path)
             return legacy_exists or secure_exists
         return legacy_exists
 
@@ -1685,7 +1685,6 @@ class ModernPasswordManagerGUI:
                 
                 messagebox.showinfo("🎉 Backup Complete", success_msg)
                 dialog.destroy()
-                
             except Exception as e:
                 messagebox.showerror("❌ Backup Failed", 
                                 f"Failed to create backup:\n\n{str(e)}\n\n"
@@ -1693,11 +1692,9 @@ class ModernPasswordManagerGUI:
 
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
-
         ctk.CTkButton(button_frame, text="Cancel", 
                     command=dialog.destroy, 
                     width=120, height=45).pack(side="left", padx=15)
-
         ctk.CTkButton(button_frame, text="🔐 Create Backup", 
                     command=create_backup,
                     width=180, height=45, 
@@ -1708,31 +1705,24 @@ class ModernPasswordManagerGUI:
         self.sidebar = ctk.CTkFrame(parent, width=280)
         self.sidebar.pack(side="left", fill="y", padx=10, pady=10)
         self.sidebar.pack_propagate(False)
-        
         ctk.CTkLabel(
             self.sidebar, 
             text="Navigation", 
             font=ctk.CTkFont(size=18, weight="bold")
         ).pack(pady=(20, 15), padx=15)
-
         self.sidebar_buttons = []
         self.active_button = None
-
-        # Load sidebar icons (adjust paths to your actual icon files)
         icon_accounts   = ctk.CTkImage(Image.open("icons/user.png"), size=(24, 24))
         icon_generator  = ctk.CTkImage(Image.open("icons/password.png"), size=(24, 24))
         icon_report     = ctk.CTkImage(Image.open("icons/security.png"), size=(24, 24))
         icon_audit      = ctk.CTkImage(Image.open("icons/log.png"), size=(24, 24))
 
-        # Sidebar configs (text, icon, callback)
         sidebar_configs = [
             ("Your Accounts", icon_accounts, self.show_passwords),
             ("Password Generator", icon_generator, self.show_password_generator),
             ("Security Report", icon_report, self.show_security_report),
             ("Audit Log", icon_audit, self.show_audit_log),
         ]
-
-        # Create sidebar buttons
         for text, icon, command in sidebar_configs:
             btn = ctk.CTkButton(
                 self.sidebar,
@@ -1749,7 +1739,6 @@ class ModernPasswordManagerGUI:
             )
             btn.pack(fill="x", padx=15, pady=10)
             self.sidebar_buttons.append(btn)
-
         if self.sidebar_buttons:
             self.set_active_button(self.sidebar_buttons[0])
     
@@ -1902,32 +1891,66 @@ class ModernPasswordManagerGUI:
         ctk.CTkLabel(main_frame, text="🛡️ Security Status", 
                     font=ctk.CTkFont(size=24, weight="bold")).pack(pady=20)
         
-        status = self.secure_file_manager.get_security_status()
-        
-        status_text = f"""
-Secure Storage Location: {status.get('secure_location', 'Unknown')}
-Protected Files Count: {status.get('files_count', 0)}
-Last Integrity Check: {status.get('last_integrity_check', 'Never')}
-Permissions Secure: {'✅ Yes' if status.get('permissions_secure', False) else '❌ No'}
-        """
-        
-        if self.security_monitor:
-            threat_level = self.security_monitor.get_threat_level()
-            status_text += f"\nThreat Level: {threat_level}"
+        try:
+            secure_location = os.path.abspath(self.secure_file_manager.secure_dir)
+            vault_files = self.secure_file_manager.list_vault_files()
+            files_count = len([f for f in vault_files if os.path.exists(f)])
+            integrity_ok = self.secure_file_manager.verify_integrity()
+            file_hashes = self.secure_file_manager.list_files_with_hashes()
+            last_integrity_check = "Never"
+            if os.path.exists(self.secure_file_manager.signature_path):
+                try:
+                    from datetime import datetime
+                    mtime = os.path.getmtime(self.secure_file_manager.signature_path)
+                    last_integrity_check = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    last_integrity_check = "Unknown"
+            permissions_secure = True
+            try:
+                for vault_file in vault_files:
+                    if os.path.exists(vault_file):
+                        mode = os.stat(vault_file).st_mode
+                        if os.name == 'posix':
+                            import stat
+                            if bool(mode & (stat.S_IROTH | stat.S_IWOTH)):
+                                permissions_secure = False
+                                break
+            except Exception:
+                permissions_secure = False
+            status_text = f"""
+    Secure Storage Location: {secure_location}
+    Protected Files Count: {files_count}
+    Last Integrity Check: {last_integrity_check}
+    Integrity Status: {'✅ Valid' if integrity_ok else '❌ Failed'}
+    Permissions Secure: {'✅ Yes' if permissions_secure else '❌ No'}
+    Encryption Enabled: {'✅ Yes' if self.secure_file_manager.encryption_key else '❌ No'}
+            """
+            if self.security_monitor:
+                threat_level = self.security_monitor.get_threat_level()
+                status_text += f"\nThreat Level: {threat_level}"
+        except Exception as e:
+            status_text = f"Error retrieving security status: {str(e)}"
         
         ctk.CTkLabel(main_frame, text=status_text, 
                     font=ctk.CTkFont(size=14, family="monospace"),
                     justify="left").pack(pady=20, padx=20)
         
         def run_integrity_check():
-            if self.secure_file_manager.perform_integrity_check():
+            if self.secure_file_manager.verify_integrity():
                 messagebox.showinfo("Integrity Check", "✅ All files passed integrity verification")
             else:
                 messagebox.showerror("Integrity Check", "❌ File integrity check failed!")
-        
         ctk.CTkButton(main_frame, text="🔍 Run Integrity Check", 
                     command=run_integrity_check, height=40).pack(pady=10)
-        
+        def rotate_signature():
+            if self.secure_file_manager.rotate_integrity_signature():
+                messagebox.showinfo("Signature Update", "✅ Integrity signature updated successfully")
+                status_window.destroy()
+                self.show_security_status()  # Refresh the window
+            else:
+                messagebox.showerror("Signature Update", "❌ Failed to update integrity signature")
+        ctk.CTkButton(main_frame, text="🔄 Update Integrity Signature", 
+                    command=rotate_signature, height=40).pack(pady=5)
         ctk.CTkButton(main_frame, text="Close", 
                     command=status_window.destroy, height=40).pack(pady=20)
 

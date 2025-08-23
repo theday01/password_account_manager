@@ -133,6 +133,91 @@ class SecureFileManager:
         self.sensitive_db = os.path.join(self.secure_dir, "sensitive.db")
         self.settings_path = os.path.join(self.secure_dir, "settings.json")
 
+
+    def get_security_status(self) -> Dict:
+        """Return a comprehensive security status report for the UI.
+        
+        Returns a dictionary with security information including:
+        - secure_location: path to the secure directory
+        - files_count: number of vault files present
+        - last_integrity_check: timestamp of last integrity verification
+        - permissions_secure: boolean indicating if permissions are properly set
+        - file_hashes: dictionary of file hashes for verification
+        - vault_initialized: whether the vault has been properly initialized
+        """
+        try:
+            # Get basic vault information
+            vault_files = [f for f in self.list_vault_files() if os.path.exists(f)]
+            files_count = len(vault_files)
+            
+            # Check if vault is initialized
+            vault_initialized = (
+                os.path.exists(self.metadata_db) and 
+                os.path.exists(self.sensitive_db) and 
+                os.path.exists(self.salt_path)
+            )
+            
+            # Verify current integrity
+            integrity_ok = self.verify_integrity()
+            
+            # Check permissions (best effort)
+            permissions_secure = True
+            try:
+                for vault_file in vault_files:
+                    if os.path.exists(vault_file):
+                        mode = os.stat(vault_file).st_mode
+                        # Check if file is world-readable or world-writable
+                        if os.name == 'posix':
+                            if bool(mode & (stat.S_IROTH | stat.S_IWOTH)):
+                                permissions_secure = False
+                                break
+            except Exception:
+                permissions_secure = False
+            
+            # Get file hashes for verification
+            file_hashes = self.list_files_with_hashes()
+            
+            # Get last integrity check timestamp
+            last_integrity_check = "Never"
+            if os.path.exists(self.signature_path):
+                try:
+                    mtime = os.path.getmtime(self.signature_path)
+                    last_integrity_check = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    last_integrity_check = "Unknown"
+            
+            return {
+                "secure_location": os.path.abspath(self.secure_dir),
+                "files_count": files_count,
+                "last_integrity_check": last_integrity_check,
+                "permissions_secure": permissions_secure,
+                "file_hashes": file_hashes,
+                "vault_initialized": vault_initialized,
+                "integrity_ok": integrity_ok,
+                "encryption_enabled": self.encryption_key is not None
+            }
+            
+        except Exception as e:
+            LOG.exception("Failed to get security status")
+            return {
+                "secure_location": os.path.abspath(self.secure_dir),
+                "files_count": 0,
+                "last_integrity_check": "Error",
+                "permissions_secure": False,
+                "file_hashes": {},
+                "vault_initialized": False,
+                "integrity_ok": False,
+                "encryption_enabled": False,
+                "error": str(e)
+            }
+
+    def perform_integrity_check(self) -> bool:
+        """Perform an integrity check and return True if successful.
+        
+        This is a convenience method that wraps verify_integrity() for UI compatibility.
+        """
+        return self.verify_integrity()
+        
     # --- path helpers ---
     def list_vault_files(self) -> List[str]:
         return [self.metadata_db, self.sensitive_db, self.salt_path, self.signature_path, self.settings_path]
