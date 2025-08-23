@@ -1187,6 +1187,9 @@ class ModernPasswordManagerGUI:
         if not master_password or master_password != confirm_password:
             messagebox.showerror("Error", "Passwords don't match or are empty")
             return
+        if len(master_password) < 16:
+            messagebox.showerror("Error", "Password must be at least 16 characters long.")
+            return
         try:
             if self.secure_file_manager:
                 if not self.secure_file_manager.initialize_encryption(master_password):
@@ -2291,7 +2294,7 @@ class ModernPasswordManagerGUI:
     def show_error_message(self, message):
         frame = ctk.CTkFrame(self.passwords_container)
         frame.pack(fill="x", padx=10, pady=20)
-        ctk.CTkLabel(frame, text=f"❌ {message}", 
+        ctk.CTkLabel(frame, text=f"❌ {message} , please re-start program or contact developer", 
                      font=ctk.CTkFont(size=14), 
                      text_color="#FF4444").pack(pady=20)
 
