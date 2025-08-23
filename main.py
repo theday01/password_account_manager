@@ -679,7 +679,7 @@ class ModernPasswordManagerGUI:
         self.settings = {}
         self.consecutive_lockouts = 0
         self.inactivity_timer = None
-        self.INACTIVITY_TIMEOUT = 3 * 60 * 1000  # 3 minutes in milliseconds
+        self.INACTIVITY_TIMEOUT = 2 * 60 * 1000  # 2 minutes in milliseconds
         self._setup_secure_file_manager()
         self.load_settings()
         self.validate_lockout_integrity()
@@ -1144,7 +1144,8 @@ class ModernPasswordManagerGUI:
         self.update_login_button_states()
         setup_window = ctk.CTkToplevel(self.root)
         setup_window.title("SecureVault Setup Wizard")
-        setup_window.geometry("600x400")
+        setup_window.geometry("600x370")
+        setup_window.resizable(0,0)
         setup_window.grab_set()
         main_frame = ctk.CTkFrame(setup_window)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -1528,7 +1529,7 @@ class ModernPasswordManagerGUI:
             return
 
         dialog = ctk.CTkToplevel(self.root)
-        dialog.title("🛡️ Create Secure Backup")
+        dialog.title("Create Secure Backup")
         dialog.geometry("630x730")
         dialog.grab_set()
         dialog.resizable(False, False)
@@ -1850,7 +1851,7 @@ class ModernPasswordManagerGUI:
     def show_settings(self):
         settings_window = ctk.CTkToplevel(self.root)
         settings_window.title("Password Vault Settings")
-        settings_window.geometry("500x600")
+        settings_window.geometry("500x500")
         settings_window.grab_set()
         settings_window.resizable(False, False)
         
@@ -1890,7 +1891,7 @@ class ModernPasswordManagerGUI:
         ctk.CTkLabel(timeout_frame, text="Automatic Logout",
                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
 
-        ctk.CTkLabel(timeout_frame, text="For your security, the application will automatically\nlock and close after 3 minutes of inactivity.",
+        ctk.CTkLabel(timeout_frame, text="For your security, the application will automatically\nlock and close after 2 minutes of inactivity",
                     font=ctk.CTkFont(size=12)).pack(pady=10)
 
     def show_tfa_dialog(self):
@@ -1903,7 +1904,7 @@ class ModernPasswordManagerGUI:
     def enable_tfa_dialog(self):
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("Enable Two-Factor Authentication")
-        dialog.geometry("380x480")
+        dialog.geometry("380x550")
         dialog.resizable(False, False)
         dialog.grab_set()
         
@@ -2379,7 +2380,8 @@ class ModernPasswordManagerGUI:
         username, password = self.database.get_account_credentials(account["id"])
         dialog = ctk.CTkToplevel(self.root)
         dialog.title(f"Account Details - {account['name']}")
-        dialog.geometry("500x600")
+        dialog.geometry("500x770")
+        dialog.resizable(0,0)
         dialog.grab_set()
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -2465,6 +2467,7 @@ class ModernPasswordManagerGUI:
         dialog = ctk.CTkToplevel(self.root)
         dialog.title(title)
         dialog.geometry("550x720")
+        dialog.resizable(0,0)
         dialog.grab_set()
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
