@@ -5,6 +5,7 @@ import time
 import shutil
 from datetime import datetime
 from typing import List, Optional
+import logging
 
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
@@ -20,6 +21,7 @@ class BackupManager:
     HEADER = b"SVBK1"  # file signature / version
 
     def __init__(self, metadata_db_path: str, sensitive_db_path: str, salt_path: str, integrity_path: str, backups_dir: str = "backups"):
+        self.logger = logging.getLogger(__name__)
         self.metadata_db_path = metadata_db_path
         self.sensitive_db_path = sensitive_db_path
         self.salt_path = salt_path
@@ -65,11 +67,16 @@ class BackupManager:
         The produced file format (binary):
           HEADER(5) | salt(32) | iv(16) | tag(16) | ciphertext(...)
         """
+        self.logger.info("Creating a new backup...")
         if not backup_code or not backup_code.strip():
+            self.logger.error("Backup creation failed: Backup code is required.")
             raise BackupError("Backup code is required")
         files = self._collect_files()
         if not files:
+            self.logger.error("Backup creation failed: No vault files found to back up.")
             raise BackupError("No vault files found to back up")
+
+        self.logger.info(f"Found {len(files)} files to back up.")
 
         # create in-memory zip
         zip_buffer = io.BytesIO()
@@ -104,6 +111,7 @@ class BackupManager:
             f.write(tag)
             f.write(ciphertext)
 
+        self.logger.info(f"Backup created successfully at {out_path}")
         return out_path
 
     def list_backups(self) -> List[str]:
@@ -115,14 +123,18 @@ class BackupManager:
         Returns list of restored file paths.
         Throws BackupError on failure (including wrong code).
         """
+        self.logger.info(f"Restoring backup from {backup_file_path}...")
         if not os.path.exists(backup_file_path):
+            self.logger.error(f"Restore failed: Backup file not found at {backup_file_path}")
             raise BackupError("Backup file not found")
         if not backup_code or not backup_code.strip():
+            self.logger.error("Restore failed: Backup code is required.")
             raise BackupError("Backup code is required to restore")
 
         with open(backup_file_path, "rb") as f:
             header = f.read(len(self.HEADER))
             if header != self.HEADER:
+                self.logger.error("Restore failed: Invalid backup file header.")
                 raise BackupError("Invalid backup file (bad header)")
             salt = f.read(32)
             iv = f.read(16)
@@ -133,10 +145,12 @@ class BackupManager:
         try:
             zip_bytes = self._gcm_decrypt(iv, tag, ciphertext, key)
         except Exception as e:
+            self.logger.error("Failed to decrypt backup - wrong code or corrupted file.", exc_info=True)
             raise BackupError("Failed to decrypt backup - wrong code or corrupted file") from e
 
         restore_dir = restore_to_dir or os.getcwd()
         os.makedirs(restore_dir, exist_ok=True)
+        self.logger.info(f"Restoring files to {restore_dir}")
 
         restored_files = []
         zip_buffer = io.BytesIO(zip_bytes)
@@ -145,12 +159,14 @@ class BackupManager:
                 # protect against zip-slip
                 member_path = os.path.normpath(member)
                 if member_path.startswith("..") or os.path.isabs(member_path):
+                    self.logger.warning(f"Skipping potentially malicious zip member: {member}")
                     continue
                 out_path = os.path.join(restore_dir, os.path.basename(member_path))
                 with zf.open(member) as src, open(out_path, "wb") as dst:
                     shutil.copyfileobj(src, dst)
                 restored_files.append(out_path)
 
+        self.logger.info(f"Restored {len(restored_files)} files successfully.")
         return restored_files
 
 

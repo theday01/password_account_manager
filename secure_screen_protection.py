@@ -23,14 +23,7 @@ try:
 except Exception:
     PSUTIL_AVAILABLE = False
 
-# Configure logging (writes to security_audit.log by default)
-logger = logging.getLogger("ScreenProtector")
-logger.setLevel(logging.INFO)
-handler = logging.FileHandler("security_audit.log")
-formatter = logging.Formatter("[%(asctime)s] SCREEN_PROTECTOR: %(message)s")
-handler.setFormatter(formatter)
-if not logger.handlers:
-    logger.addHandler(handler)
+logger = logging.getLogger(__name__)
 
 
 # Common recorder/screencap process names (lowercase). Extend as needed.
@@ -82,8 +75,7 @@ class ScreenProtector:
         self._running = True
         self._thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self._thread.start()
-        logger.info("Screen protector started (action=%s, clipboard_check=%s, psutil=%s)",
-                    self.action, self.enable_clipboard_check, PSUTIL_AVAILABLE)
+        logger.info("Screen protector started (action=%s, clipboard_check=%s, psutil=%s)", self.action, self.enable_clipboard_check, PSUTIL_AVAILABLE)
 
     def stop(self):
         self._running = False

@@ -22,6 +22,10 @@ import customtkinter as ctk
 from secure_file_manager import SecureFileManager, SecureVaultSetup, SecurityMonitor, setup_secure_vault
 from backup_manager import BackupManager, BackupError
 from PIL import Image
+import logging
+from audit_logger import setup_logging
+
+logger = logging.getLogger(__name__)
 
 restore_icon = ctk.CTkImage(
     light_image=Image.open("icons/backup.png"),   # path to your icon
@@ -128,6 +132,7 @@ class CryptoManager:
 
 class PasswordGenerator:
     def __init__(self):
+        self.logger = logging.getLogger(__name__)
         self.lowercase = "abcdefghijklmnopqrstuvwxyz"
         self.uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         self.digits = "0123456789"
@@ -162,6 +167,7 @@ class PasswordGenerator:
         for _ in range(length - len(password)):
             password.append(secrets.choice(charset))
         secrets.SystemRandom().shuffle(password)
+        self.logger.info(f"Generated a new password of length {length}.")
         return ''.join(password)
 
     def assess_strength(self, password: str) -> Tuple[int, str, List[str]]:
@@ -250,17 +256,17 @@ class DatabaseManager:
         self.last_integrity_error = False
         
     def initialize_database(self, master_password: str):
-        print("🔧 DATABASE: Starting database initialization...")
+        logger.info("Starting database initialization...")
         salt = self.crypto.generate_salt()
         self.encryption_key = self.crypto.generate_key_from_password(master_password, salt)
         self.integrity_key = self.crypto.generate_key_from_password(master_password + "_integrity", salt)
-        print(f"✅ DATABASE: Generated salt ({len(salt)} bytes) and encryption keys")
+        logger.info(f"Generated salt ({len(salt)} bytes) and encryption keys")
         try:
             with open(self.salt_path, "wb") as f:
                 f.write(salt)
-            print(f"✅ DATABASE: Salt saved to {self.salt_path}")
+            logger.info(f"Salt saved to {self.salt_path}")
         except Exception as e:
-            print(f"❌ DATABASE: Failed to save salt: {e}")
+            logger.error(f"Failed to save salt: {e}")
             raise
         try:
             metadata_conn = sqlite3.connect(self.metadata_db)
@@ -289,9 +295,9 @@ class DatabaseManager:
             """)
             metadata_conn.commit()
             metadata_conn.close()
-            print("✅ DATABASE: Metadata database created")
+            logger.info("Metadata database created")
         except Exception as e:
-            print(f"❌ DATABASE: Failed to create metadata database: {e}")
+            logger.error(f"Failed to create metadata database: {e}")
             raise
         try:
             sensitive_conn = sqlite3.connect(self.sensitive_db)
@@ -304,12 +310,12 @@ class DatabaseManager:
             """)
             sensitive_conn.commit()
             sensitive_conn.close()
-            print("✅ DATABASE: Sensitive database created")
+            logger.info("Sensitive database created")
         except Exception as e:
-            print(f"❌ DATABASE: Failed to create sensitive database: {e}")
+            logger.error(f"Failed to create sensitive database: {e}")
             raise
         try:
-            print("🔑 DATABASE: Creating master account for authentication...")
+            logger.info("Creating master account for authentication...")
             encrypted_username = self.crypto.encrypt_data("master", self.encryption_key)
             encrypted_password = self.crypto.encrypt_data(master_password, self.encryption_key)
             metadata_conn = sqlite3.connect(self.metadata_db)
@@ -336,71 +342,71 @@ class DatabaseManager:
             """, ("master_account", encrypted_username, encrypted_password))
             sensitive_conn.commit()
             sensitive_conn.close()
-            print("✅ DATABASE: Master account created successfully")
+            logger.info("Master account created successfully")
         except Exception as e:
-            print(f"❌ DATABASE: Failed to create master account: {e}")
+            logger.error(f"Failed to create master account: {e}")
             raise
         try:
             self.update_integrity_signature()
-            print("✅ DATABASE: Integrity signature created")
+            logger.info("Integrity signature created")
         except Exception as e:
-            print(f"❌ DATABASE: Failed to create integrity signature: {e}")
+            logger.error(f"Failed to create integrity signature: {e}")
             raise
         try:
-            print("🧪 DATABASE: Testing authentication with new password...")
+            logger.info("Testing authentication with new password...")
             if self.authenticate(master_password):
-                print("✅ DATABASE: Authentication test successful")
+                logger.info("Authentication test successful")
             else:
-                print("❌ DATABASE: Authentication test failed")
+                logger.error("Authentication test failed")
                 raise Exception("Authentication test failed after initialization")
         except Exception as e:
-            print(f"❌ DATABASE: Authentication test error: {e}")
+            logger.error(f"Authentication test error: {e}")
             raise
         self.log_action("CREATE", "SYSTEM", "database", "Database initialized successfully")
-        print("🎉 DATABASE: Database initialization completed successfully!")  
+        logger.info("Database initialization completed successfully!")
                 
     def authenticate(self, master_password: str) -> bool:
         try:
-            print(f"🔐 AUTH: Attempting authentication...")
-            print(f"🔐 AUTH: Salt path: {self.salt_path}")
-            print(f"🔐 AUTH: Metadata DB path: {self.metadata_db}")
-            print(f"🔐 AUTH: Sensitive DB path: {self.sensitive_db}")
-            print(f"🔐 AUTH: Integrity path: {self.integrity_path}")
+            logger.info("Attempting authentication...")
+            logger.info(f"Salt path: {self.salt_path}")
+            logger.info(f"Metadata DB path: {self.metadata_db}")
+            logger.info(f"Sensitive DB path: {self.sensitive_db}")
+            logger.info(f"Integrity path: {self.integrity_path}")
             required_files = [self.salt_path, self.metadata_db, self.sensitive_db]
             missing_files = [f for f in required_files if not os.path.exists(f)]
             if missing_files:
-                print(f"❌ AUTH: Missing required files: {missing_files}")
+                logger.error(f"Missing required files: {missing_files}")
                 return False
             if not os.path.exists(self.salt_path):
-                print(f"❌ AUTH: Salt file not found at {self.salt_path}")
+                logger.error(f"Salt file not found at {self.salt_path}")
                 return False
             with open(self.salt_path, "rb") as f:
                 salt = f.read()
-            print(f"✅ AUTH: Salt loaded successfully ({len(salt)} bytes)")
+            logger.info(f"Salt loaded successfully ({len(salt)} bytes)")
             self.encryption_key = self.crypto.generate_key_from_password(master_password, salt)
             self.integrity_key = self.crypto.generate_key_from_password(master_password + "_integrity", salt)
-            print("✅ AUTH: Encryption keys generated")
+            logger.info("Encryption keys generated")
             integrity_valid = self.verify_database_integrity()
-            print(f"🔐 AUTH: Database integrity check: {'✅ PASSED' if integrity_valid else '❌ FAILED'}")
+            logger.info(f"Database integrity check: {'PASSED' if integrity_valid else 'FAILED'}")
             if not integrity_valid:
-                print("❌ AUTH: Database integrity check failed")
+                logger.error("Database integrity check failed")
                 self.last_integrity_error = True
-                print("🔄 AUTH: Attempting integrity recovery...")
+                logger.info("Attempting integrity recovery...")
                 try:
                     if self.update_integrity_signature():
-                        print("✅ AUTH: Integrity signature regenerated, retrying verification...")
+                        logger.info("Integrity signature regenerated, retrying verification...")
                         integrity_valid = self.verify_database_integrity()
                         if integrity_valid:
-                            print("✅ AUTH: Integrity recovery successful")
+                            logger.info("Integrity recovery successful")
                             self.last_integrity_error = False
                         else:
-                            print("❌ AUTH: Integrity recovery failed")
+                            logger.error("Integrity recovery failed")
                             return False
                     else:
-                        print("❌ AUTH: Failed to regenerate integrity signature")
+                        logger.error("Failed to regenerate integrity signature")
                         return False
                 except Exception as recovery_error:
-                    print(f"❌ AUTH: Integrity recovery error: {recovery_error}")
+                    logger.error(f"Integrity recovery error: {recovery_error}")
                     return False
             try:
                 sensitive_conn = sqlite3.connect(self.sensitive_db)
@@ -416,66 +422,66 @@ class DatabaseManager:
                     try:
                         test_username = self.crypto.decrypt_data(test_row[0], self.encryption_key)
                         test_password = self.crypto.decrypt_data(test_row[1], self.encryption_key)
-                        print("✅ AUTH: Test decryption successful")
+                        logger.info("Test decryption successful")
                     except Exception as decrypt_error:
-                        print(f"❌ AUTH: Test decryption failed: {decrypt_error}")
+                        logger.error(f"Test decryption failed: {decrypt_error}")
                         return False
                 else:
-                    print("⚠️ AUTH: No master account found for test decryption")
+                    logger.warning("No master account found for test decryption")
             except Exception as test_error:
-                print(f"❌ AUTH: Database test failed: {test_error}")
+                logger.error(f"Database test failed: {test_error}")
                 return False
-            print("🎉 AUTH: Authentication successful!")
+            logger.info("Authentication successful!")
             return True
         except FileNotFoundError as e:
-            print(f"❌ AUTH: Required file not found: {e}")
+            logger.error(f"Required file not found: {e}")
             return False
         except Exception as e:
-            print(f"❌ AUTH: Authentication error: {e}")
-            print(f"🔍 AUTH: Error type: {type(e).__name__}")
+            logger.error(f"Authentication error: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
             import traceback
             traceback.print_exc()
             return False
                 
     def verify_database_integrity(self) -> bool:
         try:
-            print(f"🔍 INTEGRITY: Checking database integrity...")
-            print(f"🔍 INTEGRITY: Integrity file path: {self.integrity_path}")
+            logger.info("Checking database integrity...")
+            logger.info(f"Integrity file path: {self.integrity_path}")
             if not os.path.exists(self.integrity_path):
-                print(f"🔍 INTEGRITY: No integrity file found, creating new signature...")
+                logger.info("No integrity file found, creating new signature...")
                 self.update_integrity_signature()
                 return True
             try:
                 with open(self.integrity_path, "rb") as f:
                     stored_signature = f.read()
-                print(f"🔍 INTEGRITY: Stored signature loaded ({len(stored_signature)} bytes)")
+                logger.info(f"Stored signature loaded ({len(stored_signature)} bytes)")
             except Exception as e:
-                print(f"❌ INTEGRITY: Failed to read stored signature: {e}")
+                logger.error(f"Failed to read stored signature: {e}")
                 return False
             try:
                 current_signature = self.calculate_database_signature()
-                print(f"🔍 INTEGRITY: Current signature calculated ({len(current_signature)} bytes)")
+                logger.info(f"Current signature calculated ({len(current_signature)} bytes)")
             except Exception as e:
-                print(f"❌ INTEGRITY: Failed to calculate current signature: {e}")
+                logger.error(f"Failed to calculate current signature: {e}")
                 return False
             try:
                 is_valid = self.crypto.verify_hmac(current_signature, stored_signature, self.integrity_key)
-                print(f"🔍 INTEGRITY: HMAC verification: {'✅ PASSED' if is_valid else '❌ FAILED'}")
+                logger.info(f"HMAC verification: {'PASSED' if is_valid else 'FAILED'}")
                 if not is_valid:
-                    print(f"⚠️ INTEGRITY: Signature mismatch detected, attempting to regenerate...")
+                    logger.warning("Signature mismatch detected, attempting to regenerate...")
                     try:
                         self.update_integrity_signature()
-                        print(f"✅ INTEGRITY: Signature regenerated successfully")
+                        logger.info("Signature regenerated successfully")
                         return True
                     except Exception as regen_error:
-                        print(f"❌ INTEGRITY: Failed to regenerate signature: {regen_error}")
+                        logger.error(f"Failed to regenerate signature: {regen_error}")
                         return False
                 return is_valid
             except Exception as e:
-                print(f"❌ INTEGRITY: HMAC verification error: {e}")
+                logger.error(f"HMAC verification error: {e}")
                 return False
         except Exception as e:
-            print(f"❌ INTEGRITY: Integrity check failed: {e}")
+            logger.error(f"Integrity check failed: {e}")
             return False
     
     def calculate_database_signature(self) -> bytes:
@@ -491,40 +497,40 @@ class DatabaseManager:
     def update_integrity_signature(self):
         try:
             if not self.integrity_key:
-                print(f"❌ INTEGRITY: Cannot update signature - no integrity key available")
+                logger.error("Cannot update signature - no integrity key available")
                 return False
-            print(f"🔍 INTEGRITY: Updating database integrity signature...")
+            logger.info("Updating database integrity signature...")
             signature_data = self.calculate_database_signature()
-            print(f"🔍 INTEGRITY: Signature data calculated ({len(signature_data)} bytes)")
+            logger.info(f"Signature data calculated ({len(signature_data)} bytes)")
             signature = self.crypto.generate_hmac(signature_data, self.integrity_key)
-            print(f"🔍 INTEGRITY: HMAC signature generated ({len(signature)} bytes)")
+            logger.info(f"HMAC signature generated ({len(signature)} bytes)")
             with open(self.integrity_path, "wb") as f:
                 f.write(signature)
-            print(f"✅ INTEGRITY: Signature updated successfully to {self.integrity_path}")
+            logger.info(f"Signature updated successfully to {self.integrity_path}")
             return True
         except Exception as e:
-            print(f"❌ INTEGRITY: Failed to update signature: {e}")
+            logger.error(f"Failed to update signature: {e}")
             return False
     
     def force_integrity_reset(self):
         try:
-            print(f"⚠️ INTEGRITY: Force resetting integrity signature...")
+            logger.warning("Force resetting integrity signature...")
             if os.path.exists(self.integrity_path):
                 os.remove(self.integrity_path)
-                print(f"✅ INTEGRITY: Old integrity file removed")
+                logger.info("Old integrity file removed")
             if self.integrity_key:
                 success = self.update_integrity_signature()
                 if success:
-                    print(f"✅ INTEGRITY: New integrity signature created")
+                    logger.info("New integrity signature created")
                     return True
                 else:
-                    print(f"❌ INTEGRITY: Failed to create new integrity signature")
+                    logger.error("Failed to create new integrity signature")
                     return False
             else:
-                print(f"❌ INTEGRITY: No integrity key available for reset")
+                logger.error("No integrity key available for reset")
                 return False
         except Exception as e:
-            print(f"❌ INTEGRITY: Force reset failed: {e}")
+            logger.error(f"Force reset failed: {e}")
             return False
     
     def add_account(self, account: Account, username: str, password: str):
@@ -558,10 +564,10 @@ class DatabaseManager:
             sensitive_conn.commit()
             self.log_action("CREATE", "ACCOUNT", account.id, f"Created account: {account.name}")
             self.update_integrity_signature()
-            print(f"✅ DATABASE: Account '{account.name}' created successfully with ID: {account.id}")
+            logger.info(f"Account '{account.name}' created successfully with ID: {account.id}")
             
         except sqlite3.IntegrityError as e:
-            print(f"❌ DATABASE: Integrity error while creating account: {e}")
+            logger.error(f"Integrity error while creating account: {e}")
             try:
                 if metadata_conn:
                     metadata_conn.execute("DELETE FROM accounts WHERE id = ?", (account.id,))
@@ -570,10 +576,10 @@ class DatabaseManager:
                     sensitive_conn.execute("DELETE FROM credentials WHERE account_id = ?", (account.id,))
                     sensitive_conn.commit()
             except Exception as cleanup_error:
-                print(f"❌ DATABASE: Error during cleanup: {cleanup_error}")
+                logger.error(f"Error during cleanup: {cleanup_error}")
             raise e
         except Exception as e:
-            print(f"❌ DATABASE: Error creating account: {e}")
+            logger.error(f"Error creating account: {e}")
             try:
                 if metadata_conn:
                     metadata_conn.execute("DELETE FROM accounts WHERE id = ?", (account.id,))
@@ -582,7 +588,7 @@ class DatabaseManager:
                     sensitive_conn.execute("DELETE FROM credentials WHERE account_id = ?", (account.id,))
                     sensitive_conn.commit()
             except Exception as cleanup_error:
-                print(f"❌ DATABASE: Error during cleanup: {cleanup_error}")
+                logger.error(f"Error during cleanup: {cleanup_error}")
             raise e
         finally:
             if metadata_conn:
@@ -644,15 +650,15 @@ class DatabaseManager:
     def change_master_password(self, current_password: str, new_password: str):
         if not self.authenticate(current_password):
             raise ValueError("Current password is incorrect")
-        print("🔑 PASSWORD: Starting master password change process...")
+        logger.info("Starting master password change process...")
         new_salt = self.crypto.generate_salt()
         new_encryption_key = self.crypto.generate_key_from_password(new_password, new_salt)
         new_integrity_key = self.crypto.generate_key_from_password(new_password + "_integrity", new_salt)
-        print("🔑 PASSWORD: Generated new encryption keys")
+        logger.info("Generated new encryption keys")
         sensitive_conn = sqlite3.connect(self.sensitive_db)
         cursor = sensitive_conn.execute("SELECT account_id, encrypted_username, encrypted_password FROM credentials")
         credentials = cursor.fetchall()
-        print(f"🔑 PASSWORD: Found {len(credentials)} accounts to re-encrypt")
+        logger.info(f"Found {len(credentials)} accounts to re-encrypt")
         for account_id, enc_username, enc_password in credentials:
             try:
                 username = self.crypto.decrypt_data(enc_username, self.encryption_key)
@@ -665,49 +671,50 @@ class DatabaseManager:
                     WHERE account_id=?
                 """, (new_enc_username, new_enc_password, account_id))
                 
-                print(f"✅ PASSWORD: Re-encrypted credentials for account {account_id}")
+                logger.info(f"Re-encrypted credentials for account {account_id}")
             except Exception as e:
-                print(f"❌ PASSWORD: Failed to re-encrypt account {account_id}: {e}")
+                logger.error(f"Failed to re-encrypt account {account_id}: {e}")
                 sensitive_conn.close()
                 raise ValueError(f"Failed to re-encrypt account {account_id}: {e}")
         sensitive_conn.commit()
         sensitive_conn.close()
-        print("✅ PASSWORD: All credentials re-encrypted successfully")
+        logger.info("All credentials re-encrypted successfully")
         self.encryption_key = new_encryption_key
         self.integrity_key = new_integrity_key
         try:
             with open(self.salt_path, "wb") as f:
                 f.write(new_salt)
-            print(f"✅ PASSWORD: New salt written to {self.salt_path}")
+            logger.info(f"New salt written to {self.salt_path}")
         except Exception as e:
-            print(f"❌ PASSWORD: Failed to write salt file: {e}")
+            logger.error(f"Failed to write salt file: {e}")
             raise ValueError(f"Failed to write salt file: {e}")
         try:
             self.update_integrity_signature()
-            print("✅ PASSWORD: Integrity signature updated")
+            logger.info("Integrity signature updated")
         except Exception as e:
-            print(f"❌ PASSWORD: Failed to update integrity signature: {e}")
+            logger.error(f"Failed to update integrity signature: {e}")
             raise ValueError(f"Failed to update integrity signature: {e}")
         self.log_action("UPDATE", "SYSTEM", "master_password", "Master password changed successfully")
         if self.secure_file_manager:
             try:
                 self.secure_file_manager.sync_all_files()
-                print("✅ PASSWORD: Changes synced to secure storage")
+                logger.info("Changes synced to secure storage")
             except Exception as e:
-                print(f"⚠️ PASSWORD: Warning - failed to sync to secure storage: {e}")
-        print("🎉 PASSWORD: Master password change completed successfully!")
+                logger.warning(f"Failed to sync to secure storage: {e}")
+        logger.info("Master password change completed successfully!")
         try:
             test_encryption_key = self.crypto.generate_key_from_password(new_password, new_salt)
             if test_encryption_key == self.encryption_key:
-                print("✅ PASSWORD: New password verification successful")
+                logger.info("New password verification successful")
             else:
-                print("❌ PASSWORD: New password verification failed")
+                logger.error("New password verification failed")
                 raise ValueError("Password change verification failed")
         except Exception as e:
-            print(f"❌ PASSWORD: Verification error: {e}")
+            logger.error(f"Verification error: {e}")
             raise ValueError(f"Password change verification failed: {e}")    
 
     def log_action(self, action: str, entity_type: str, entity_id: str, details: str):
+        logger.info(f"DB Action: {action}, Type: {entity_type}, ID: {entity_id}, Details: {details}")
         metadata_conn = sqlite3.connect(self.metadata_db)
         metadata_conn.execute("""
             INSERT INTO audit_log (timestamp, action, entity_type, entity_id, details)
@@ -740,11 +747,11 @@ class ModernPasswordManagerGUI:
 
     def _setup_secure_file_manager(self):
         try:
-            print("🔧 SECURITY: Initializing secure file management system...")
+            logger.info("Initializing secure file management system...")
             self.secure_file_manager = SecureFileManager()
-            print("✅ SECURITY: Secure file manager initialized")
+            logger.info("Secure file manager initialized")
         except Exception as e:
-            print(f"❌ SECURITY: Failed to initialize secure file manager: {e}")
+            logger.error(f"Failed to initialize secure file manager: {e}")
             self.secure_file_manager = None
 
     def load_settings(self):
@@ -765,7 +772,7 @@ class ModernPasswordManagerGUI:
                     self.restore_lockout_state()
                     return
             except Exception as e:
-                print(f"Failed to load secure settings: {e}")
+                logger.error(f"Failed to load secure settings: {e}")
         settings_file = "vault_settings.json"
         try:
             if os.path.exists(settings_file):
@@ -776,12 +783,12 @@ class ModernPasswordManagerGUI:
                         try:
                             stored_time = float(loaded_settings['last_modified'])
                             if abs(current_file_time - stored_time) > 1:
-                                print("🔒 SECURITY: Settings file modification time mismatch detected")
+                                logger.warning("Settings file modification time mismatch detected")
                                 loaded_settings['lockout_until'] = None
                                 loaded_settings['failed_attempts'] = 0
                                 loaded_settings['consecutive_lockouts'] = 0
                         except (ValueError, TypeError):
-                            print("🔒 SECURITY: Invalid modification time in settings")
+                            logger.warning("Invalid modification time in settings")
                             loaded_settings['lockout_until'] = None
                             loaded_settings['failed_attempts'] = 0
                             loaded_settings['consecutive_lockouts'] = 0
@@ -791,7 +798,7 @@ class ModernPasswordManagerGUI:
                 self.settings = default_settings
                 self.save_settings_to_file()
         except Exception as e:
-            print(f"Error loading settings: {e}")
+            logger.error(f"Error loading settings: {e}")
             self.settings = default_settings
 
     def restore_lockout_state(self):
@@ -805,19 +812,19 @@ class ModernPasswordManagerGUI:
                     self.consecutive_lockouts = self.settings.get('consecutive_lockouts', 0)
                     remaining_seconds = int((lockout_time - current_time).total_seconds())
                     lockout_minutes = remaining_seconds // 60
-                    print(f"🔒 SECURITY: Lockout state restored - {lockout_minutes} minutes remaining")
+                    logger.info(f"Lockout state restored - {lockout_minutes} minutes remaining")
                 else:
                     self.clear_lockout_state()
-                    print("🔓 SECURITY: Lockout period expired, state cleared")
+                    logger.info("Lockout period expired, state cleared")
             except Exception as e:
-                print(f"❌ ERROR: Error parsing lockout time: {e}")
+                logger.error(f"Error parsing lockout time: {e}")
                 self.clear_lockout_state()
         else:
             self.failed_attempts = self.settings.get('failed_attempts', 0)
             self.consecutive_lockouts = self.settings.get('consecutive_lockouts', 0)
 
     def clear_lockout_state(self):
-        print("🔓 SECURITY: Clearing lockout state")
+        logger.info("Clearing lockout state")
         self.lockout_until = None
         self.failed_attempts = 0
         self.consecutive_lockouts = 0
@@ -832,7 +839,7 @@ class ModernPasswordManagerGUI:
             remaining_time = self.get_remaining_lockout_time()
             minutes = remaining_time // 60
             seconds = remaining_time % 60
-            print(f"🔒 SECURITY: Saving lockout state - {minutes:02d}:{seconds:02d} remaining")
+            logger.info(f"Saving lockout state - {minutes:02d}:{seconds:02d} remaining")
         else:
             self.settings['lockout_until'] = None
         self.settings['failed_attempts'] = self.failed_attempts
@@ -846,20 +853,20 @@ class ModernPasswordManagerGUI:
                 if self.secure_file_manager.write_settings(self.settings):
                     return
             except Exception as e:
-                print(f"Failed to save secure settings: {e}")
+                logger.error(f"Failed to save secure settings: {e}")
         try:
             settings_file = "vault_settings.json"
             with open(settings_file, 'w') as f:
                 json.dump(self.settings, f, indent=4)
         except Exception as e:
-            print(f"Error saving settings: {e}")
+            logger.error(f"Error saving settings: {e}")
 
     def validate_lockout_integrity(self):
-        print("🔒 SECURITY: Validating lockout state integrity...")
+        logger.info("Validating lockout state integrity...")
         if self.lockout_until:
             current_time = datetime.now()
             if current_time >= self.lockout_until:
-                print("🔒 SECURITY: Lockout period has expired, clearing state")
+                logger.info("Lockout period has expired, clearing state")
                 self.clear_lockout_state()
             else:
                 if self.failed_attempts < 0:
@@ -868,7 +875,7 @@ class ModernPasswordManagerGUI:
                     self.consecutive_lockouts = 0
                 max_lockout_duration = timedelta(hours=24)
                 if self.lockout_until - current_time > max_lockout_duration:
-                    print("🔒 SECURITY: Lockout time exceeds maximum duration, resetting")
+                    logger.warning("Lockout time exceeds maximum duration, resetting")
                     self.clear_lockout_state()
                     return
         else:
@@ -878,21 +885,14 @@ class ModernPasswordManagerGUI:
                 self.consecutive_lockouts = 0
 
     def log_security_event(self, event_type: str, details: str):
-        timestamp = datetime.now().isoformat()
-        security_log = f"[{timestamp}] SECURITY: {event_type} - {details}"
-        print(security_log)
-        try:
-            with open("security_audit.log", "a") as f:
-                f.write(security_log + "\n")
-        except Exception as e:
-            print(f"Error writing to security log: {e}")
+        logger.info(f"SECURITY EVENT: {event_type} - {details}")
 
     def start_lockout_validation_timer(self):
         def validate_periodically():
             if self.lockout_until:
                 current_time = datetime.now()
                 if current_time >= self.lockout_until:
-                    print("🔒 SECURITY: Periodic check - lockout period expired")
+                    logger.info("Periodic check - lockout period expired")
                     self.clear_lockout_state()
                     if hasattr(self, 'lockout_countdown_label'):
                         self.root.after(0, self.show_login_screen)
@@ -996,7 +996,7 @@ class ModernPasswordManagerGUI:
         if self.secure_file_manager:
             legacy_setup = SecureVaultSetup(self.secure_file_manager)
             if legacy_setup.has_legacy_files():
-                print("🔄 MIGRATION: Legacy files detected, starting migration...")
+                logger.info("Legacy files detected, starting migration...")
                 if not legacy_setup.migrate_legacy_files(master_password):
                     messagebox.showerror("Migration Error", "Failed to migrate legacy files")
                     return
@@ -1004,7 +1004,7 @@ class ModernPasswordManagerGUI:
             if not self.secure_file_manager.initialize_encryption(master_password):
                 messagebox.showerror("Error", "Failed to initialize secure storage")
                 return
-            print("🔧 SECURITY: Loading files from secure storage...")
+            logger.info("Loading files from secure storage...")
             if not self.secure_file_manager.load_files_to_temp():
                 diagnostic_report = self.diagnose_secure_storage_issues()
                 error_msg = "Failed to load files from secure storage.\n\n"
@@ -1066,9 +1066,9 @@ class ModernPasswordManagerGUI:
                     if not self.security_monitor.monitor_file_access():
                         threat_level = self.security_monitor.get_threat_level()
                         if threat_level in ["HIGH", "CRITICAL"]:
-                            print(f"🚨 SECURITY ALERT: Threat level {threat_level}")
+                            logger.warning(f"SECURITY ALERT: Threat level {threat_level}")
                 except Exception as e:
-                    print(f"Security monitoring error: {e}")
+                    logger.error(f"Security monitoring error: {e}")
                     break
         
         if self.security_monitor:
@@ -1766,25 +1766,25 @@ class ModernPasswordManagerGUI:
     def lock_vault(self):
         try:
             if self.secure_file_manager and self.authenticated:
-                print("🔒 SECURITY: Syncing files to secure storage before lock...")
+                logger.info("Syncing files to secure storage before lock...")
                 self.secure_file_manager.sync_all_files()
                 
                 if not self.secure_file_manager.perform_integrity_check():
-                    print("❌ SECURITY: Integrity check failed during vault lock")
+                    logger.error("Integrity check failed during vault lock")
                     messagebox.showwarning("Security Warning", 
                                         "File integrity check failed.")
                 
                 self.secure_file_manager.cleanup_temp_files()
-                print("🧹 SECURITY: Temporary files cleaned up")
+                logger.info("Temporary files cleaned up")
             self.authenticated = False
             self.database = None
             self.security_monitor = None
             self.show_login_screen()
             
-            print("✅ SECURITY: Vault locked successfully")
+            logger.info("Vault locked successfully")
             
         except Exception as e:
-            print(f"Error during vault lock: {e}")
+            logger.error(f"Error during vault lock: {e}")
             self.authenticated = False
             self.database = None
             self.show_login_screen()
@@ -1794,14 +1794,14 @@ class ModernPasswordManagerGUI:
             self.root.mainloop()
         finally:
             if self.secure_file_manager:
-                print("🧹 CLEANUP: Performing final sync and cleanup...")
+                logger.info("Performing final sync and cleanup...")
                 try:
                     if self.authenticated:
                         self.secure_file_manager.sync_all_files()
                     self.secure_file_manager.cleanup_temp_files()
-                    print("✅ CLEANUP: Secure cleanup completed")
+                    logger.info("Secure cleanup completed")
                 except Exception as e:
-                    print(f"Cleanup error: {e}")
+                    logger.error(f"Cleanup error: {e}")
 
     def create_desktop_integration():
         try:
@@ -1830,7 +1830,7 @@ class ModernPasswordManagerGUI:
                     shortcut.WorkingDirectory = str(app_dir)
                     shortcut.Description = "SecureVault Password Manager - Secure Password Storage"
                     shortcut.save()
-                    print("🔗 SHORTCUT: Windows desktop shortcut created")
+                    logger.info("Windows desktop shortcut created")
                 except ImportError:
                     batch_content = f"""@echo off
     cd /d "{app_dir}"
@@ -1839,7 +1839,7 @@ class ModernPasswordManagerGUI:
     """
                     with open(desktop_path / "SecureVault Password Manager.bat", "w") as f:
                         f.write(batch_content)
-                    print("🔗 SHORTCUT: Windows batch file created")
+                    logger.info("Windows batch file created")
                     
             elif sys.platform == "darwin":  # macOS
                 try:
@@ -1850,9 +1850,9 @@ class ModernPasswordManagerGUI:
                     end tell
                     '''
                     subprocess.run(["osascript", "-e", script], check=True)
-                    print("🔗 SHORTCUT: macOS alias created")
+                    logger.info("macOS alias created")
                 except:
-                    print("⚠️ SHORTCUT: Could not create macOS shortcut automatically")
+                    logger.warning("Could not create macOS shortcut automatically")
             else:  # Linux and other Unix-like systems
                 desktop_file_content = f"""[Desktop Entry]
     Version=1.0
@@ -1869,10 +1869,10 @@ class ModernPasswordManagerGUI:
                 with open(desktop_file_path, "w") as f:
                     f.write(desktop_file_content)
                 desktop_file_path.chmod(0o755)
-                print("🔗 SHORTCUT: Linux desktop file created")
+                logger.info("Linux desktop file created")
             return True
         except Exception as e:
-            print(f"Warning: Could not create desktop integration: {e}")
+            logger.warning(f"Could not create desktop integration: {e}")
             return False
 
     def show_security_status(self):
@@ -2104,7 +2104,7 @@ class ModernPasswordManagerGUI:
                         messagebox.showerror("Error", error_msg)
             except Exception as e:
                 error_msg = f"Password change failed: {str(e)}"
-                print(f"❌ PASSWORD CHANGE ERROR: {error_msg}")
+                logger.error(f"PASSWORD CHANGE ERROR: {error_msg}")
                 try:
                     progress_label.configure(text="❌ Password change failed", text_color="#FF4444")
                 except:
@@ -2135,28 +2135,28 @@ class ModernPasswordManagerGUI:
         import sys
         import subprocess
         try:
-            print("🔄 RESTART: Initiating secure program restart...")
+            logger.info("Initiating secure program restart...")
             if self.secure_file_manager and self.authenticated:
-                print("🔄 RESTART: Syncing files to secure storage...")
+                logger.info("Syncing files to secure storage...")
                 self.secure_file_manager.sync_all_files()
                 if not self.secure_file_manager.perform_integrity_check():
-                    print("⚠️ RESTART: Integrity check failed during restart")
+                    logger.warning("Integrity check failed during restart")
                     messagebox.showwarning("Security Warning", 
                                         "File integrity check failed during restart.")
                 self.secure_file_manager.cleanup_temp_files()
-                print("🧹 RESTART: Temporary files cleaned up")
+                logger.info("Temporary files cleaned up")
             
             self.authenticated = False
             self.database = None
             self.security_monitor = None
             
-            print("✅ RESTART: Secure shutdown completed")
+            logger.info("Secure shutdown completed")
             if getattr(sys, 'frozen', False):
                 script_path = sys.executable
             else:
                 script_path = sys.argv[0]
             
-            print(f"🔄 RESTART: Restarting program: {script_path}")
+            logger.info(f"Restarting program: {script_path}")
             
             self.root.destroy()
             
@@ -2167,7 +2167,7 @@ class ModernPasswordManagerGUI:
             
             sys.exit(0)
         except Exception as e:
-            print(f"❌ RESTART: Error during program restart: {e}")
+            logger.error(f"Error during program restart: {e}")
             messagebox.showerror("Restart Error", 
                             f"Failed to restart program automatically: {str(e)}\n\n"
                             "Please manually restart the application.")
@@ -2178,20 +2178,20 @@ class ModernPasswordManagerGUI:
                 
     def verify_new_password(self, new_password):
         try:
-            print("🧪 TESTING: Verifying new password works...")
+            logger.info("Verifying new password works...")
             temp_db = DatabaseManager(self.database.db_path, self.crypto, self.secure_file_manager)
             if temp_db.authenticate(new_password):
-                print("✅ TESTING: New password verification successful")
+                logger.info("New password verification successful")
                 messagebox.showinfo("Verification", 
                                 "Password change verified successfully!\n"
                                 "Your new password is working correctly.")
             else:
-                print("❌ TESTING: New password verification failed")
+                logger.warning("New password verification failed")
                 messagebox.showwarning("Verification Warning", 
                                     "Password was changed but verification failed.\n"
                                     "Please try logging in again.")
         except Exception as e:
-            print(f"❌ TESTING: Password verification error: {e}")
+            logger.error(f"Password verification error: {e}")
             messagebox.showwarning("Verification Warning", 
                                 f"Password was changed but couldn't verify: {str(e)}")
                                         
@@ -2548,7 +2548,7 @@ class ModernPasswordManagerGUI:
                             account_id = potential_id
                             break
                     except Exception as e:
-                        print(f"Error checking account ID uniqueness: {e}")
+                        logger.error(f"Error checking account ID uniqueness: {e}")
                         continue
                 if not account_id:
                     messagebox.showerror("Error", "Failed to generate unique account ID. Please try again.")
@@ -2565,7 +2565,7 @@ class ModernPasswordManagerGUI:
                         if not result:
                             return
                 except Exception as e:
-                    print(f"Error checking account name uniqueness: {e}")
+                    logger.error(f"Error checking account name uniqueness: {e}")
                 
                 try:
                     new_account = Account(
@@ -2599,7 +2599,7 @@ class ModernPasswordManagerGUI:
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save account: {str(e)}")
-            print(f"Full error details: {e}")
+            logger.error(f"Full error details: {e}")
             import traceback
             traceback.print_exc()
             
@@ -2821,48 +2821,70 @@ Duplicate Passwords: {len(duplicate_passwords)}
             widget.destroy()
         header = ctk.CTkFrame(self.main_panel)
         header.pack(fill="x", padx=15, pady=15)
-        ctk.CTkLabel(header, text="📑 Audit Log", 
+        ctk.CTkLabel(header, text="📑 Audit Log",
                      font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
         content = ctk.CTkScrollableFrame(self.main_panel)
         content.pack(fill="both", expand=True, padx=15, pady=15)
-        
+
         try:
-            metadata_conn = sqlite3.connect(self.database.metadata_db)
-            cursor = metadata_conn.execute("""
-                SELECT timestamp, action, entity_type, entity_id, details
-                FROM audit_log 
-                ORDER BY timestamp DESC 
-                LIMIT 100
-            """)
-            logs = cursor.fetchall()
-            metadata_conn.close()
+            with open('audit.log', 'r') as f:
+                logs = f.readlines()
+
             if not logs:
-                ctk.CTkLabel(content, text="No audit log entries found", 
+                ctk.CTkLabel(content, text="No audit log entries found",
                              font=ctk.CTkFont(size=16), text_color="#888888").pack(pady=50)
                 return
-            for timestamp, action, entity_type, entity_id, details in logs:
+
+            keywords = [
+                "account", "login", "password", "security", "backup",
+                "restore", "alert", "authentication", "generated a new password"
+            ]
+
+            filtered_logs = []
+            for log_line in logs:
+                log_lower = log_line.lower()
+                if any(keyword in log_lower for keyword in keywords) or \
+                   "WARNING" in log_line or "ERROR" in log_line or "CRITICAL" in log_line:
+                    filtered_logs.append(log_line)
+
+            if not filtered_logs:
+                ctk.CTkLabel(content, text="No relevant audit log entries found",
+                             font=ctk.CTkFont(size=16), text_color="#888888").pack(pady=50)
+                return
+
+            for log_line in reversed(filtered_logs):
                 log_frame = ctk.CTkFrame(content)
                 log_frame.pack(fill="x", padx=10, pady=5)
-                try:
-                    dt = datetime.fromisoformat(timestamp)
-                    time_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-                except:
-                    time_str = timestamp
-                action_colors = {
-                    "CREATE": "#00FF00",
-                    "UPDATE": "#FFAA44", 
-                    "DELETE": "#FF4444",
-                    "LOGIN": "#44FF44",
-                    "VIEW": "#44AAFF"
-                }
-                action_color = action_colors.get(action, "#FFFFFF")
-                log_text = f"[{time_str}] {action} {entity_type}: {details}"
-                ctk.CTkLabel(log_frame, text=log_text, 
-                             text_color=action_color, 
-                             font=ctk.CTkFont(family="monospace")).pack(anchor="w", padx=15, pady=8)
+
+                parts = log_line.strip().split(' - ')
+                if len(parts) >= 4:
+                    timestamp, logger_name, level, message = parts[0], parts[1], parts[2], " - ".join(parts[3:])
+
+                    log_color = "#FFFFFF"  # Default
+                    if level == "INFO":
+                        log_color = "#00FF00"
+                    elif level == "WARNING":
+                        log_color = "#FFAA44"
+                    elif level == "ERROR":
+                        log_color = "#FF4444"
+                    elif level == "CRITICAL":
+                        log_color = "#FF0000"
+
+                    log_text = f"[{timestamp}] [{level}] [{logger_name}] {message}"
+                    ctk.CTkLabel(log_frame, text=log_text,
+                                 text_color=log_color,
+                                 font=ctk.CTkFont(family="monospace")).pack(anchor="w", padx=15, pady=8)
+                else:
+                    ctk.CTkLabel(log_frame, text=log_line.strip(),
+                                 font=ctk.CTkFont(family="monospace")).pack(anchor="w", padx=15, pady=8)
+
+        except FileNotFoundError:
+            ctk.CTkLabel(content, text="audit.log file not found.",
+                         font=ctk.CTkFont(size=16), text_color="#FF4444").pack(pady=20)
         except Exception as e:
-            ctk.CTkLabel(content, text=f"Error loading audit log: {str(e)}", 
+            ctk.CTkLabel(content, text=f"Error loading audit log: {str(e)}",
                          text_color="#FF4444").pack(pady=20)
+
 
     def get_remaining_lockout_time(self) -> int:
         if self.lockout_until and datetime.now() < self.lockout_until:
@@ -2876,7 +2898,7 @@ Duplicate Passwords: {len(duplicate_passwords)}
             seconds = remaining_time % 60
             messagebox.showerror("Account Locked", 
                                f"Account is locked for {minutes:02d}:{seconds:02d} due to failed attempts.")
-            self.log_security_event("LOCKOUT_ENFORCED", f"Login attempt blocked - user locked out")
+            self.log_security_event("LOCKOUT_ENFORCED", "Login attempt blocked - user locked out")
             return True
         return False
 
@@ -2890,7 +2912,7 @@ Duplicate Passwords: {len(duplicate_passwords)}
             remaining_time = self.get_remaining_lockout_time()
             minutes = remaining_time // 60
             seconds = remaining_time % 60
-            print(f"🔒 SECURITY: User is locked out on startup - {minutes:02d}:{seconds:02d} remaining")
+            logger.info(f"User is locked out on startup - {minutes:02d}:{seconds:02d} remaining")
             self.show_lockout_screen()
             return True
         return False
@@ -2999,27 +3021,28 @@ Duplicate Passwords: {len(duplicate_passwords)}
             self.root.mainloop()
         finally:
             if self.secure_file_manager:
-                print("🧹 CLEANUP: Performing final sync and cleanup...")
+                logger.info("Performing final sync and cleanup...")
                 try:
                     if self.authenticated:
                         self.secure_file_manager.sync_all_files()
                     self.secure_file_manager.cleanup_temp_files()
-                    print("✅ CLEANUP: Secure cleanup completed")
+                    logger.info("Secure cleanup completed")
                 except Exception as e:
-                    print(f"Cleanup error: {e}")
+                    logger.error(f"Cleanup error: {e}")
 
 def main():
     try:
-        print("🚀 STARTUP: Starting SecureVault Password Manager...")
+        setup_logging()
+        logger.info("Starting SecureVault Password Manager...")
         ModernPasswordManagerGUI.create_desktop_integration()
         app = ModernPasswordManagerGUI()
-        print("✅ STARTUP: Application initialized successfully")
+        logger.info("Application initialized successfully")
         app.run()
         
     except Exception as e:
-        print(f"❌ STARTUP: Failed to start application: {e}")
-        print("Please ensure all required dependencies are installed:")
-        print("pip install customtkinter cryptography pillow")
+        logger.error(f"Failed to start application: {e}")
+        logger.info("Please ensure all required dependencies are installed:")
+        logger.info("pip install customtkinter cryptography pillow")
         try:
             import tkinter.messagebox as msgbox
             msgbox.showerror("Startup Error", 
