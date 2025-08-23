@@ -64,6 +64,10 @@ save = ctk.CTkImage(
     light_image=Image.open("icons/save.png"),   # path to your icon
     size=(24, 24)  # adjust size
 )
+info = ctk.CTkImage(
+    light_image=Image.open("icons/info.png"),   # path to your icon
+    size=(24, 24)  # adjust size
+)
 class SecurityLevel(Enum):
     LOW = 1
     MEDIUM = 2
@@ -1256,6 +1260,17 @@ class ModernPasswordManagerGUI:
 
         ctk.CTkButton(
             toolbar,
+            text="About",
+            width=120,
+            height=55,
+            image=info,
+            compound="left",  # icon on the left, text on the right
+            command=self.show_about_dialog,
+            font=ctk.CTkFont(size=18)
+        ).pack(side="right", padx=10, pady=8)
+
+        ctk.CTkButton(
+            toolbar,
             text="Backup",
             width=120,
             height=55,
@@ -1896,6 +1911,44 @@ class ModernPasswordManagerGUI:
 
         ctk.CTkLabel(timeout_frame, text="For your security, the application will automatically\nlock and close after 2 minutes of inactivity",
                     font=ctk.CTkFont(size=12)).pack(pady=10)
+
+    def show_about_dialog(self):
+        about_dialog = ctk.CTkToplevel(self.root)
+        about_dialog.title("About Secure Password Manager")
+        about_dialog.geometry("1000x450")
+        about_dialog.resizable(False, False)
+        about_dialog.grab_set()
+
+        main_frame = ctk.CTkFrame(about_dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        title_label = ctk.CTkLabel(main_frame, text="Your Digital Safe", font=ctk.CTkFont(size=20, weight="bold"))
+        title_label.pack(pady=(0, 15))
+
+        about_text = """
+This program is your personal digital safe for passwords.
+
+How it works:
+1. You create a single, strong Master Password. This is the only password you need to remember.
+
+2. When you save a password for a website or app, the program scrambles it into a secret code using your Master Password.
+
+3. This secret code is stored securely on your computer. Without your Master Password, it's just gibberish to anyone else.
+
+4. When you need a password, you unlock the program with your Master Password, and it unscrambles the secret code back into your password for you to use.
+
+Think of it like a locked diary. Only you have the key (your Master Password) to open it and read what's inside.
+
+
+
+
+THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
+"""
+        text_label = ctk.CTkLabel(main_frame, text=about_text, justify="left")
+        text_label.pack(pady=10)
+
+        close_button = ctk.CTkButton(main_frame, text="Close", command=about_dialog.destroy, width=100)
+        close_button.pack(pady=(15, 0))
 
     def show_tfa_dialog(self):
         tfa_enabled = self.settings.get('tfa_secret') is not None
