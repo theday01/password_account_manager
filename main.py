@@ -21,9 +21,10 @@ from tkinter import ttk, messagebox, filedialog
 import customtkinter as ctk
 from secure_file_manager import SecureFileManager, SecureVaultSetup, SecurityMonitor, setup_secure_vault
 from backup_manager import BackupManager, BackupError
-from PIL import Image
+from PIL import Image, ImageTk
 import logging
 from audit_logger import setup_logging
+from two_factor_auth import TwoFactorAuthManager
 
 logger = logging.getLogger(__name__)
 
@@ -657,6 +658,7 @@ class ModernPasswordManagerGUI:
     def __init__(self):
         self.crypto = CryptoManager()
         self.password_generator = PasswordGenerator()
+        self.tfa_manager = TwoFactorAuthManager()
         self.database = None
         self.secure_file_manager = None
         self.security_monitor = None
@@ -695,7 +697,8 @@ class ModernPasswordManagerGUI:
             'failed_attempts': 0,
             'consecutive_lockouts': 0,
             'last_modified': None,
-            'secure_storage_enabled': True
+            'secure_storage_enabled': True,
+            'tfa_secret': None
         }
         if self.secure_file_manager:
             try:
@@ -781,6 +784,13 @@ class ModernPasswordManagerGUI:
 
     def save_settings_to_file(self):
         self.settings['last_modified'] = time.time()
+        if self.secure_file_manager and self.secure_file_manager.temp_dir:
+            try:
+                temp_settings_path = os.path.join(self.secure_file_manager.temp_dir, "settings.json")
+                with open(temp_settings_path, 'w') as f:
+                    json.dump(self.settings, f, indent=4)
+            except Exception as e:
+                logger.warning(f"Could not save settings to temp dir: {e}")
         if self.secure_file_manager:
             try:
                 if self.secure_file_manager.write_settings(self.settings):
@@ -947,15 +957,18 @@ class ModernPasswordManagerGUI:
         db_path = "manageyouraccount"
         self.database = DatabaseManager(db_path, self.crypto, self.secure_file_manager)
         if self.database.authenticate(master_password):
-            self.authenticated = True
-            self.failed_attempts = 0
-            self.consecutive_lockouts = 0
-            self.clear_lockout_state()
-            if self.secure_file_manager:
-                self.security_monitor = SecurityMonitor(self.secure_file_manager)
-                self.security_monitor.set_alert_callback(self.handle_security_alert)
-                self._start_security_monitoring()
-            self.show_main_interface()
+            if self.settings.get('tfa_secret'):
+                self.prompt_for_tfa()
+            else:
+                self.authenticated = True
+                self.failed_attempts = 0
+                self.consecutive_lockouts = 0
+                self.clear_lockout_state()
+                if self.secure_file_manager:
+                    self.security_monitor = SecurityMonitor(self.secure_file_manager)
+                    self.security_monitor.set_alert_callback(self.handle_security_alert)
+                    self._start_security_monitoring()
+                self.show_main_interface()
         else:
             if hasattr(self.database, 'last_integrity_error') and self.database.last_integrity_error:
                 result = messagebox.askyesno(
@@ -1831,7 +1844,7 @@ class ModernPasswordManagerGUI:
     def show_settings(self):
         settings_window = ctk.CTkToplevel(self.root)
         settings_window.title("Password Vault Settings")
-        settings_window.geometry("500x400")
+        settings_window.geometry("500x500")
         settings_window.grab_set()
         settings_window.resizable(False, False)
         
@@ -1851,6 +1864,20 @@ class ModernPasswordManagerGUI:
                     command=self.change_master_password_dialog,
                     height=40).pack(pady=10)
 
+        tfa_frame = ctk.CTkFrame(main_frame)
+        tfa_frame.pack(fill="x", pady=10)
+
+        ctk.CTkLabel(tfa_frame, text="Two-Factor Authentication",
+                    font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
+
+        tfa_enabled = self.settings.get('tfa_secret') is not None
+        tfa_button_text = "Disable 2FA" if tfa_enabled else "Enable 2FA"
+        tfa_button = ctk.CTkButton(tfa_frame, text=tfa_button_text,
+                                   command=self.show_tfa_dialog,
+                                   height=40)
+        tfa_button.pack(pady=10)
+
+
         timeout_frame = ctk.CTkFrame(main_frame)
         timeout_frame.pack(fill="x", pady=10)
 
@@ -1859,6 +1886,135 @@ class ModernPasswordManagerGUI:
 
         ctk.CTkLabel(timeout_frame, text="For your security, the application will automatically\nlock and close after 3 minutes of inactivity.",
                     font=ctk.CTkFont(size=12)).pack(pady=10)
+
+    def show_tfa_dialog(self):
+        tfa_enabled = self.settings.get('tfa_secret') is not None
+        if tfa_enabled:
+            self.disable_tfa_dialog()
+        else:
+            self.enable_tfa_dialog()
+
+    def enable_tfa_dialog(self):
+        dialog = ctk.CTkToplevel(self.root)
+        dialog.title("Enable Two-Factor Authentication")
+        dialog.geometry("380x550")
+        dialog.resizable(False, False)
+        dialog.grab_set()
+        
+        main_frame = ctk.CTkFrame(dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(main_frame, text="Scan QR Code with your Authenticator App",
+                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=10)
+
+        secret = self.tfa_manager.generate_secret()
+        uri = self.tfa_manager.get_provisioning_uri(secret, "user@securevault")
+        qr_image_data = self.tfa_manager.generate_qr_code(uri)
+        qr_image = Image.open(qr_image_data)
+        qr_photo = ImageTk.PhotoImage(qr_image)
+        
+        qr_label = ctk.CTkLabel(main_frame, image=qr_photo, text="")
+        qr_label.image = qr_photo
+        qr_label.pack(pady=10)
+
+        ctk.CTkLabel(main_frame, text="Enter the 6-digit code to verify:",
+                     font=ctk.CTkFont(size=14)).pack(pady=10)
+        
+        code_entry = ctk.CTkEntry(main_frame, width=200)
+        code_entry.pack(pady=5)
+
+        def verify_and_enable():
+            code = code_entry.get().strip()
+            if self.tfa_manager.verify_code(secret, code):
+                encrypted_secret = self.crypto.encrypt_data(secret, self.database.encryption_key)
+                self.settings['tfa_secret'] = base64.b64encode(encrypted_secret).decode('utf-8')
+                self.save_settings_to_file()
+                messagebox.showinfo("Success", "2FA enabled successfully!")
+                dialog.destroy()
+            else:
+                messagebox.showerror("Error", "Invalid code. Please try again.")
+
+        verify_button = ctk.CTkButton(main_frame, text="Verify and Enable", command=verify_and_enable)
+        verify_button.pack(pady=20)
+
+    def disable_tfa_dialog(self):
+        dialog = ctk.CTkToplevel(self.root)
+        dialog.title("Disable Two-Factor Authentication")
+        dialog.geometry("400x250")
+        dialog.grab_set()
+
+        main_frame = ctk.CTkFrame(dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(main_frame, text="Enter a 6-digit code to disable 2FA:",
+                     font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
+        
+        code_entry = ctk.CTkEntry(main_frame, width=200)
+        code_entry.pack(pady=10)
+
+        def verify_and_disable():
+            code = code_entry.get().strip()
+            encrypted_secret_b64 = self.settings.get('tfa_secret')
+            encrypted_secret = base64.b64decode(encrypted_secret_b64)
+            secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
+            if self.tfa_manager.verify_code(secret, code):
+                self.settings['tfa_secret'] = None
+                self.save_settings_to_file()
+                messagebox.showinfo("Success", "2FA disabled successfully!")
+                dialog.destroy()
+            else:
+                messagebox.showerror("Error", "Invalid code.")
+
+        verify_button = ctk.CTkButton(main_frame, text="Verify and Disable", command=verify_and_disable)
+        verify_button.pack(pady=20)
+
+    def prompt_for_tfa(self):
+        dialog = ctk.CTkToplevel(self.root)
+        dialog.title("Two-Factor Authentication")
+        dialog.geometry("400x250")
+        dialog.grab_set()
+
+        main_frame = ctk.CTkFrame(dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(main_frame, text="Enter your 6-digit 2FA code:",
+                     font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
+        
+        code_entry = ctk.CTkEntry(main_frame, width=200)
+        code_entry.pack(pady=10)
+
+        def verify_tfa():
+            code = code_entry.get().strip()
+            encrypted_secret_b64 = self.settings.get('tfa_secret')
+            encrypted_secret = base64.b64decode(encrypted_secret_b64)
+            secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
+            if self.tfa_manager.verify_code(secret, code):
+                self.authenticated = True
+                self.failed_attempts = 0
+                self.consecutive_lockouts = 0
+                self.clear_lockout_state()
+                if self.secure_file_manager:
+                    self.security_monitor = SecurityMonitor(self.secure_file_manager)
+                    self.security_monitor.set_alert_callback(self.handle_security_alert)
+                    self._start_security_monitoring()
+                dialog.destroy()
+                self.show_main_interface()
+            else:
+                messagebox.showerror("Error", "Invalid 2FA code.")
+                self.failed_attempts += 1
+                if self.failed_attempts >= 3:
+                    self.consecutive_lockouts += 1
+                    lockout_minutes = 3 * self.consecutive_lockouts
+                    self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
+                    self.save_lockout_state()
+                    messagebox.showerror("Account Locked", 
+                                f"Too many failed attempts. Account locked for {lockout_minutes} minutes.")
+                    self.failed_attempts = 0
+                    dialog.destroy()
+                    self.lock_vault()
+
+        verify_button = ctk.CTkButton(main_frame, text="Verify", command=verify_tfa)
+        verify_button.pack(pady=20)
 
     def change_master_password_dialog(self):
         dialog = ctk.CTkToplevel(self.root)
