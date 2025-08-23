@@ -60,8 +60,7 @@ try:
 except Exception:
     CRYPTO_AVAILABLE = False
 
-LOG = logging.getLogger("secure_file_manager")
-LOG.addHandler(logging.NullHandler())
+LOG = logging.getLogger(__name__)
 
 
 # ------------------------ Utilities ------------------------
@@ -229,16 +228,21 @@ class SecureFileManager:
         Uses PBKDF2-HMAC-SHA256 if cryptography is available; otherwise falls back to hashlib.pbkdf2_hmac.
         Returns True on success.
         """
+        LOG.info("Initializing encryption...")
         if master_password is None:
+            LOG.error("Master password is None, cannot initialize encryption.")
             raise ValueError("master_password cannot be None")
 
         if not os.path.exists(self.salt_path):
+            LOG.info("Salt file not found, creating a new one.")
             with open(self.salt_path, "wb") as f:
                 f.write(os.urandom(32))
 
         salt = open(self.salt_path, "rb").read()
+        LOG.info(f"Salt loaded from {self.salt_path}")
 
         if CRYPTO_AVAILABLE:
+            LOG.info("Using 'cryptography' package for key derivation.")
             kdf = PBKDF2HMAC(
                 algorithm=hashes.SHA256(),
                 length=32,
@@ -248,8 +252,10 @@ class SecureFileManager:
             )
             self.encryption_key = kdf.derive(master_password.encode())
         else:
+            LOG.warning("Cryptography package not available, falling back to hashlib.pbkdf2_hmac.")
             # fallback
             self.encryption_key = hashlib.pbkdf2_hmac("sha256", master_password.encode(), salt, iterations, dklen=32)
+        LOG.info("Encryption key derived successfully.")
         return True
 
     # --- vault init / schema ---
@@ -259,8 +265,10 @@ class SecureFileManager:
         This function will not overwrite existing DBs; it will only create them when missing.
         It then writes an initial integrity signature (HMAC or SHA256) and attempts permission hardening.
         """
+        LOG.info("Initializing vault files...")
         try:
             if not os.path.exists(self.metadata_db):
+                LOG.info(f"Metadata database not found, creating at {self.metadata_db}")
                 conn = sqlite3.connect(self.metadata_db)
                 conn.execute("PRAGMA journal_mode=WAL;")
                 conn.execute("PRAGMA synchronous=NORMAL;")
@@ -291,6 +299,7 @@ class SecureFileManager:
                 conn.close()
 
             if not os.path.exists(self.sensitive_db):
+                LOG.info(f"Sensitive database not found, creating at {self.sensitive_db}")
                 conn = sqlite3.connect(self.sensitive_db)
                 conn.execute("PRAGMA journal_mode=WAL;")
                 conn.execute("PRAGMA synchronous=NORMAL;")
@@ -306,6 +315,7 @@ class SecureFileManager:
 
             # Ensure salt exists
             if not os.path.exists(self.salt_path):
+                LOG.info("Salt file not found, creating a new one.")
                 with open(self.salt_path, "wb") as f:
                     f.write(os.urandom(32))
 
@@ -318,6 +328,7 @@ class SecureFileManager:
             except Exception as e:
                 LOG.warning("Permission hardening not fully applied: %s", e)
 
+            LOG.info("Vault files initialized successfully.")
             return True
         except Exception as e:
             LOG.exception("initialize_vault_files failed")
@@ -347,12 +358,16 @@ class SecureFileManager:
         If encryption_key is set we use HMAC-SHA256 keyed by the encryption_key. Otherwise plain SHA256.
         """
         try:
+            LOG.info("Rotating integrity signature.")
             data = self._collect_integrity_data()
             if self.encryption_key:
+                LOG.info("Using HMAC-SHA256 for integrity signature.")
                 sig = hmac.new(self.encryption_key, data, hashlib.sha256).digest()
             else:
+                LOG.warning("No encryption key, using plain SHA256 for integrity signature.")
                 sig = hashlib.sha256(data).digest()
             _atomic_write(self.signature_path, sig)
+            LOG.info(f"Integrity signature written to {self.signature_path}")
             return True
         except Exception:
             LOG.exception("Failed to rotate integrity signature")
@@ -363,6 +378,7 @@ class SecureFileManager:
 
         Returns True when the signature exists and matches; False otherwise.
         """
+        LOG.info("Verifying integrity...")
         try:
             if not os.path.exists(self.signature_path):
                 LOG.warning("Integrity signature missing; rotating to create one")
@@ -371,10 +387,15 @@ class SecureFileManager:
             stored = open(self.signature_path, "rb").read()
             current = self._collect_integrity_data()
             if self.encryption_key:
+                LOG.info("Verifying with HMAC-SHA256.")
                 expected = hmac.new(self.encryption_key, current, hashlib.sha256).digest()
             else:
+                LOG.warning("No encryption key, verifying with plain SHA256.")
                 expected = hashlib.sha256(current).digest()
-            return hmac.compare_digest(expected, stored)
+
+            is_valid = hmac.compare_digest(expected, stored)
+            LOG.info(f"Integrity verification result: {'OK' if is_valid else 'FAILED'}")
+            return is_valid
         except Exception:
             LOG.exception("Integrity verification failed")
             return False
@@ -385,13 +406,17 @@ class SecureFileManager:
 
         This is atomic: a new temp dir is created and set to self.temp_dir. Previous temp_dir is removed.
         """
+        LOG.info("Loading files to temporary directory...")
         try:
             if self.temp_dir and os.path.exists(self.temp_dir):
+                LOG.info(f"Removing old temp directory: {self.temp_dir}")
                 shutil.rmtree(self.temp_dir, ignore_errors=True)
             self.temp_dir = tempfile.mkdtemp(prefix="sv_tmp_")
+            LOG.info(f"Created new temp directory: {self.temp_dir}")
             for p in [self.metadata_db, self.sensitive_db, self.salt_path, self.signature_path, self.settings_path]:
                 if os.path.exists(p):
                     shutil.copy2(p, os.path.join(self.temp_dir, os.path.basename(p)))
+            LOG.info("Files loaded to temp directory successfully.")
             return True
         except Exception:
             LOG.exception("load_files_to_temp failed")
@@ -401,10 +426,13 @@ class SecureFileManager:
             return False
 
     def cleanup_temp_files(self) -> bool:
+        LOG.info("Cleaning up temporary files...")
         try:
             if self.temp_dir and os.path.exists(self.temp_dir):
+                LOG.info(f"Removing temp directory: {self.temp_dir}")
                 shutil.rmtree(self.temp_dir, ignore_errors=True)
             self.temp_dir = None
+            LOG.info("Temporary files cleaned up successfully.")
             return True
         except Exception:
             LOG.exception("cleanup_temp_files failed")
@@ -415,24 +443,30 @@ class SecureFileManager:
 
         Uses copy2 to preserve metadata and does not delete other files in secure_dir.
         """
+        LOG.info("Syncing all files...")
         try:
             if self.temp_dir and os.path.exists(self.temp_dir):
+                LOG.info(f"Syncing from temp directory: {self.temp_dir}")
                 for name in os.listdir(self.temp_dir):
                     shutil.copy2(os.path.join(self.temp_dir, name), os.path.join(self.secure_dir, name))
                 # re-rotate signature after pushing
                 self.rotate_integrity_signature()
+                LOG.info("Sync from temp directory completed.")
                 return True
 
             cwd = os.getcwd()
+            LOG.info(f"Syncing from current working directory: {cwd}")
             candidates = ["metadata.db", "sensitive.db", "salt_file", "integrity_file", "settings.json"]
             for name in candidates:
                 src = os.path.join(cwd, name)
                 dst = os.path.join(self.secure_dir, name)
                 if os.path.exists(src):
                     if (not os.path.exists(dst)) or (os.path.getmtime(src) > os.path.getmtime(dst)):
+                        LOG.info(f"Copying {src} to {dst}")
                         shutil.copy2(src, dst)
             # ensure integrity signature
             self.rotate_integrity_signature()
+            LOG.info("Sync from current working directory completed.")
             return True
         except Exception:
             LOG.exception("sync_all_files failed")
@@ -444,10 +478,12 @@ class SecureFileManager:
 
         Returns the path to the backup directory.
         """
+        LOG.info(f"Creating backup in directory: {backup_dir}")
         _ensure_dir_exists(backup_dir)
         ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
         dest = os.path.join(backup_dir, f"vault_backup_{ts}")
         shutil.copytree(self.secure_dir, dest)
+        LOG.info(f"Backup created at: {dest}")
         return dest
 
     def restore_backup(self, backup_path: str, overwrite: bool = False) -> bool:
@@ -455,8 +491,10 @@ class SecureFileManager:
 
         When overwrite=True, existing files will be replaced. Otherwise missing files are added only.
         """
+        LOG.info(f"Restoring backup from {backup_path} to {self.secure_dir} (overwrite={overwrite})")
         try:
             if not os.path.exists(backup_path):
+                LOG.error(f"Backup path not found: {backup_path}")
                 raise FileNotFoundError(backup_path)
             for root, dirs, files in os.walk(backup_path):
                 rel = os.path.relpath(root, backup_path)
@@ -466,9 +504,12 @@ class SecureFileManager:
                     src = os.path.join(root, f)
                     dst = os.path.join(target_root, f)
                     if os.path.exists(dst) and not overwrite:
+                        LOG.info(f"Skipping existing file: {dst}")
                         continue
+                    LOG.info(f"Restoring file {src} to {dst}")
                     shutil.copy2(src, dst)
             self.rotate_integrity_signature()
+            LOG.info("Backup restored successfully.")
             return True
         except Exception:
             LOG.exception("restore_backup failed")
@@ -481,10 +522,13 @@ class SecureFileManager:
         On POSIX: set directories to 0o700 and files to 0o600.
         On Windows: attempt to set the read-only attribute for others via os.chmod.
         """
+        LOG.info("Enforcing permissions...")
         try:
             if os.name == "posix":
+                LOG.info("Applying POSIX permissions (dir: 700, file: 600)")
                 _posix_harden_permissions(self.secure_dir)
             else:
+                LOG.info("Applying Windows permissions (best-effort).")
                 # Windows best-effort: remove write permission for others by making files read-only, and hide integrity
                 for root, _, files in os.walk(self.secure_dir):
                     for f in files:
@@ -493,6 +537,7 @@ class SecureFileManager:
                             os.chmod(p, stat.S_IREAD | stat.S_IWRITE)
                         except Exception:
                             pass
+            LOG.info("Permissions enforced successfully.")
         except Exception:
             LOG.exception("enforce_permissions failed")
             raise
