@@ -1315,10 +1315,6 @@ class ModernPasswordManagerGUI:
         os.makedirs(backup_folder, exist_ok=True)
         backups = sorted(glob.glob(os.path.join(backup_folder, "*.svbk")), reverse=True)
 
-        if not backups:
-            messagebox.showinfo("No backups found", "No backup files were found in ./backups/")
-            return
-
         win = tk.Toplevel(self.root)
         win.title("Restore Backup")
         win.geometry("820x480")
@@ -1372,6 +1368,25 @@ class ModernPasswordManagerGUI:
                 info_label.config(text=info_text)
             except Exception as e:
                 info_label.config(text=f"Error reading file info: {e}")
+        
+        def browse_for_backup():
+            filepath = filedialog.askopenfilename(
+                title="Select a backup file",
+                filetypes=[("SecureVault Backups", "*.svbk"), ("All files", "*.*")]
+            )
+            if filepath:
+                # Always add to the top of the list, even if not in backups folder
+                if filepath not in backups:
+                    backups.insert(0, filepath)
+                    listbox.insert(0, f"{len(backups)}. {os.path.basename(filepath)} (external)")
+                else:
+                    idx = backups.index(filepath)
+                    listbox.selection_clear(0, "end")
+                    listbox.selection_set(idx)
+                # Select the newly added file
+                listbox.selection_clear(0, "end")
+                listbox.selection_set(0)
+                on_selection()
 
         listbox.bind("<<ListboxSelect>>", on_selection)
         on_selection()
@@ -1526,6 +1541,9 @@ class ModernPasswordManagerGUI:
                     shutil.rmtree(tempdir, ignore_errors=True)
                 except Exception:
                     pass
+
+        browse_btn = tk.Button(btn_frame, text="Browse...", command=browse_for_backup, width=12)
+        browse_btn.pack(side="left", padx=(0,8))
 
         preview_btn = tk.Button(btn_frame, text="Preview contents", command=preview_contents, width=18)
         preview_btn.pack(side="left", padx=(0,8))
