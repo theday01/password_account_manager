@@ -666,6 +666,12 @@ class ModernPasswordManagerGUI:
         self.root = ctk.CTk()
         self.root.title("Secure Password Manager")
         self.root.geometry("1200x800")
+        try:
+            icon_path = os.path.join("icons", "main.ico")
+            if os.path.exists(icon_path):
+                self.root.iconbitmap(default=icon_path)
+        except Exception as e:
+            logger.warning(f"Could not set application icon: {e}")
         self.authenticated = False
         self.accounts = []
         self.failed_attempts = 0
@@ -1844,7 +1850,7 @@ class ModernPasswordManagerGUI:
     def show_settings(self):
         settings_window = ctk.CTkToplevel(self.root)
         settings_window.title("Password Vault Settings")
-        settings_window.geometry("500x500")
+        settings_window.geometry("500x600")
         settings_window.grab_set()
         settings_window.resizable(False, False)
         
@@ -1897,7 +1903,7 @@ class ModernPasswordManagerGUI:
     def enable_tfa_dialog(self):
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("Enable Two-Factor Authentication")
-        dialog.geometry("380x550")
+        dialog.geometry("380x480")
         dialog.resizable(False, False)
         dialog.grab_set()
         
