@@ -1040,6 +1040,8 @@ class ModernPasswordManagerGUI:
             height=55,
             font=ctk.CTkFont(size=18),
             corner_radius=12,
+            fg_color="#1E9E7A",
+            hover_color="#187A61",
             state="disabled" if self.is_vault_initialized() else "normal"
         )
         self.setup_btn.pack(pady=8)
