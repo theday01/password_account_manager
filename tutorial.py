@@ -3,8 +3,9 @@ from PIL import Image
 import os
 
 class TutorialManager:
-    def __init__(self, parent):
+    def __init__(self, parent, lang_manager):
         self.parent = parent
+        self.lang_manager = lang_manager
         self.tutorial_window = None
         self.current_step = 0
         self._current_image = None  # keep a reference to the image to avoid GC
@@ -13,51 +14,7 @@ class TutorialManager:
         self.win_width = 620
         self.win_height = 420
 
-        # Steps: Welcome -> Overview -> Feature walkthrough -> Finish
-        self.steps = [
-            {
-                "title": "Welcome to SecureVault Pro!",
-                "text": "This quick tutorial will guide you through the main features of the application.",
-                "image": "info.png"
-            },
-            {
-                "title": "Program Overview",
-                "text": (
-                    "SecureVault Pro is a desktop password manager focused on strong local security and privacy. "
-                    "All vault data (usernames, passwords, URLs, notes) is encrypted locally using AES-256-GCM. "
-                    "The encryption key is derived from your Master Password via PBKDF2 (SHA-256) with a unique salt, "
-                    "and file integrity is verified with HMAC-SHA256.\n\n"
-                    "Core capabilities include adding/editing/deleting detailed account entries, a quick search, "
-                    "secure copy-to-clipboard (automatically cleared after 30 seconds), and a customizable password generator "
-                    "(length 8–64, uppercase/lowercase/digits/symbols, option to exclude ambiguous characters). "
-                    "A Security Dashboard provides a password-health report (weak/duplicate passwords) and optional 2FA support.\n\n"
-                    "Backups are encrypted `.svbk` files protected by a separate backup code; you can preview a backup's manifest "
-                    "before restoring. The UI is built with CustomTkinter (dark theme available), includes an inactivity lock "
-                    "(2 minutes) and a startup loading screen that checks vault integrity during initialization."
-                ),
-                "image": None
-            },
-            {
-                "title": "The Master Password",
-                "text": "Your Master Password is the one and only key to your vault. Keep it safe and don't forget it!",
-                "image": "security.png"
-            },
-            {
-                "title": "Adding an Account",
-                "text": "Click 'Add New Account' to save new login credentials. You can generate a strong password or enter your own.",
-                "image": "user.png"
-            },
-            {
-                "title": "Password Generator",
-                "text": "Use the built-in generator to create strong, unique passwords for your accounts.",
-                "image": "password.png"
-            },
-            {
-                "title": "All Done!",
-                "text": "You're now ready to use SecureVault Pro. Stay secure!",
-                "image": "logout.png"
-            }
-        ]
+        self.steps = self.get_translated_steps()
 
     def _center_window(self, window, width, height, parent=None):
         """
@@ -91,10 +48,44 @@ class TutorialManager:
         if y < 0: y = 0
         window.geometry(f"{width}x{height}+{x}+{y}")
 
+    def get_translated_steps(self):
+        return [
+            {
+                "title": self.lang_manager.get_string("tutorial_step_1_title"),
+                "text": self.lang_manager.get_string("tutorial_step_1_text"),
+                "image": "info.png"
+            },
+            {
+                "title": self.lang_manager.get_string("tutorial_step_2_title"),
+                "text": self.lang_manager.get_string("tutorial_step_2_text"),
+                "image": None
+            },
+            {
+                "title": self.lang_manager.get_string("tutorial_step_3_title"),
+                "text": self.lang_manager.get_string("tutorial_step_3_text"),
+                "image": "security.png"
+            },
+            {
+                "title": self.lang_manager.get_string("tutorial_step_4_title"),
+                "text": self.lang_manager.get_string("tutorial_step_4_text"),
+                "image": "user.png"
+            },
+            {
+                "title": self.lang_manager.get_string("tutorial_step_5_title"),
+                "text": self.lang_manager.get_string("tutorial_step_5_text"),
+                "image": "password.png"
+            },
+            {
+                "title": self.lang_manager.get_string("tutorial_step_6_title"),
+                "text": self.lang_manager.get_string("tutorial_step_6_text"),
+                "image": "logout.png"
+            }
+        ]
+
     def show_tutorial_window(self):
         # Create window with increased width to avoid clipping titles
         self.tutorial_window = ctk.CTkToplevel(self.parent)
-        self.tutorial_window.title("Welcome to SecureVault Pro")
+        self.tutorial_window.title(self.lang_manager.get_string("tutorial_title"))
         width, height = self.win_width, self.win_height
         self.tutorial_window.overrideredirect(True)
         self.tutorial_window.resizable(False, False)
@@ -172,14 +163,14 @@ class TutorialManager:
         right_container.grid(row=0, column=1, sticky="e")
 
         if self.current_step > 0:
-            prev_button = ctk.CTkButton(left_container, text="Previous", command=self.prev_step, width=110)
+            prev_button = ctk.CTkButton(left_container, text=self.lang_manager.get_string("previous_button"), command=self.prev_step, width=110)
             prev_button.pack(side="left", padx=4)
 
         if self.current_step < len(self.steps) - 1:
-            next_button = ctk.CTkButton(right_container, text="Next", command=self.next_step, width=110)
+            next_button = ctk.CTkButton(right_container, text=self.lang_manager.get_string("next_button"), command=self.next_step, width=110)
             next_button.pack(side="right", padx=4)
         else:
-            finish_button = ctk.CTkButton(right_container, text="Finish", command=self.finish_tutorial, width=110)
+            finish_button = ctk.CTkButton(right_container, text=self.lang_manager.get_string("finish_button"), command=self.finish_tutorial, width=110)
             finish_button.pack(side="right", padx=4)
 
     def next_step(self):

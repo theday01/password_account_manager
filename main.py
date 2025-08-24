@@ -26,6 +26,7 @@ import logging
 from audit_logger import setup_logging
 from two_factor_auth import TwoFactorAuthManager
 from tutorial import TutorialManager
+from localization import LanguageManager
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,8 @@ class CryptoManager:
         return hmac.compare_digest(expected, signature)
 
 class PasswordGenerator:
-    def __init__(self):
+    def __init__(self, lang_manager):
+        self.lang_manager = lang_manager
         self.logger = logging.getLogger(__name__)
         self.lowercase = "abcdefghijklmnopqrstuvwxyz"
         self.uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -193,7 +195,7 @@ class PasswordGenerator:
         elif password_length >= 8:
             score += 15
         else:
-            recommendations.append("Use at least 12 characters")
+            recommendations.append(self.lang_manager.get_string("use_at_least_12_chars"))
         has_lower = any(c.islower() for c in password)
         has_upper = any(c.isupper() for c in password)
         has_digit = any(c.isdigit() for c in password)
@@ -201,13 +203,13 @@ class PasswordGenerator:
         variety_score = sum([has_lower, has_upper, has_digit, has_symbol]) * 10
         score += variety_score
         if not has_lower:
-            recommendations.append("Add lowercase letters")
+            recommendations.append(self.lang_manager.get_string("add_lowercase"))
         if not has_upper:
-            recommendations.append("Add uppercase letters")
+            recommendations.append(self.lang_manager.get_string("add_uppercase"))
         if not has_digit:
-            recommendations.append("Add numbers")
+            recommendations.append(self.lang_manager.get_string("add_numbers"))
         if not has_symbol:
-            recommendations.append("Add symbols")
+            recommendations.append(self.lang_manager.get_string("add_symbols"))
         unique_chars = len(set(password))
         if password_length > 0:
             uniqueness_ratio = unique_chars / password_length
@@ -218,7 +220,7 @@ class PasswordGenerator:
             elif uniqueness_ratio > 0.5:
                 score += 10
             else:
-                recommendations.append("Avoid repeated characters")
+                recommendations.append(self.lang_manager.get_string("avoid_repeated_chars"))
         if password_length >= 32:
             score += 10
         if password_length >= 50:
@@ -226,7 +228,7 @@ class PasswordGenerator:
         common_patterns = ["123", "abc", "qwerty", "password"]
         if any(pattern in password.lower() for pattern in common_patterns):
             score -= 20
-            recommendations.append("Avoid common patterns")
+            recommendations.append(self.lang_manager.get_string("avoid_common_patterns"))
         score = min(100, max(0, score))
         if score >= 90:
             strength = "Excellent"
@@ -666,8 +668,9 @@ class DatabaseManager:
         metadata_conn.close()
 class ModernPasswordManagerGUI:
     def __init__(self):
+        self.lang_manager = LanguageManager()
         self.crypto = CryptoManager()
-        self.password_generator = PasswordGenerator()
+        self.password_generator = PasswordGenerator(self.lang_manager)
         self.tfa_manager = TwoFactorAuthManager()
         self.database = None
         self.secure_file_manager = None
@@ -675,7 +678,7 @@ class ModernPasswordManagerGUI:
         ctk.set_appearance_mode("dark")  
         self.root = ctk.CTk()
         self.root.withdraw()
-        self.root.title("SecureVault Pro")
+        self.root.title(self.lang_manager.get_string("app_title"))
         self.root.geometry("1200x800")
         try:
             icon_path = os.path.join("icons", "main.ico")
@@ -710,7 +713,7 @@ class ModernPasswordManagerGUI:
         
         width, height = 420, 380
         loading_window = ctk.CTkToplevel(self.root, fg_color=bg_color)
-        loading_window.title("Loading...")
+        loading_window.title(self.lang_manager.get_string("loading"))
         loading_window.geometry(f"{width}x{height}")
         loading_window.resizable(False, False)
         loading_window.overrideredirect(True)
@@ -732,14 +735,14 @@ class ModernPasswordManagerGUI:
 
         ctk.CTkLabel(
             loading_window,
-            text="SecureVault Pro",
+            text=self.lang_manager.get_string("app_title"),
             font=ctk.CTkFont(size=24, weight="bold"),
             text_color=accent_color
         ).pack(pady=(0, 3))
 
         ctk.CTkLabel(
             loading_window,
-            text="~ ONLY YOU OPEN IT !",
+            text=self.lang_manager.get_string("app_slogan"),
             font=ctk.CTkFont(size=11, slant="italic"),
             text_color=slogan_color
         ).pack(pady=(0, 15))
@@ -756,7 +759,7 @@ class ModernPasswordManagerGUI:
 
         status_label = ctk.CTkLabel(
             loading_window,
-            text="Initializing...",
+            text=self.lang_manager.get_string("initializing"),
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color=accent_color
         )
@@ -764,7 +767,7 @@ class ModernPasswordManagerGUI:
 
         details_label = ctk.CTkLabel(
             loading_window,
-            text="Starting up the engine...",
+            text=self.lang_manager.get_string("starting_engine"),
             font=ctk.CTkFont(size=10),
             text_color=subtext_color
         )
@@ -773,23 +776,23 @@ class ModernPasswordManagerGUI:
         def update_loading(step):
             if step == 1:
                 progress_bar.set(0.25)
-                status_label.configure(text="Loading components...")
-                details_label.configure(text="Loading GUI elements and icons...")
+                status_label.configure(text=self.lang_manager.get_string("loading_components"))
+                details_label.configure(text=self.lang_manager.get_string("loading_gui"))
                 loading_window.after(700, lambda: update_loading(2))
             elif step == 2:
                 progress_bar.set(0.55)
-                status_label.configure(text="Verifying security...")
-                details_label.configure(text="Checking vault integrity and loading settings...")
+                status_label.configure(text=self.lang_manager.get_string("verifying_security"))
+                details_label.configure(text=self.lang_manager.get_string("checking_vault"))
                 loading_window.after(1000, lambda: update_loading(3))
             elif step == 3:
                 progress_bar.set(0.85)
-                status_label.configure(text="Preparing workspace...")
-                details_label.configure(text="Setting up the main interface...")
+                status_label.configure(text=self.lang_manager.get_string("preparing_workspace"))
+                details_label.configure(text=self.lang_manager.get_string("setting_up_main_interface"))
                 loading_window.after(600, lambda: update_loading(4))
             elif step == 4:
                 progress_bar.set(1.0)
-                status_label.configure(text="Done!")
-                details_label.configure(text="Launching application...")
+                status_label.configure(text=self.lang_manager.get_string("done"))
+                details_label.configure(text=self.lang_manager.get_string("launching_application"))
                 loading_window.after(600, lambda: finish_loading())
 
         def finish_loading():
@@ -818,13 +821,16 @@ class ModernPasswordManagerGUI:
             'last_modified': None,
             'secure_storage_enabled': True,
             'tfa_secret': None,
-            'tutorial_completed': False
+            'tutorial_completed': False,
+            'language': 'English'
         }
         if self.secure_file_manager:
             try:
                 loaded_settings = self.secure_file_manager.read_settings()
                 if loaded_settings:
                     self.settings = {**default_settings, **loaded_settings}
+                    if 'language' in self.settings:
+                        self.lang_manager.set_language(self.settings['language'])
                     self.restore_lockout_state()
                     return
             except Exception as e:
@@ -849,6 +855,8 @@ class ModernPasswordManagerGUI:
                             loaded_settings['failed_attempts'] = 0
                             loaded_settings['consecutive_lockouts'] = 0
                     self.settings = {**default_settings, **loaded_settings}
+                    if 'language' in self.settings:
+                        self.lang_manager.set_language(self.settings['language'])
                     self.restore_lockout_state()
             else:
                 self.settings = default_settings
@@ -999,20 +1007,20 @@ class ModernPasswordManagerGUI:
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         title = ctk.CTkLabel(
             login_card, 
-            text="🔒 SecureVault Pro", 
+            text="🔒 " + self.lang_manager.get_string("app_title"),
             font=ctk.CTkFont(size=28, weight="bold")
         )
         title.pack(pady=(30, 20), padx=40)
         subtitle = ctk.CTkLabel(
             login_card,
-            text="~ ONLY YOU OPEN IT!",
+            text=self.lang_manager.get_string("app_slogan"),
             font=ctk.CTkFont(size=16),
             text_color="#888888"
         )
         subtitle.pack(pady=(0, 30), padx=40)
         self.master_password_entry = ctk.CTkEntry(
             login_card, 
-            placeholder_text="Enter Master Password", 
+            placeholder_text=self.lang_manager.get_string("enter_master_password"),
             show="*", 
             width=350,
             height=45,
@@ -1023,7 +1031,7 @@ class ModernPasswordManagerGUI:
         button_frame.pack(pady=30, padx=40)
         self.login_btn = ctk.CTkButton(
             button_frame, 
-            text="🔓 Login", 
+            text=self.lang_manager.get_string("login"),
             command=self.authenticate_user,
             width=250,
             height=55,
@@ -1034,7 +1042,7 @@ class ModernPasswordManagerGUI:
         self.login_btn.pack(pady=15)
         self.setup_btn = ctk.CTkButton(
             button_frame, 
-            text="⚙️ First Time Setup", 
+            text=self.lang_manager.get_string("first_time_setup"),
             command=self.show_setup_wizard,
             width=250,
             height=55,
@@ -1053,27 +1061,27 @@ class ModernPasswordManagerGUI:
     def authenticate_user(self):
         master_password = self.master_password_entry.get().strip()
         if not master_password:
-            messagebox.showerror("Error", "Please enter your master password")
+            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("enter_master_password_error"))
             return
         if not self.is_vault_initialized():
-            messagebox.showerror("Error", "Vault is not initialized. Please run first time setup.")
+            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("vault_not_initialized_error"))
             return
         if self.secure_file_manager:
             legacy_setup = SecureVaultSetup(self.secure_file_manager)
             if legacy_setup.has_legacy_files():
                 logger.info("Legacy files detected, starting migration...")
                 if not legacy_setup.migrate_legacy_files(master_password):
-                    messagebox.showerror("Migration Error", "Failed to migrate legacy files")
+                    messagebox.showerror(self.lang_manager.get_string("migration_error_title"), self.lang_manager.get_string("migration_error_body"))
                     return
         if self.secure_file_manager:
             if not self.secure_file_manager.initialize_encryption(master_password):
-                messagebox.showerror("Error", "Failed to initialize secure storage")
+                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("secure_storage_init_error"))
                 return
             logger.info("Loading files from secure storage...")
             if not self.secure_file_manager.load_files_to_temp():
                 diagnostic_report = self.diagnose_secure_storage_issues()
-                error_msg = "Failed to load files from secure storage.\n\n"
-                error_msg += "🔍 Diagnostic Report:\n" + diagnostic_report
+                error_msg = self.lang_manager.get_string("secure_storage_load_error") + "\n\n"
+                error_msg += self.lang_manager.get_string("diagnostic_report") + "\n" + diagnostic_report
                 self.show_secure_storage_error_dialog(error_msg)
                 return
         db_path = "manageyouraccount"
@@ -1094,25 +1102,21 @@ class ModernPasswordManagerGUI:
         else:
             if hasattr(self.database, 'last_integrity_error') and self.database.last_integrity_error:
                 result = messagebox.askyesno(
-                    "Integrity Error", 
-                    "Database integrity check failed. This usually happens when:\n\n"
-                    "• Database files were modified outside the application\n"
-                    "• The application was not properly closed\n"
-                    "• There was a system crash\n\n"
-                    "Would you like to attempt to fix this automatically?"
+                    self.lang_manager.get_string("integrity_error_title"),
+                    self.lang_manager.get_string("integrity_error_body")
                 )
                 
                 if result:
                     try:
                         if self.database.force_integrity_reset():
-                            messagebox.showinfo("Success", 
-                                            "Integrity issue fixed! Please try logging in again.")
+                            messagebox.showinfo(self.lang_manager.get_string("success"),
+                                            self.lang_manager.get_string("integrity_fix_success"))
                             self.database.last_integrity_error = False
                             return
                         else:
-                            messagebox.showerror("Error", "Failed to fix integrity issue automatically.")
+                            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("integrity_fix_fail"))
                     except Exception as e:
-                        messagebox.showerror("Error", f"Failed to fix integrity issue: {str(e)}")
+                        messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("integrity_fix_error", error=str(e)))
             
             self.failed_attempts += 1
             if self.failed_attempts >= 3:
@@ -1120,12 +1124,12 @@ class ModernPasswordManagerGUI:
                 lockout_minutes = 3 * self.consecutive_lockouts
                 self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
                 self.save_lockout_state()
-                messagebox.showerror("Account Locked", 
-                            f"Too many failed attempts. Account locked for {lockout_minutes} minutes.")
+                messagebox.showerror(self.lang_manager.get_string("account_locked_error_title"),
+                            self.lang_manager.get_string("account_locked_error", minutes=lockout_minutes))
                 self.failed_attempts = 0
                 self.disable_login_button_with_countdown(lockout_minutes)
             else:
-                messagebox.showerror("Error", f"Invalid master password. {3 - self.failed_attempts} attempts remaining.")
+                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("invalid_master_password_error", attempts=3 - self.failed_attempts))
 
     def _start_security_monitoring(self):
         if self.security_monitor:
@@ -1193,7 +1197,7 @@ class ModernPasswordManagerGUI:
         if self.enforce_lockout():
             return False
         dialog = ctk.CTkToplevel(self.root)
-        dialog.title("Verify Master Password")
+        dialog.title(self.lang_manager.get_string("verify_master_password_title"))
         dialog.geometry("400x230")
         dialog.grab_set()
         dialog.resizable(False, False)
@@ -1201,11 +1205,11 @@ class ModernPasswordManagerGUI:
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        ctk.CTkLabel(main_frame, text="🔐 Authentication Required",
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("auth_required"),
                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
         
         password_entry = ctk.CTkEntry(main_frame, width=300, height=40, show="*",
-                                    placeholder_text="Master Password")
+                                    placeholder_text=self.lang_manager.get_string("master_password_placeholder"))
         password_entry.pack(pady=15)
         password_entry.focus()
         
@@ -1223,8 +1227,8 @@ class ModernPasswordManagerGUI:
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=10)
         
-        ctk.CTkButton(button_frame, text="Cancel", command=on_cancel, width=100).pack(side="left", padx=10)
-        ctk.CTkButton(button_frame, text="OK", command=on_ok, width=100).pack(side="right", padx=10)
+        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), command=on_cancel, width=100).pack(side="left", padx=10)
+        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("ok_button"), command=on_ok, width=100).pack(side="right", padx=10)
         
         dialog.wait_window()
         
@@ -1242,43 +1246,43 @@ class ModernPasswordManagerGUI:
                     lockout_minutes = 3 * self.consecutive_lockouts
                     self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
                     self.save_lockout_state()
-                    messagebox.showerror("Account Locked", 
-                                    f"Too many failed attempts. Account locked for {lockout_minutes} minutes.")
+                    messagebox.showerror(self.lang_manager.get_string("account_locked_error_title"),
+                                    self.lang_manager.get_string("account_locked_error", minutes=lockout_minutes))
                     self.failed_attempts = 0
                 else:
-                    messagebox.showerror("Error", "Invalid master password")
+                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("invalid_master_password"))
                 return False
         except Exception:
-            messagebox.showerror("Error", "Authentication failed")
+            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("auth_failed"))
             return False
 
     def show_setup_wizard(self):
         if self.is_vault_initialized():
-            messagebox.showinfo("Already Set Up", "Vault is already initialized.")
+            messagebox.showinfo(self.lang_manager.get_string("setup_wizard_title"), self.lang_manager.get_string("vault_not_initialized_error"))
             return
         
         self.update_login_button_states()
         setup_window = ctk.CTkToplevel(self.root)
-        setup_window.title("SecureVault Pro Setup Wizard")
+        setup_window.title(self.lang_manager.get_string("setup_wizard_title"))
         setup_window.geometry("600x370")
         setup_window.resizable(0,0)
         setup_window.grab_set()
         main_frame = ctk.CTkFrame(setup_window)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        ctk.CTkLabel(main_frame, text="Create Your Master Password", 
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("create_master_password_title"), 
                      font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
-        self.setup_master_password = ctk.CTkEntry(main_frame, placeholder_text="Master Password", 
+        self.setup_master_password = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("master_password_placeholder"), 
                                                   show="*", width=300, height=40)
         self.setup_master_password.pack(pady=10)
-        self.setup_confirm_password = ctk.CTkEntry(main_frame, placeholder_text="Confirm Password", 
+        self.setup_confirm_password = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("confirm_password_placeholder"), 
                                                    show="*", width=300, height=40)
         self.setup_confirm_password.pack(pady=10)
         self.strength_label = ctk.CTkLabel(main_frame, text="")
         self.strength_label.pack(pady=10)
         self.setup_master_password.bind("<KeyRelease>", self.update_password_strength)
         
-        finish_btn = ctk.CTkButton(main_frame, text="Complete Setup", 
+        finish_btn = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("complete_setup_button"), 
                                    command=lambda: self.complete_setup(setup_window),
                                    height=45, font=ctk.CTkFont(size=16))
         finish_btn.pack(pady=20)
@@ -1293,7 +1297,7 @@ class ModernPasswordManagerGUI:
             }
             color = color_map.get(strength, "#888888")
             self.strength_label.configure(
-                text=f"Length: {len(password)} chars | Strength: {strength} ({score}/100)", 
+                text=self.lang_manager.get_string("password_strength_template", length=len(password), strength=strength, score=score), 
                 text_color=color
             )
 
@@ -1301,18 +1305,18 @@ class ModernPasswordManagerGUI:
         master_password = self.setup_master_password.get()
         confirm_password = self.setup_confirm_password.get()
         if not master_password or master_password != confirm_password:
-            messagebox.showerror("Error", "Passwords don't match or are empty")
+            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("passwords_dont_match"))
             return
         if len(master_password) < 1:
-            messagebox.showerror("Error", "Password must be at least 16 characters long.")
+            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("password_too_short"))
             return
         try:
             if self.secure_file_manager:
                 if not self.secure_file_manager.initialize_encryption(master_password):
-                    messagebox.showerror("Error", "Failed to initialize secure storage")
+                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("secure_storage_init_error"))
                     return
                 if not self.secure_file_manager.initialize_vault_files():
-                    messagebox.showerror("Error", "Failed to create secure vault files")
+                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("create_vault_files_error"))
                     return
                 self.secure_file_manager.load_files_to_temp()
             
@@ -1322,12 +1326,12 @@ class ModernPasswordManagerGUI:
             
             if self.secure_file_manager:
                 self.secure_file_manager.sync_all_files()
-            messagebox.showinfo("Success", "SecureVault Pro has been set up successfully!")
+            messagebox.showinfo(self.lang_manager.get_string("success"), self.lang_manager.get_string("setup_success_message"))
             
             setup_window.destroy()
             self.show_login_screen()
         except Exception as e:
-            messagebox.showerror("Error", f"Setup failed: {str(e)}")
+            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("setup_failed_message", error=str(e)))
 
     def show_main_interface(self):
         self.root.state('zoomed')
@@ -1341,7 +1345,7 @@ class ModernPasswordManagerGUI:
 
         # Show tutorial on first-time login
         if not self.settings.get('tutorial_completed', False):
-            tutorial = TutorialManager(self.root)
+            tutorial = TutorialManager(self.root, self.lang_manager)
             tutorial.show_tutorial_window()
             self.settings['tutorial_completed'] = True
             self.save_settings_to_file()
@@ -1352,13 +1356,13 @@ class ModernPasswordManagerGUI:
         
         ctk.CTkLabel(
             toolbar, 
-            text="🔒 SecureVault Pro", 
+            text=self.lang_manager.get_string("main_toolbar_title"), 
             font=ctk.CTkFont(size=24, weight="bold")
         ).pack(side="left", padx=25, pady=20)
         
         ctk.CTkButton(
             toolbar, 
-            text="Logout", 
+            text=self.lang_manager.get_string("logout"), 
             width=100, 
             height=55,
             image=logout,
@@ -1369,7 +1373,7 @@ class ModernPasswordManagerGUI:
         
         ctk.CTkButton(
             toolbar, 
-            text="Settings", 
+            text=self.lang_manager.get_string("settings"), 
             width=120, 
             height=55,
             image=settings,
@@ -1380,7 +1384,7 @@ class ModernPasswordManagerGUI:
 
         ctk.CTkButton(
             toolbar,
-            text="About",
+            text=self.lang_manager.get_string("about"),
             width=120,
             height=55,
             image=info,
@@ -1391,7 +1395,7 @@ class ModernPasswordManagerGUI:
 
         ctk.CTkButton(
             toolbar,
-            text="Backup",
+            text=self.lang_manager.get_string("backup"),
             width=120,
             height=55,
             image=save,
@@ -1402,7 +1406,7 @@ class ModernPasswordManagerGUI:
 
         ctk.CTkButton(
             toolbar,
-            text="Restore old backup",
+            text=self.lang_manager.get_string("restore_old_backup"),
             width=160,
             height=55,
             image=restore_icon,
@@ -1428,7 +1432,7 @@ class ModernPasswordManagerGUI:
         from backup_manager import BackupManager, BackupError
 
         if not getattr(self, "database", None):
-            messagebox.showerror("Error", "Database not available. Please log in first.")
+            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("database_not_available_error"))
             return
 
         backup_folder = os.path.join(os.getcwd(), "backups")
@@ -1436,16 +1440,16 @@ class ModernPasswordManagerGUI:
         backups = sorted(glob.glob(os.path.join(backup_folder, "*.svbk")), reverse=True)
 
         win = tk.Toplevel(self.root)
-        win.title("Restore Backup")
+        win.title(self.lang_manager.get_string("restore_dialog_title"))
         win.geometry("820x480")
         win.resizable(True, True)
 
         top_frame = tk.Frame(win)
         top_frame.pack(fill="x", padx=12, pady=(12,6))
 
-        tk.Label(top_frame, text="Available backups (most recent first):", anchor="w", font=("TkDefaultFont", 10, "bold")).pack(anchor="w")
+        tk.Label(top_frame, text=self.lang_manager.get_string("available_backups_label"), anchor="w", font=("TkDefaultFont", 10, "bold")).pack(anchor="w")
 
-        info_label = tk.Label(top_frame, text="Select a backup to see details", anchor="w", justify="left")
+        info_label = tk.Label(top_frame, text=self.lang_manager.get_string("select_backup_details"), anchor="w", justify="left")
         info_label.pack(fill="x", pady=(6,0))
 
         listbox_frame = tk.Frame(win)
@@ -1461,7 +1465,7 @@ class ModernPasswordManagerGUI:
         listbox.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=listbox.yview)
 
-        preview_lbl = tk.Label(win, text="Preview / Manifest (enter code to view):", anchor="w")
+        preview_lbl = tk.Label(win, text=self.lang_manager.get_string("preview_manifest_label"), anchor="w")
         preview_lbl.pack(fill="x", padx=12)
         preview_text = tk.Text(win, height=10, wrap="word")
         preview_text.pack(fill="both", padx=12, pady=(4,8), expand=True)
@@ -1477,28 +1481,28 @@ class ModernPasswordManagerGUI:
         def on_selection(event=None):
             sel = listbox.curselection()
             if not sel:
-                info_label.config(text="Select a backup to see details")
+                info_label.config(text=self.lang_manager.get_string("select_backup_details"))
                 return
             idx = sel[0]
             path = backups[idx]
             try:
                 size = os.path.getsize(path)
                 mtime = datetime.utcfromtimestamp(os.path.getmtime(path)).strftime("%Y-%m-%d %H:%M:%SZ")
-                info_text = f"File: {os.path.basename(path)}\nPath: {path}\nSize: {size:,} bytes\nLast modified (UTC): {mtime}\n\nTip: Use 'Preview contents' to view the manifest (requires backup code)."
+                info_text = self.lang_manager.get_string("backup_file_details_template", filename=os.path.basename(path), path=path, size=size, mtime=mtime)
                 info_label.config(text=info_text)
             except Exception as e:
-                info_label.config(text=f"Error reading file info: {e}")
+                info_label.config(text=self.lang_manager.get_string("error_reading_file_info", e=e))
         
         def browse_for_backup():
             filepath = filedialog.askopenfilename(
-                title="Select a backup file",
-                filetypes=[("SecureVault Backups", "*.svbk"), ("All files", "*.*")]
+                title=self.lang_manager.get_string("select_backup_file_title"),
+                filetypes=[(self.lang_manager.get_string("secure_vault_backups_filetype"), "*.svbk"), (self.lang_manager.get_string("all_files_filetype"), "*.*")]
             )
             if filepath:
                 # Always add to the top of the list, even if not in backups folder
                 if filepath not in backups:
                     backups.insert(0, filepath)
-                    listbox.insert(0, f"{len(backups)}. {os.path.basename(filepath)} (external)")
+                    listbox.insert(0, self.lang_manager.get_string("external_backup_label", index=len(backups), filename=os.path.basename(filepath)))
                 else:
                     idx = backups.index(filepath)
                     listbox.selection_clear(0, "end")
@@ -1514,16 +1518,16 @@ class ModernPasswordManagerGUI:
         def preview_contents():
             sel = listbox.curselection()
             if not sel:
-                messagebox.showerror("No selection", "Please select a backup to preview.")
+                messagebox.showerror(self.lang_manager.get_string("no_selection_error"), self.lang_manager.get_string("select_backup_to_preview_error"))
                 return
             idx = sel[0]
             backup_path = backups[idx]
 
-            code = simpledialog.askstring("Backup Code", "Enter the backup code to preview this backup:", parent=win, show="*")
+            code = simpledialog.askstring(self.lang_manager.get_string("backup_code_prompt_preview"), self.lang_manager.get_string("backup_code_prompt_preview"), parent=win, show="*")
             if code is None:
                 return
 
-            status_var.set("Previewing backup (decrypting)... this may take a moment")
+            status_var.set(self.lang_manager.get_string("previewing_backup_status"))
             win.update_idletasks()
             tempdir = tempfile.mkdtemp(prefix="sv_preview_")
             try:
@@ -1537,10 +1541,10 @@ class ModernPasswordManagerGUI:
                 try:
                     restored = bm.restore_backup(backup_path, code, restore_to_dir=tempdir)
                 except BackupError as be:
-                    messagebox.showerror("Preview failed", f"Failed to decrypt/preview backup: {be}")
+                    messagebox.showerror(self.lang_manager.get_string("preview_failed_error"), self.lang_manager.get_string("preview_failed_error", be=be))
                     return
                 except Exception as e:
-                    messagebox.showerror("Preview failed", f"Unexpected error during preview: {e}")
+                    messagebox.showerror(self.lang_manager.get_string("preview_failed_error"), self.lang_manager.get_string("unexpected_preview_error", e=e))
                     return
 
                 manifest_path = os.path.join(tempdir, "backup_manifest.json")
@@ -1553,9 +1557,9 @@ class ModernPasswordManagerGUI:
                         pretty = json.dumps(manifest, indent=2, ensure_ascii=False)
                         preview_text.insert("1.0", pretty)
                     except Exception as e:
-                        preview_text.insert("1.0", f"Failed to read manifest: {e}\n\nFiles restored to temp dir:\n" + "\n".join(os.path.basename(p) for p in restored))
+                        preview_text.insert("1.0", self.lang_manager.get_string("failed_to_read_manifest", e=e, files="\n".join(os.path.basename(p) for p in restored)))
                 else:
-                    preview_text.insert("1.0", "No manifest found. Files contained:\n" + "\n".join(os.path.basename(p) for p in restored))
+                    preview_text.insert("1.0", self.lang_manager.get_string("no_manifest_found", files="\n".join(os.path.basename(p) for p in restored)))
 
                 preview_text.configure(state="disabled")
             finally:
@@ -1563,28 +1567,28 @@ class ModernPasswordManagerGUI:
                     shutil.rmtree(tempdir)
                 except Exception:
                     pass
-                status_var.set("Preview complete")
+                status_var.set(self.lang_manager.get_string("preview_complete_status"))
 
         def perform_restore():
             sel = listbox.curselection()
             if not sel:
-                messagebox.showerror("No selection", "Please select a backup to restore.")
+                messagebox.showerror(self.lang_manager.get_string("no_selection_error"), self.lang_manager.get_string("select_backup_to_restore_error"))
                 return
             idx = sel[0]
             backup_path = backups[idx]
 
-            code = simpledialog.askstring("Backup Code", "Enter the backup code for this file:", parent=win, show="*")
+            code = simpledialog.askstring(self.lang_manager.get_string("backup_code_prompt_restore"), self.lang_manager.get_string("backup_code_prompt_restore"), parent=win, show="*")
             if code is None:
                 return
 
             proceed = messagebox.askyesno(
-                "Confirm restore",
-                "Restoring will overwrite the active vault files. A backup of existing files will be created (suffix .bak.TIMESTAMP). Proceed?"
+                self.lang_manager.get_string("confirm_restore_title"),
+                self.lang_manager.get_string("confirm_restore_message")
             )
             if not proceed:
                 return
 
-            status_var.set("Restoring backup... please wait")
+            status_var.set(self.lang_manager.get_string("restoring_backup_status"))
             win.update_idletasks()
             tempdir = tempfile.mkdtemp(prefix="sv_restore_")
             try:
@@ -1600,12 +1604,12 @@ class ModernPasswordManagerGUI:
                     restored = bm.restore_backup(backup_path, code, restore_to_dir=tempdir)
                 except BackupError as be:
                     shutil.rmtree(tempdir, ignore_errors=True)
-                    messagebox.showerror("Restore failed", f"Failed to decrypt/restore backup: {be}")
+                    messagebox.showerror(self.lang_manager.get_string("restore_failed_error"), self.lang_manager.get_string("restore_failed_error", be=be))
                     status_var.set("")
                     return
                 except Exception as e:
                     shutil.rmtree(tempdir, ignore_errors=True)
-                    messagebox.showerror("Restore failed", f"Unexpected error while restoring: {e}")
+                    messagebox.showerror(self.lang_manager.get_string("restore_failed_error"), self.lang_manager.get_string("unexpected_restore_error", e=e))
                     status_var.set("")
                     return
 
@@ -1633,14 +1637,10 @@ class ModernPasswordManagerGUI:
                     moved.append(dest)
 
                 shutil.rmtree(tempdir, ignore_errors=True)
-                status_var.set("Restore complete")
-                message = f"Restore complete.\n\nRestored files:\n" + "\n".join(os.path.basename(p) for p in moved)
-                if backups_created:
-                    message += "\n\nBackups of previous files:\n" + "\n".join(backups_created)
-                message += ("\n\nIMPORTANT: The program must be restarted for changes to take full effect.\n"
-                            "Please save your work. Do you want to exit the program now?")
+                status_var.set(self.lang_manager.get_string("restore_complete_status"))
+                message = self.lang_manager.get_string("restore_complete_message", moved="\n".join(os.path.basename(p) for p in moved), backups="\n".join(backups_created))
 
-                if messagebox.askyesno("Restore complete - Exit now?", message):
+                if messagebox.askyesno(self.lang_manager.get_string("restore_complete_message_title"), message):
                     try:
                         try:
                             self.root.destroy()
@@ -1650,28 +1650,28 @@ class ModernPasswordManagerGUI:
                     except SystemExit:
                         raise
                     except Exception as e:
-                        messagebox.showinfo("Exit failed", f"Automatic exit failed: {e}\nPlease close the program manually.")
+                        messagebox.showinfo(self.lang_manager.get_string("exit_failed_error"), self.lang_manager.get_string("exit_failed_error", e=e))
                 else:
-                    messagebox.showinfo("Restore complete", "Restore complete. Please restart the program later for changes to take effect.")
+                    messagebox.showinfo(self.lang_manager.get_string("restore_complete_info"), self.lang_manager.get_string("restore_complete_info"))
                 win.destroy()
             except Exception as e:
-                messagebox.showerror("Restore error", f"An error occurred during restore: {e}")
+                messagebox.showerror(self.lang_manager.get_string("restore_error_title"), self.lang_manager.get_string("restore_error_message", e=e))
                 status_var.set("")
                 try:
                     shutil.rmtree(tempdir, ignore_errors=True)
                 except Exception:
                     pass
 
-        browse_btn = tk.Button(btn_frame, text="Browse...", command=browse_for_backup, width=12)
+        browse_btn = tk.Button(btn_frame, text=self.lang_manager.get_string("browse_button"), command=browse_for_backup, width=12)
         browse_btn.pack(side="left", padx=(0,8))
 
-        preview_btn = tk.Button(btn_frame, text="Preview contents", command=preview_contents, width=18)
+        preview_btn = tk.Button(btn_frame, text=self.lang_manager.get_string("preview_contents_button"), command=preview_contents, width=18)
         preview_btn.pack(side="left", padx=(0,8))
 
-        restore_btn = tk.Button(btn_frame, text="Restore Selected Backup", command=perform_restore, width=22)
+        restore_btn = tk.Button(btn_frame, text=self.lang_manager.get_string("restore_selected_backup_button"), command=perform_restore, width=22)
         restore_btn.pack(side="left", padx=(0,8))
 
-        close_btn = tk.Button(btn_frame, text="Close", command=win.destroy, width=12)
+        close_btn = tk.Button(btn_frame, text=self.lang_manager.get_string("close_button"), command=win.destroy, width=12)
         close_btn.pack(side="right")
 
         win.transient(self.root)
@@ -1681,11 +1681,11 @@ class ModernPasswordManagerGUI:
     def show_backup_dialog(self):
         import tkinter.simpledialog as simpledialog
         if not self.database:
-            messagebox.showerror("Error", "Database is not available (not authenticated).")
+            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("database_not_available_error"))
             return
 
         dialog = ctk.CTkToplevel(self.root)
-        dialog.title("Create Secure Backup")
+        dialog.title(self.lang_manager.get_string("backup_dialog_title"))
         dialog.geometry("630x730")
         dialog.grab_set()
         dialog.resizable(False, False)
@@ -1693,33 +1693,17 @@ class ModernPasswordManagerGUI:
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-        ctk.CTkLabel(main_frame, text="🔐 Create Encrypted Backup", 
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("create_encrypted_backup_title"), 
                     font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(20, 10))
 
         warning_frame = ctk.CTkFrame(main_frame, fg_color="#2b1515")  # Dark red background
         warning_frame.pack(fill="x", padx=10, pady=15)
 
-        ctk.CTkLabel(warning_frame, text="⚠️ CRITICAL SECURITY WARNINGS", 
+        ctk.CTkLabel(warning_frame, text=self.lang_manager.get_string("critical_security_warnings_title"), 
                     font=ctk.CTkFont(size=18, weight="bold"), 
                     text_color="#ff4444").pack(pady=(15, 10))
 
-        warnings_text = """🚨 BACKUP CODE IS EXTREMELY IMPORTANT:
-    • If you LOSE your backup code, your backup is PERMANENTLY UNUSABLE
-    • Write down your backup code on PAPER and store it SAFELY
-    • DO NOT store the backup code digitally on the same device
-    • Consider storing the code in multiple SECURE physical locations
-
-    🔒 BACKUP SECURITY BEST PRACTICES:
-    • Use a STRONG, UNIQUE backup code (minimum 12 characters)
-    • Include uppercase, lowercase, numbers, and symbols
-    • NEVER share your backup code with anyone
-    • Store backups and codes in SEPARATE secure locations
-
-    💾 BACKUP FILE SAFETY:
-    • Store backup files (.svbk) in secure, encrypted storage
-    • Make multiple copies in different safe locations
-    • Test your backup restoration periodically
-    • Keep backup codes separate from backup files"""
+        warnings_text = self.lang_manager.get_string("backup_warnings_text")
 
         warning_label = ctk.CTkLabel(warning_frame, text=warnings_text, 
                                     font=ctk.CTkFont(size=12), 
@@ -1730,52 +1714,41 @@ class ModernPasswordManagerGUI:
         code_frame = ctk.CTkFrame(main_frame)
         code_frame.pack(fill="x", padx=10, pady=10)
 
-        ctk.CTkLabel(code_frame, text="Enter Backup Code:", 
+        ctk.CTkLabel(code_frame, text=self.lang_manager.get_string("enter_backup_code_label"), 
                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(15, 5))
 
-        ctk.CTkLabel(code_frame, text="⚠️ Remember: This code is required to restore your backup!", 
+        ctk.CTkLabel(code_frame, text=self.lang_manager.get_string("remember_backup_code_warning"), 
                     font=ctk.CTkFont(size=12), 
                     text_color="#ff4444").pack(pady=(0, 10))
 
         code_entry = ctk.CTkEntry(code_frame, width=400, height=40, show="*",
-                                placeholder_text="Enter a strong backup code...")
+                                placeholder_text=self.lang_manager.get_string("backup_code_placeholder"))
         code_entry.pack(pady=(0, 10))
 
         def toggle_code_visibility():
             if code_entry.cget("show") == "*":
                 code_entry.configure(show="")
-                show_btn.configure(text="🙈 Hide")
+                show_btn.configure(text=self.lang_manager.get_string("hide_button"))
             else:
                 code_entry.configure(show="*")
-                show_btn.configure(text="👁️ Show")
+                show_btn.configure(text=self.lang_manager.get_string("show_button"))
 
-        show_btn = ctk.CTkButton(code_frame, text="👁️ Show", width=80, height=30,
+        show_btn = ctk.CTkButton(code_frame, text=self.lang_manager.get_string("show_button"), width=80, height=30,
                                 command=toggle_code_visibility)
         show_btn.pack(pady=(0, 15))
 
         def create_backup():
             code = code_entry.get().strip()
             if not code:
-                messagebox.showerror("Error", "⚠️ Backup code is required!")
+                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("backup_code_required_error"))
                 return
 
             if len(code) < 8:
-                messagebox.showerror("Error", "⚠️ Backup code must be at least 8 characters long!")
+                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("backup_code_min_length_error"))
                 return
-            confirm_msg = f"""⚠️ FINAL CONFIRMATION ⚠️
+            confirm_msg = self.lang_manager.get_string("final_backup_confirmation_message", code_length=len(code))
 
-    You are about to create an encrypted backup with the code you entered.
-
-    🚨 CRITICAL REMINDERS:
-    • Have you written down your backup code on PAPER?
-    • Have you stored it in a SAFE, SECURE location?
-    • Do you understand that WITHOUT this code, your backup is USELESS?
-
-    Backup code length: {len(code)} characters
-
-    Are you absolutely sure you want to proceed?"""
-
-            if not messagebox.askyesno("🔐 Final Backup Confirmation", confirm_msg):
+            if not messagebox.askyesno(self.lang_manager.get_string("final_backup_confirmation_title"), confirm_msg):
                 return
             try:
                 if self.secure_file_manager:
@@ -1790,32 +1763,20 @@ class ModernPasswordManagerGUI:
                 )
                 out_path = bm.create_backup(code)
                 
-                success_msg = f"""✅ Backup Created Successfully!
-
-    📁 Backup saved to: {out_path}
-
-    🚨 IMPORTANT NEXT STEPS:
-    1. ✍️ Write your backup code on PAPER immediately
-    2. 🏦 Store the code in a SECURE location (safe, bank vault, etc.)
-    3. 💾 Copy the backup file to MULTIPLE secure locations
-    4. 🧪 Test your backup by attempting to restore it
-    5. 🔄 Create regular backups and update storage locations
-
-    ⚠️ Remember: Your backup is only as secure as your backup code storage!"""
+                success_msg = self.lang_manager.get_string("backup_complete_message", out_path=out_path)
                 
-                messagebox.showinfo("🎉 Backup Complete", success_msg)
+                messagebox.showinfo(self.lang_manager.get_string("backup_complete_title"), success_msg)
                 dialog.destroy()
             except Exception as e:
-                messagebox.showerror("❌ Backup Failed", 
-                                f"Failed to create backup:\n\n{str(e)}\n\n"
-                                f"Please check your permissions and try again.")
+                messagebox.showerror(self.lang_manager.get_string("backup_failed_title"), 
+                                self.lang_manager.get_string("backup_failed_message", error=str(e)))
 
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
-        ctk.CTkButton(button_frame, text="Cancel", 
+        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), 
                     command=dialog.destroy, 
                     width=120, height=45).pack(side="left", padx=15)
-        ctk.CTkButton(button_frame, text="🔐 Create Backup", 
+        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("create_backup_button"), 
                     command=create_backup,
                     width=180, height=45, 
                     font=ctk.CTkFont(size=16, weight="bold")).pack(side="right", padx=15)
@@ -1827,7 +1788,7 @@ class ModernPasswordManagerGUI:
         self.sidebar.pack_propagate(False)
         ctk.CTkLabel(
             self.sidebar, 
-            text="Navigation", 
+            text=self.lang_manager.get_string("navigation"), 
             font=ctk.CTkFont(size=18, weight="bold")
         ).pack(pady=(20, 15), padx=15)
         self.sidebar_buttons = []
@@ -1837,9 +1798,9 @@ class ModernPasswordManagerGUI:
         icon_report     = ctk.CTkImage(Image.open("icons/security.png"), size=(24, 24))
 
         sidebar_configs = [
-            ("Your Accounts", icon_accounts, self.show_passwords),
-            ("Password Generator", icon_generator, self.show_password_generator),
-            ("Security Report", icon_report, self.show_security_report),
+            (self.lang_manager.get_string("your_accounts"), icon_accounts, self.show_passwords),
+            (self.lang_manager.get_string("password_generator"), icon_generator, self.show_password_generator),
+            (self.lang_manager.get_string("security_report"), icon_report, self.show_security_report),
         ]
         for text, icon, command in sidebar_configs:
             btn = ctk.CTkButton(
@@ -2004,35 +1965,35 @@ class ModernPasswordManagerGUI:
 
     def show_settings(self):
         settings_window = ctk.CTkToplevel(self.root)
-        settings_window.title("Password Vault Settings")
-        settings_window.geometry("500x500")
+        settings_window.title(self.lang_manager.get_string("settings"))
+        settings_window.geometry("500x600")
         settings_window.grab_set()
         settings_window.resizable(False, False)
         
         main_frame = ctk.CTkFrame(settings_window)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        ctk.CTkLabel(main_frame, text="🔐 Security Settings", 
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("security_settings_title"), 
                     font=ctk.CTkFont(size=24, weight="bold")).pack(pady=20)
         
         password_frame = ctk.CTkFrame(main_frame)
         password_frame.pack(fill="x", pady=10)
         
-        ctk.CTkLabel(password_frame, text="Master Password", 
+        ctk.CTkLabel(password_frame, text=self.lang_manager.get_string("master_password_label"), 
                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
         
-        ctk.CTkButton(password_frame, text="Change Master Password",
+        ctk.CTkButton(password_frame, text=self.lang_manager.get_string("change_master_password_button"),
                     command=self.change_master_password_dialog,
                     height=40).pack(pady=10)
 
         tfa_frame = ctk.CTkFrame(main_frame)
         tfa_frame.pack(fill="x", pady=10)
 
-        ctk.CTkLabel(tfa_frame, text="Two-Factor Authentication",
+        ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("tfa_title"),
                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
 
         tfa_enabled = self.settings.get('tfa_secret') is not None
-        tfa_button_text = "Disable 2FA" if tfa_enabled else "Enable 2FA"
+        tfa_button_text = self.lang_manager.get_string("disable_2fa_button") if tfa_enabled else self.lang_manager.get_string("enable_2fa_button")
         tfa_button = ctk.CTkButton(tfa_frame, text=tfa_button_text,
                                    command=self.show_tfa_dialog,
                                    height=40)
@@ -2042,15 +2003,35 @@ class ModernPasswordManagerGUI:
         timeout_frame = ctk.CTkFrame(main_frame)
         timeout_frame.pack(fill="x", pady=10)
 
-        ctk.CTkLabel(timeout_frame, text="Automatic Logout",
+        ctk.CTkLabel(timeout_frame, text=self.lang_manager.get_string("auto_logout_title"),
                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
 
-        ctk.CTkLabel(timeout_frame, text="For your security, the application will automatically\nlock and close after 2 minutes of inactivity",
+        ctk.CTkLabel(timeout_frame, text=self.lang_manager.get_string("auto_logout_message"),
                     font=ctk.CTkFont(size=12)).pack(pady=10)
+        
+        lang_frame = ctk.CTkFrame(main_frame)
+        lang_frame.pack(fill="x", pady=10)
+
+        ctk.CTkLabel(lang_frame, text=self.lang_manager.get_string("language_settings"),
+                        font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
+
+        language_option_frame = ctk.CTkFrame(lang_frame, fg_color="transparent")
+        language_option_frame.pack(fill="x", padx=20, pady=10)
+
+        ctk.CTkLabel(language_option_frame, text=self.lang_manager.get_string("language"),
+                        font=ctk.CTkFont(size=14)).pack(side="left", padx=10)
+
+        lang_options = ctk.CTkOptionMenu(
+            language_option_frame,
+            values=self.lang_manager.supported_languages,
+            command=self.change_language,
+            variable=ctk.StringVar(value=self.lang_manager.language)
+        )
+        lang_options.pack(side="right", padx=10)
 
     def show_about_dialog(self):
         about_dialog = ctk.CTkToplevel(self.root)
-        about_dialog.title("About SecureVault Pro")
+        about_dialog.title(self.lang_manager.get_string("about_dialog_title"))
         about_dialog.geometry("1000x450")
         about_dialog.resizable(False, False)
         about_dialog.grab_set()
@@ -2058,32 +2039,14 @@ class ModernPasswordManagerGUI:
         main_frame = ctk.CTkFrame(about_dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-        title_label = ctk.CTkLabel(main_frame, text="only you open it!", font=ctk.CTkFont(size=20, weight="bold"))
+        title_label = ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("about_slogan"), font=ctk.CTkFont(size=20, weight="bold"))
         title_label.pack(pady=(0, 15))
 
-        about_text = """
-This program is your personal digital safe for passwords, only you open it!
-
-How it works:
-1. You create a single, strong Master Password. This is the only password you need to remember.
-
-2. When you save a password for a website or app, the program scrambles it into a secret code using your Master Password.
-
-3. This secret code is stored securely on your computer. Without your Master Password, it's just gibberish to anyone else.
-
-4. When you need a password, you unlock the program with your Master Password, and it unscrambles the secret code back into your password for you to use.
-
-Think of it like a locked diary. Only you have the key (your Master Password) to open it and read what's inside.
-
-
-
-
-THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
-"""
+        about_text = self.lang_manager.get_string("about_text")
         text_label = ctk.CTkLabel(main_frame, text=about_text, justify="left")
         text_label.pack(pady=10)
 
-        close_button = ctk.CTkButton(main_frame, text="Close", command=about_dialog.destroy, width=100)
+        close_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("close_button"), command=about_dialog.destroy, width=100)
         close_button.pack(pady=(15, 0))
 
     def show_tfa_dialog(self):
@@ -2095,7 +2058,7 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
 
     def enable_tfa_dialog(self):
         dialog = ctk.CTkToplevel(self.root)
-        dialog.title("Enable Two-Factor Authentication")
+        dialog.title(self.lang_manager.get_string("enable_tfa_dialog_title"))
         dialog.geometry("380x550")
         dialog.resizable(False, False)
         dialog.grab_set()
@@ -2103,7 +2066,7 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-        ctk.CTkLabel(main_frame, text="Scan QR Code with your Authenticator App",
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("scan_qr_code_label"),
                      font=ctk.CTkFont(size=16, weight="bold")).pack(pady=10)
 
         secret = self.tfa_manager.generate_secret()
@@ -2116,7 +2079,7 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         qr_label.image = qr_photo
         qr_label.pack(pady=10)
 
-        ctk.CTkLabel(main_frame, text="Enter the 6-digit code to verify:",
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("enter_6_digit_code_verify_label"),
                      font=ctk.CTkFont(size=14)).pack(pady=10)
         
         code_entry = ctk.CTkEntry(main_frame, width=200)
@@ -2128,24 +2091,24 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
                 encrypted_secret = self.crypto.encrypt_data(secret, self.database.encryption_key)
                 self.settings['tfa_secret'] = base64.b64encode(encrypted_secret).decode('utf-8')
                 self.save_settings_to_file()
-                messagebox.showinfo("Success", "2FA enabled successfully!")
+                messagebox.showinfo(self.lang_manager.get_string("success"), self.lang_manager.get_string("tfa_enabled_success"))
                 dialog.destroy()
             else:
-                messagebox.showerror("Error", "Invalid code. Please try again.")
+                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("invalid_code_try_again"))
 
-        verify_button = ctk.CTkButton(main_frame, text="Verify and Enable", command=verify_and_enable)
+        verify_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("verify_and_enable_button"), command=verify_and_enable)
         verify_button.pack(pady=20)
 
     def disable_tfa_dialog(self):
         dialog = ctk.CTkToplevel(self.root)
-        dialog.title("Disable Two-Factor Authentication")
+        dialog.title(self.lang_manager.get_string("disable_tfa_dialog_title"))
         dialog.geometry("400x250")
         dialog.grab_set()
 
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-        ctk.CTkLabel(main_frame, text="Enter a 6-digit code to disable 2FA:",
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("enter_6_digit_code_disable_label"),
                      font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
         
         code_entry = ctk.CTkEntry(main_frame, width=200)
@@ -2159,24 +2122,24 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
             if self.tfa_manager.verify_code(secret, code):
                 self.settings['tfa_secret'] = None
                 self.save_settings_to_file()
-                messagebox.showinfo("Success", "2FA disabled successfully!")
+                messagebox.showinfo(self.lang_manager.get_string("success"), self.lang_manager.get_string("tfa_disabled_success"))
                 dialog.destroy()
             else:
-                messagebox.showerror("Error", "Invalid code.")
+                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("invalid_code"))
 
-        verify_button = ctk.CTkButton(main_frame, text="Verify and Disable", command=verify_and_disable)
+        verify_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("verify_and_disable_button"), command=verify_and_disable)
         verify_button.pack(pady=20)
 
     def prompt_for_tfa(self):
         dialog = ctk.CTkToplevel(self.root)
-        dialog.title("Two-Factor Authentication")
+        dialog.title(self.lang_manager.get_string("tfa_dialog_title"))
         dialog.geometry("400x250")
         dialog.grab_set()
 
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-        ctk.CTkLabel(main_frame, text="Enter your 6-digit 2FA code:",
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("enter_2fa_code_label"),
                      font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
         
         code_entry = ctk.CTkEntry(main_frame, width=200)
@@ -2199,25 +2162,25 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
                 dialog.destroy()
                 self.show_main_interface()
             else:
-                messagebox.showerror("Error", "Invalid 2FA code.")
+                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("invalid_2fa_code"))
                 self.failed_attempts += 1
                 if self.failed_attempts >= 3:
                     self.consecutive_lockouts += 1
                     lockout_minutes = 3 * self.consecutive_lockouts
                     self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
                     self.save_lockout_state()
-                    messagebox.showerror("Account Locked", 
-                                f"Too many failed attempts. Account locked for {lockout_minutes} minutes.")
+                    messagebox.showerror(self.lang_manager.get_string("account_locked_error_title"),
+                                self.lang_manager.get_string("account_locked_error", minutes=lockout_minutes))
                     self.failed_attempts = 0
                     dialog.destroy()
                     self.lock_vault()
 
-        verify_button = ctk.CTkButton(main_frame, text="Verify", command=verify_tfa)
+        verify_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("verify_button"), command=verify_tfa)
         verify_button.pack(pady=20)
 
     def change_master_password_dialog(self):
         dialog = ctk.CTkToplevel(self.root)
-        dialog.title("Change Master Password")
+        dialog.title(self.lang_manager.get_string("change_master_password_dialog_title"))
         dialog.geometry("450x530")
         dialog.resizable(False, False)
         dialog.grab_set()
@@ -2225,24 +2188,24 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        ctk.CTkLabel(main_frame, text="🔒 Change Master Password",
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("change_master_password_icon_title"),
                     font=ctk.CTkFont(size=20, weight="bold")).pack(pady=20)
         
-        ctk.CTkLabel(main_frame, text="Current Password:", 
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("current_password_label"), 
                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
-        current_entry = ctk.CTkEntry(main_frame, placeholder_text="Enter current password", 
+        current_entry = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("current_password_placeholder"), 
                                     show="*", width=350, height=40)
         current_entry.pack(padx=20, pady=(0, 10))
         
-        ctk.CTkLabel(main_frame, text="New Password:", 
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("new_password_label"), 
                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
-        new_entry = ctk.CTkEntry(main_frame, placeholder_text="Enter new password", 
+        new_entry = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("new_password_placeholder"), 
                                 show="*", width=350, height=40)
         new_entry.pack(padx=20, pady=(0, 10))
         
-        ctk.CTkLabel(main_frame, text="Confirm New Password:", 
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("confirm_new_password_label"), 
                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
-        confirm_entry = ctk.CTkEntry(main_frame, placeholder_text="Confirm new password", 
+        confirm_entry = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("confirm_new_password_placeholder"), 
                                     show="*", width=350, height=40)
         confirm_entry.pack(padx=20, pady=(0, 15))
         progress_label = ctk.CTkLabel(main_frame, text="", font=ctk.CTkFont(size=12))
@@ -2258,46 +2221,46 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
             confirm = confirm_entry.get().strip()
             if not current:
                 try:
-                    progress_label.configure(text="❌ Current password is required", text_color="#FF4444")
+                    progress_label.configure(text=self.lang_manager.get_string("current_password_required_error"), text_color="#FF4444")
                 except:
-                    messagebox.showerror("Error", "Current password is required")
+                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("current_password_required_error"))
                     return
                 current_entry.focus()
                 return
             if not new:
                 try:
-                    progress_label.configure(text="❌ New password is required", text_color="#FF4444")
+                    progress_label.configure(text=self.lang_manager.get_string("new_password_required_error"), text_color="#FF4444")
                 except:
-                    messagebox.showerror("Error", "New password is required")
+                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("new_password_required_error"))
                     return
                 new_entry.focus()
                 return
             if len(new) < 8:
                 try:
-                    progress_label.configure(text="❌ New password must be at least 8 characters", text_color="#FF4444")
+                    progress_label.configure(text=self.lang_manager.get_string("new_password_min_length_error"), text_color="#FF4444")
                 except:
-                    messagebox.showerror("Error", "New password must be at least 8 characters")
+                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("new_password_min_length_error"))
                     return
                 new_entry.focus()
                 return
             if new != confirm:
                 try:
-                    progress_label.configure(text="❌ New passwords don't match", text_color="#FF4444")
+                    progress_label.configure(text=self.lang_manager.get_string("new_passwords_no_match_error"), text_color="#FF4444")
                 except:
-                    messagebox.showerror("Error", "New passwords don't match")
+                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("new_passwords_no_match_error"))
                     return
                 confirm_entry.focus()
                 return
             if current == new:
                 try:
-                    progress_label.configure(text="❌ New password must be different from current", text_color="#FF4444")
+                    progress_label.configure(text=self.lang_manager.get_string("new_password_must_be_different_error"), text_color="#FF4444")
                 except:
-                    messagebox.showerror("Error", "New password must be different from current")
+                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("new_password_must_be_different_error"))
                     return
                 new_entry.focus()
                 return
             try:
-                progress_label.configure(text="🔄 Changing password...", text_color="#FFAA44")
+                progress_label.configure(text=self.lang_manager.get_string("changing_password_status"), text_color="#FFAA44")
                 dialog.update()
             except:
                 pass
@@ -2305,14 +2268,12 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
             try:
                 self.database.change_master_password(current, new)
                 try:
-                    progress_label.configure(text="✅ Password changed successfully!", text_color="#00FF00")
+                    progress_label.configure(text=self.lang_manager.get_string("password_changed_success_status"), text_color="#00FF00")
                     dialog.update()
                 except:
                     pass
-                restart_result = messagebox.showinfo("Password Changed Successfully", 
-                                "Master password changed successfully!\n\n"
-                                "🔄 The program will now restart to ensure all changes take effect.\n\n"
-                                "Please wait while the application restarts...")
+                restart_result = messagebox.showinfo(self.lang_manager.get_string("password_changed_success_title"),
+                                                    self.lang_manager.get_string("password_changed_success_message"))
                 dialog.destroy()
                 self.restart_program()
                 
@@ -2320,32 +2281,32 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
                 error_msg = str(ve)
                 if "Current password is incorrect" in error_msg:
                     try:
-                        progress_label.configure(text="❌ Current password is incorrect", text_color="#FF4444")
+                        progress_label.configure(text=self.lang_manager.get_string("current_password_incorrect_error"), text_color="#FF4444")
                     except:
-                        messagebox.showerror("Error", "Current password is incorrect")
+                        messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("current_password_incorrect_error"))
                     current_entry.focus()
                     current_entry.select_range(0, tk.END)
                 else:
                     try:
                         progress_label.configure(text=f"❌ {error_msg}", text_color="#FF4444")
                     except:
-                        messagebox.showerror("Error", error_msg)
+                        messagebox.showerror(self.lang_manager.get_string("error"), error_msg)
             except Exception as e:
-                error_msg = f"Password change failed: {str(e)}"
+                error_msg = self.lang_manager.get_string("password_change_failed_error", error=str(e))
                 logger.error(f"PASSWORD CHANGE ERROR: {error_msg}")
                 try:
-                    progress_label.configure(text="❌ Password change failed", text_color="#FF4444")
+                    progress_label.configure(text=self.lang_manager.get_string("password_change_failed_status"), text_color="#FF4444")
                 except:
-                    messagebox.showerror("Error", "Password change failed")
+                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("password_change_failed_status"))
         
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
         
-        cancel_btn = ctk.CTkButton(button_frame, text="Cancel", 
+        cancel_btn = ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), 
                                 command=dialog.destroy, width=120, height=45)
         cancel_btn.pack(side="left", padx=15)
         
-        change_btn = ctk.CTkButton(button_frame, text="Change Password", 
+        change_btn = ctk.CTkButton(button_frame, text=self.lang_manager.get_string("change_master_password_button"), 
                                 command=validate_and_change_password,
                                 width=150, height=45, 
                                 font=ctk.CTkFont(size=16, weight="bold"))
@@ -2358,6 +2319,15 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         new_entry.bind('<Return>', on_enter)
         confirm_entry.bind('<Return>', on_enter)
         current_entry.focus()
+
+    def change_language(self, language: str):
+        self.lang_manager.set_language(language)
+        self.settings['language'] = language
+        self.save_settings_to_file()
+        messagebox.showinfo(
+            self.lang_manager.get_string('language_change_title'),
+            self.lang_manager.get_string('language_change_message')
+        )
 
     def restart_program(self):
         import sys
@@ -2430,17 +2400,17 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         header = ctk.CTkFrame(self.main_panel)
         header.pack(fill="x", padx=15, pady=15)
         
-        ctk.CTkLabel(header, text="🔑 Your Accounts", 
+        ctk.CTkLabel(header, text=self.lang_manager.get_string("your_accounts_title"), 
                      font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
         
-        ctk.CTkButton(header, text="➕ Add New Account", 
+        ctk.CTkButton(header, text=self.lang_manager.get_string("add_new_account"), 
                       command=self.show_account_dialog,
                       width=180, height=55, font=ctk.CTkFont(size=20, weight="bold")).pack(side="right", padx=25, pady=15)
         
         search_frame = ctk.CTkFrame(self.main_panel)
         search_frame.pack(fill="x", padx=15, pady=10)
         
-        self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="🔍 Search by name, email, or URL...",
+        self.search_entry = ctk.CTkEntry(search_frame, placeholder_text=self.lang_manager.get_string("search_placeholder"),
                                          width=400, height=45)
         self.search_entry.pack(side="left", padx=25, pady=15)
 
@@ -2479,7 +2449,7 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
             metadata_conn.close()
             if not accounts:
                 if query:
-                    self.show_no_accounts_message("No accounts found matching your search.")
+                    self.show_no_accounts_message(self.lang_manager.get_string("no_accounts_found_search"))
                 else:
                     self.show_no_accounts_message()
                 return
@@ -2492,14 +2462,16 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         query = self.search_entry.get().strip()
         self.load_password_cards(query=query)
 
-    def show_no_accounts_message(self, message="📝 No accounts found"):
+    def show_no_accounts_message(self, message=None):
+        if message is None:
+            message = self.lang_manager.get_string("no_accounts_found")
         frame = ctk.CTkFrame(self.passwords_container)
         frame.pack(fill="x", padx=10, pady=20)
         ctk.CTkLabel(frame, text=message,
                      font=ctk.CTkFont(size=18, weight="bold"),
                      text_color="#888888").pack(pady=20)
-        if "search" not in message.lower():
-            ctk.CTkLabel(frame, text="Click 'Add New Account' to get started",
+        if self.lang_manager.get_string("no_accounts_found_search") not in message:
+            ctk.CTkLabel(frame, text=self.lang_manager.get_string("add_new_account"),
                          font=ctk.CTkFont(size=14),
                          text_color="#666666").pack(pady=(0, 20))
 
@@ -2517,14 +2489,14 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         if password:
             score, strength, _ = self.password_generator.assess_strength(password)
         else:
-            score, strength = 0, "Unknown"
+            score, strength = 0, self.lang_manager.get_string("unknown_strength")
         
         account_data = {
             "id": account_id,
             "name": name,
-            "username": username or email or "No username",
+            "username": username or email or self.lang_manager.get_string("no_username"),
             "email": email or "",
-            "url": url or "No URL",
+            "url": url or self.lang_manager.get_string("no_url"),
             "notes": notes or "",
             "strength": strength,
             "score": score
@@ -2543,13 +2515,13 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         
         ctk.CTkLabel(left_frame, text=f"👤 {account_data['username']}", 
                      text_color="#888888", font=ctk.CTkFont(size=14)).pack(anchor="w", pady=2)
-        if url and url != "No URL":
+        if url and url != self.lang_manager.get_string("no_url"):
             ctk.CTkLabel(left_frame, text=f"🌐 {url}", 
                          text_color="#888888", font=ctk.CTkFont(size=14)).pack(anchor="w", pady=2)
         right_frame = ctk.CTkFrame(content, fg_color="transparent")
         right_frame.pack(side="right")
         strength_color = self.get_strength_color(strength)
-        ctk.CTkLabel(right_frame, text=f"🛡️ {strength}", 
+        ctk.CTkLabel(right_frame, text=self.lang_manager.get_string("strength_template", strength=strength), 
                      text_color=strength_color, font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(0, 10))
         
         self.create_action_buttons(right_frame, account_data)
@@ -2565,13 +2537,13 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         button_frame = ctk.CTkFrame(parent, fg_color="transparent")
         button_frame.pack()
         buttons = [
-            ("👁️ View", lambda: self.view_account_details(account)),
-            ("📋 Copy Password", lambda: self.copy_password_to_clipboard(account)),
-            ("✏️ Edit Data", lambda: self.show_account_dialog(account)),
-            ("🗑️ Delete Account", lambda: self.delete_account(account))
+            (self.lang_manager.get_string("view_action"), lambda: self.view_account_details(account)),
+            (self.lang_manager.get_string("copy_password_action"), lambda: self.copy_password_to_clipboard(account)),
+            (self.lang_manager.get_string("edit_action"), lambda: self.show_account_dialog(account)),
+            (self.lang_manager.get_string("delete_action"), lambda: self.delete_account(account))
         ]
-        if account['url'] and account['url'] != "No URL":
-            buttons.insert(2, ("🌐 Open", lambda: self.open_website(account)))
+        if account['url'] and account['url'] != self.lang_manager.get_string("no_url"):
+            buttons.insert(2, (self.lang_manager.get_string("open_action"), lambda: self.open_website(account)))
         for text, command in buttons:
             color = "#FF4444" if "Delete" in text else None
             ctk.CTkButton(button_frame, text=text, width=100, height=45,
@@ -2579,50 +2551,52 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
                           fg_color=color).pack(side="left", padx=5)
 
     def delete_account(self, account):
-        result = messagebox.askyesno("Confirm Delete", 
-                                     f"Are you sure you want to delete '{account['name']}'?\n\nThis action cannot be undone!")
+        result = messagebox.askyesno(self.lang_manager.get_string("delete_confirm_title"),
+                                     self.lang_manager.get_string("delete_confirm_message", account_name=account['name']))
         if result:
             try:
                 self.database.delete_account(account['id'])
-                messagebox.showinfo("Deleted", f"Account '{account['name']}' has been deleted.")
+                messagebox.showinfo(self.lang_manager.get_string("delete_success_title"),
+                                  self.lang_manager.get_string("delete_success_message", account_name=account['name']))
                 self.load_password_cards()
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to delete account: {str(e)}")
+                messagebox.showerror(self.lang_manager.get_string("error"),
+                                   self.lang_manager.get_string("delete_failed_message", error=str(e)))
 
     def view_account_details(self, account):
         if not self.verify_master_password_dialog():
             return
         username, password = self.database.get_account_credentials(account["id"])
         dialog = ctk.CTkToplevel(self.root)
-        dialog.title(f"Account Details - {account['name']}")
+        dialog.title(self.lang_manager.get_string("account_details_title", account_name=account['name']))
         dialog.geometry("500x770")
         dialog.resizable(0,0)
         dialog.grab_set()
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        ctk.CTkLabel(main_frame, text=f"🔍 {account['name']}",
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("view_details_title", account_name=account['name']),
                      font=ctk.CTkFont(size=22, weight="bold")).pack(pady=15)
         
         details = [
-            ("Account Name:", account['name']),
-            ("Username:", username or "Not set"),
-            ("Email:", account.get('email', 'Not set')),
-            ("Website:", account.get('url', 'Not set')),
-            ("Password:", password or "Not available")
+            (self.lang_manager.get_string("account_name_label"), account['name']),
+            (self.lang_manager.get_string("username_label"), username or self.lang_manager.get_string("not_set")),
+            (self.lang_manager.get_string("email_label"), account.get('email', self.lang_manager.get_string("not_set"))),
+            (self.lang_manager.get_string("website_label"), account.get('url', self.lang_manager.get_string("not_set"))),
+            (self.lang_manager.get_string("password_label"), password or self.lang_manager.get_string("not_available"))
         ]
         
         for label, value in details:
-            self.create_detail_field(main_frame, label, value, is_password="Password" in label)
+            self.create_detail_field(main_frame, label, value, is_password=label == self.lang_manager.get_string("password_label"))
         
-        self.create_detail_field(main_frame, "Notes:", account.get('notes', 'No notes available'))
+        self.create_detail_field(main_frame, self.lang_manager.get_string("notes_label"), account.get('notes', self.lang_manager.get_string("no_notes_available")))
         
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
         
-        ctk.CTkButton(button_frame, text="📋 Copy Password",
+        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("copy_password_button"),
                       command=lambda: self.copy_password_to_clipboard(account), width=150).pack(side="left", padx=10)
-        ctk.CTkButton(button_frame, text="Close", command=dialog.destroy, width=100).pack(side="right", padx=10)
+        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("close_button_label"), command=dialog.destroy, width=100).pack(side="right", padx=10)
 
     def create_detail_field(self, parent, label, value, is_password=False):
         detail_frame = ctk.CTkFrame(parent)
@@ -2666,19 +2640,22 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
             if password:
                 self.root.clipboard_clear()
                 self.root.clipboard_append(password)
-                messagebox.showinfo("Copied", f"Password for {account['name']} copied to clipboard!")
+                messagebox.showinfo(self.lang_manager.get_string("copied_title"),
+                                  self.lang_manager.get_string("copy_success_message", account_name=account['name']))
                 self.root.after(30000, lambda: self.root.clipboard_clear())
             else:
-                messagebox.showerror("Error", "Password not found")
+                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("password_not_found"))
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to copy password: {str(e)}")
+            messagebox.showerror(self.lang_manager.get_string("error"),
+                                   self.lang_manager.get_string("copy_failed_message", error=str(e)))
 
     def open_website(self, account):
-        messagebox.showinfo("Info", "Website opening functionality has been disabled for security.")
+        messagebox.showinfo(self.lang_manager.get_string("website_open_disabled_title"),
+                              self.lang_manager.get_string("website_open_disabled_message"))
 
     def show_account_dialog(self, account=None):
         is_edit = account is not None
-        title = f"Edit Account - {account['name']}" if is_edit else "Add New Account"
+        title = self.lang_manager.get_string("edit_account_title", account_name=account['name']) if is_edit else self.lang_manager.get_string("add_account_title")
         dialog = ctk.CTkToplevel(self.root)
         dialog.title(title)
         dialog.geometry("550x720")
@@ -2687,8 +2664,8 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        icon = "✏️" if is_edit else "➕"
-        ctk.CTkLabel(main_frame, text=f"{icon} {title.split(' - ')[0]}", 
+        icon_title = self.lang_manager.get_string("edit_account_icon_title") if is_edit else self.lang_manager.get_string("add_account_icon_title")
+        ctk.CTkLabel(main_frame, text=icon_title, 
                      font=ctk.CTkFont(size=22, weight="bold")).pack(pady=15)
         entries = self.create_account_form(main_frame, account)
         self.create_account_dialog_buttons(main_frame, dialog, entries, account)
@@ -2701,11 +2678,11 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
             username = password = ""
         
         fields = [
-            ("name", "Account Name:", account['name'] if account else ""),
-            ("username", "Username / Email:", username),
-            ("url", "Website URL:", account.get('url', '') if account else ""),
-            ("password", "Password:", password),
-            ("notes", "Notes:", account.get('notes', '') if account else "")
+            ("name", self.lang_manager.get_string("account_name_label"), account['name'] if account else ""),
+            ("username", self.lang_manager.get_string("username_email_label"), username),
+            ("url", self.lang_manager.get_string("website_url_label"), account.get('url', '') if account else ""),
+            ("password", self.lang_manager.get_string("password_label"), password),
+            ("notes", self.lang_manager.get_string("notes_label"), account.get('notes', '') if account else "")
         ]
         
         for field_name, label, default_value in fields:
@@ -2761,10 +2738,10 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         button_frame = ctk.CTkFrame(parent, fg_color="transparent")
         button_frame.pack(pady=20)
         
-        ctk.CTkButton(button_frame, text="Cancel", 
+        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), 
                       command=dialog.destroy, width=120, height=45).pack(side="left", padx=15)
         
-        save_text = "Update Account" if account else "Add Account"
+        save_text = self.lang_manager.get_string("update_account_button") if account else self.lang_manager.get_string("add_account_button")
         ctk.CTkButton(button_frame, text=save_text, 
                       command=lambda: self.save_account(dialog, entries, account),
                       width=150, height=45, font=ctk.CTkFont(size=16, weight="bold")).pack(side="right", padx=15)
@@ -2778,14 +2755,14 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
             notes = entries["notes"].get("1.0", tk.END).strip()
             
             if not name:
-                messagebox.showerror("Error", "Account name is required")
+                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("account_name_required"))
                 return
             if not password:
-                messagebox.showerror("Error", "Password is required")
+                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("password_required"))
                 return
             if account:  # Update existing account
                 self.database.update_account(account["id"], name, username, url, notes, username, password)
-                messagebox.showinfo("Success", f"Account '{name}' updated successfully!")
+                messagebox.showinfo(self.lang_manager.get_string("success"), self.lang_manager.get_string("update_success_message", account_name=name))
             else:  # Create new account
                 max_attempts = 10
                 account_id = None
@@ -2804,7 +2781,7 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
                         logger.error(f"Error checking account ID uniqueness: {e}")
                         continue
                 if not account_id:
-                    messagebox.showerror("Error", "Failed to generate unique account ID. Please try again.")
+                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("id_generation_failed"))
                     return
                 try:
                     metadata_conn = sqlite3.connect(self.database.metadata_db)
@@ -2813,8 +2790,8 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
                     metadata_conn.close()
                     
                     if existing_name:
-                        result = messagebox.askyesno("Duplicate Name", 
-                            f"An account with the name '{name}' already exists.\n\nDo you want to create it anyway?")
+                        result = messagebox.askyesno(self.lang_manager.get_string("duplicate_name_title"),
+                                                     self.lang_manager.get_string("duplicate_name_message", account_name=name))
                         if not result:
                             return
                 except Exception as e:
@@ -2835,23 +2812,24 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
                     )
                     
                     self.database.add_account(new_account, username, password)
-                    messagebox.showinfo("Success", f"Account '{name}' added successfully!")
+                    messagebox.showinfo(self.lang_manager.get_string("success"), self.lang_manager.get_string("add_success_message", account_name=name))
                     
                 except sqlite3.IntegrityError as e:
                     if "UNIQUE constraint failed" in str(e):
-                        messagebox.showerror("Error", f"An account with this information already exists.\n\nError: {str(e)}")
+                        messagebox.showerror(self.lang_manager.get_string("error"),
+                                             self.lang_manager.get_string("duplicate_account_error", error=str(e)))
                     else:
-                        messagebox.showerror("Error", f"Database error: {str(e)}")
+                        messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("database_error", error=str(e)))
                     return
                 except Exception as e:
-                    messagebox.showerror("Error", f"Failed to create account: {str(e)}")
+                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("create_failed_message", error=str(e)))
                     return
             
             dialog.destroy()
             self.load_password_cards()
             
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save account: {str(e)}")
+            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("save_failed_message", error=str(e)))
             logger.error(f"Full error details: {e}")
             import traceback
             traceback.print_exc()
@@ -2863,7 +2841,7 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         header = ctk.CTkFrame(self.main_panel)
         header.pack(fill="x", padx=15, pady=15)
         
-        ctk.CTkLabel(header, text="🛠️ Password Generator", 
+        ctk.CTkLabel(header, text=self.lang_manager.get_string("password_generator_title"), 
                      font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
         
         content = ctk.CTkFrame(self.main_panel)
@@ -2871,31 +2849,31 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         settings_frame = ctk.CTkFrame(content)
         settings_frame.pack(side="left", fill="both", expand=True, padx=(20, 10), pady=20)
         
-        ctk.CTkLabel(settings_frame, text="Generator Settings", 
+        ctk.CTkLabel(settings_frame, text=self.lang_manager.get_string("generator_settings"), 
                      font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
         
         length_frame = ctk.CTkFrame(settings_frame, fg_color="transparent")
         length_frame.pack(fill="x", padx=20, pady=10)
         
-        ctk.CTkLabel(length_frame, text="Password Length:", 
+        ctk.CTkLabel(length_frame, text=self.lang_manager.get_string("password_length"), 
                      font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w")
         
         self.length_var = tk.IntVar(value=16)
         self.length_slider = ctk.CTkSlider(length_frame, from_=8, to=64, 
                                            variable=self.length_var, width=300)
         self.length_slider.pack(fill="x", pady=5)
-        self.length_label = ctk.CTkLabel(length_frame, text="16 characters")
+        self.length_label = ctk.CTkLabel(length_frame, text=self.lang_manager.get_string("password_length_template", value=16))
         self.length_label.pack(anchor="w")
         
         def update_length_label(value):
-            self.length_label.configure(text=f"{int(float(value))} characters")
+            self.length_label.configure(text=self.lang_manager.get_string("password_length_template", value=int(float(value))))
         
         self.length_slider.configure(command=update_length_label)
         
         options_frame = ctk.CTkFrame(settings_frame)
         options_frame.pack(fill="x", padx=20, pady=15)
         
-        ctk.CTkLabel(options_frame, text="Character Types:", 
+        ctk.CTkLabel(options_frame, text=self.lang_manager.get_string("character_types"), 
                      font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=15, pady=(15, 10))
         self.use_uppercase = tk.BooleanVar(value=True)
         self.use_lowercase = tk.BooleanVar(value=True)
@@ -2904,23 +2882,23 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         self.exclude_ambiguous = tk.BooleanVar(value=False)
         
         checkbox_options = [
-            ("Include Uppercase (A-Z)", self.use_uppercase),
-            ("Include Lowercase (a-z)", self.use_lowercase),
-            ("Include Digits (0-9)", self.use_digits),
-            ("Include Symbols (!@#$...)", self.use_symbols),
-            ("Exclude Ambiguous (0, O, 1, l, I)", self.exclude_ambiguous)
+            (self.lang_manager.get_string("include_uppercase"), self.use_uppercase),
+            (self.lang_manager.get_string("include_lowercase"), self.use_lowercase),
+            (self.lang_manager.get_string("include_digits"), self.use_digits),
+            (self.lang_manager.get_string("include_symbols"), self.use_symbols),
+            (self.lang_manager.get_string("exclude_ambiguous"), self.exclude_ambiguous)
         ]
         for text, var in checkbox_options:
             ctk.CTkCheckBox(options_frame, text=text, variable=var).pack(anchor="w", padx=15, pady=5)
         
-        ctk.CTkButton(settings_frame, text="🎲 Generate Password", 
+        ctk.CTkButton(settings_frame, text=self.lang_manager.get_string("generate_password_action"), 
                       command=self.generate_password_gui, height=50,
                       font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
         
         result_frame = ctk.CTkFrame(content)
         result_frame.pack(side="right", fill="both", expand=True, padx=(10, 20), pady=20)
         
-        ctk.CTkLabel(result_frame, text="Generated Password", 
+        ctk.CTkLabel(result_frame, text=self.lang_manager.get_string("generated_password"), 
                      font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
         
         password_display_frame = ctk.CTkFrame(result_frame, fg_color="transparent")
@@ -2931,18 +2909,18 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         button_frame = ctk.CTkFrame(password_display_frame, fg_color="transparent")
         button_frame.pack(fill="x")
         
-        ctk.CTkButton(button_frame, text="📋 Copy", width=120, height=40,
+        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("copy_action"), width=120, height=40,
                       command=self.copy_generated_password).pack(side="left", padx=(0, 10))
         
-        ctk.CTkButton(button_frame, text="🔄 Regenerate", width=120, height=40,
+        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("regenerate_action"), width=120, height=40,
                       command=self.generate_password_gui).pack(side="right")
         
         self.strength_frame = ctk.CTkFrame(result_frame)
         self.strength_frame.pack(fill="x", padx=20, pady=15)
-        self.strength_title = ctk.CTkLabel(self.strength_frame, text="Password Strength Analysis", 
+        self.strength_title = ctk.CTkLabel(self.strength_frame, text=self.lang_manager.get_string("strength_analysis_title"), 
                                            font=ctk.CTkFont(size=16, weight="bold"))
         self.strength_title.pack(pady=10)
-        self.strength_details = ctk.CTkLabel(self.strength_frame, text="Generate a password to see analysis")
+        self.strength_details = ctk.CTkLabel(self.strength_frame, text=self.lang_manager.get_string("generate_to_see_analysis"))
         self.strength_details.pack(pady=10)
         self.generate_password_gui()
 
@@ -2966,7 +2944,7 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         score, strength, recommendations = self.password_generator.assess_strength(password)
         strength_color = self.get_strength_color(strength)
         self.strength_details.configure(
-            text=f"Strength: {strength} ({score}/100)\nLength: {len(password)} characters\nUnique characters: {len(set(password))}",
+            text=self.lang_manager.get_string("strength_analysis_template", strength=strength, score=score, length=len(password), unique_chars=len(set(password))),
             text_color=strength_color
         )
 
@@ -2975,9 +2953,9 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         if password:
             self.root.clipboard_clear()
             self.root.clipboard_append(password)
-            messagebox.showinfo("Copied", "Password copied to clipboard!")
+            messagebox.showinfo(self.lang_manager.get_string("copied_title"), self.lang_manager.get_string("copied_message"))
         else:
-            messagebox.showerror("Error", "No password to copy")
+            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("no_password_to_copy"))
 
     def show_security_report(self):
         for widget in self.main_panel.winfo_children():
@@ -2985,7 +2963,7 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         header = ctk.CTkFrame(self.main_panel)
         header.pack(fill="x", padx=15, pady=15)
         
-        ctk.CTkLabel(header, text="🛡️ Security Report", 
+        ctk.CTkLabel(header, text=self.lang_manager.get_string("security_report_title"), 
                      font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
         content = ctk.CTkScrollableFrame(self.main_panel)
         content.pack(fill="both", expand=True, padx=15, pady=15)
@@ -2993,7 +2971,7 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         stats_frame = ctk.CTkFrame(content)
         stats_frame.pack(fill="x", padx=20, pady=15)
         
-        ctk.CTkLabel(stats_frame, text="📊 Overall Statistics", 
+        ctk.CTkLabel(stats_frame, text=self.lang_manager.get_string("overall_statistics"), 
                      font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
         
         try:
@@ -3025,19 +3003,14 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
                 if len(names) > 1:
                     duplicate_passwords.extend(names)
             
-            stats_text = f"""
-Total Accounts: {total_accounts}
-Strong Passwords: {strong_passwords}
-Weak Passwords: {weak_passwords}
-Duplicate Passwords: {len(duplicate_passwords)}
-            """
+            stats_text = self.lang_manager.get_string("statistics_template", total_accounts=total_accounts, strong_passwords=strong_passwords, weak_passwords=weak_passwords, duplicate_passwords=len(duplicate_passwords))
             ctk.CTkLabel(stats_frame, text=stats_text, 
                          font=ctk.CTkFont(size=14)).pack(pady=10)
             if weak_passwords > 0:
                 weak_frame = ctk.CTkFrame(content)
                 weak_frame.pack(fill="x", padx=20, pady=15)
                 
-                ctk.CTkLabel(weak_frame, text="⚠️ Accounts with Weak Passwords", 
+                ctk.CTkLabel(weak_frame, text=self.lang_manager.get_string("weak_passwords_title"), 
                              font=ctk.CTkFont(size=16, weight="bold"), 
                              text_color="#FF8844").pack(pady=15)
                 
@@ -3049,13 +3022,13 @@ Duplicate Passwords: {len(duplicate_passwords)}
                             account_frame = ctk.CTkFrame(weak_frame)
                             account_frame.pack(fill="x", padx=15, pady=5)
                             
-                            ctk.CTkLabel(account_frame, text=f"{name}: {strength} ({score}/100)", 
+                            ctk.CTkLabel(account_frame, text=self.lang_manager.get_string("weak_password_template", name=name, strength=strength, score=score), 
                                          text_color=self.get_strength_color(strength)).pack(side="left", padx=15, pady=10)
             if duplicate_passwords:
                 dup_frame = ctk.CTkFrame(content)
                 dup_frame.pack(fill="x", padx=20, pady=15)
                 
-                ctk.CTkLabel(dup_frame, text="🔄 Accounts with Duplicate Passwords", 
+                ctk.CTkLabel(dup_frame, text=self.lang_manager.get_string("duplicate_passwords_title"), 
                              font=ctk.CTkFont(size=16, weight="bold"), 
                              text_color="#FF4444").pack(pady=15)
                 for password, names in password_counts.items():
@@ -3063,10 +3036,10 @@ Duplicate Passwords: {len(duplicate_passwords)}
                         dup_account_frame = ctk.CTkFrame(dup_frame)
                         dup_account_frame.pack(fill="x", padx=15, pady=5)
                         
-                        ctk.CTkLabel(dup_account_frame, text=f"Shared by: {', '.join(names)}", 
+                        ctk.CTkLabel(dup_account_frame, text=self.lang_manager.get_string("shared_by_template", names=', '.join(names)), 
                                      text_color="#FF4444").pack(side="left", padx=15, pady=10)
         except Exception as e:
-            ctk.CTkLabel(content, text=f"Error generating security report: {str(e)}", 
+            ctk.CTkLabel(content, text=self.lang_manager.get_string("report_error_template", error=str(e)), 
                          text_color="#FF4444").pack(pady=20)
 
     def get_remaining_lockout_time(self) -> int:
