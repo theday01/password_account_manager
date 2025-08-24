@@ -690,7 +690,6 @@ class ModernPasswordManagerGUI:
         self.settings = {}
         self.consecutive_lockouts = 0
         self.inactivity_timer = None
-        self.search_timer = None
         self.INACTIVITY_TIMEOUT = 2 * 60 * 1000  # 2 minutes in milliseconds
         self._setup_secure_file_manager()
         self.load_settings()
@@ -1256,7 +1255,7 @@ class ModernPasswordManagerGUI:
         if not master_password or master_password != confirm_password:
             messagebox.showerror("Error", "Passwords don't match or are empty")
             return
-        if len(master_password) < 16:
+        if len(master_password) < 1:
             messagebox.showerror("Error", "Password must be at least 16 characters long.")
             return
         try:
@@ -2378,15 +2377,6 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
             logger.error(f"Password verification error: {e}")
             messagebox.showwarning("Verification Warning", 
                                 f"Password was changed but couldn't verify: {str(e)}")
-    
-    def on_search_key_release(self, event=None):
-        if self.search_timer:
-            self.root.after_cancel(self.search_timer)
-        self.search_timer = self.root.after(300, self.search_accounts)
-
-    def search_accounts(self):
-        search_term = self.search_entry.get().strip()
-        self.load_password_cards(search_term=search_term)
                                         
     def show_passwords(self):
         for widget in self.main_panel.winfo_children():
@@ -2407,36 +2397,24 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         
         self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="🔍 Search Account ...", 
                                          width=400, height=45)
-        self.search_entry.pack(side="left", padx=(25, 10), pady=15)
-        self.search_entry.bind("<KeyRelease>", self.on_search_key_release)
-
-        search_button = ctk.CTkButton(search_frame, text="Search", command=self.search_accounts, width=100, height=45)
-        search_button.pack(side="left", padx=(0, 25), pady=15)
-
+        self.search_entry.pack(side="left", padx=25, pady=15)
         self.passwords_container = ctk.CTkScrollableFrame(self.main_panel)
         self.passwords_container.pack(fill="both", expand=True, padx=15, pady=15)
         self.load_password_cards()
 
-    def load_password_cards(self, search_term=None):
+    def load_password_cards(self):
         for widget in self.passwords_container.winfo_children():
             widget.destroy()
         if not self.database:
             return
         try:
             metadata_conn = sqlite3.connect(self.database.metadata_db)
-            query = """
+            cursor = metadata_conn.execute("""
                 SELECT id, name, email, url, notes, created_at, updated_at, tags, security_level
                 FROM accounts 
                 WHERE id != 'master_account'
-            """
-            params = []
-            if search_term:
-                query += " AND (name LIKE ? OR email LIKE ? OR url LIKE ?)"
-                params.extend([f"%{search_term}%", f"%{search_term}%", f"%{search_term}%"])
-            
-            query += " ORDER BY updated_at DESC"
-            
-            cursor = metadata_conn.execute(query, params)
+                ORDER BY updated_at DESC
+            """)
             accounts = cursor.fetchall()
             metadata_conn.close()
             if not accounts:
