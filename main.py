@@ -705,7 +705,7 @@ class ModernPasswordManagerGUI:
     def show_loading_screen(self):
         loading_window = ctk.CTkToplevel(self.root)
         loading_window.title("Loading...")
-        loading_window.geometry("400x250")
+        loading_window.geometry("400x320")
         loading_window.resizable(False, False)
         loading_window.overrideredirect(True)
         loading_window.grab_set()
@@ -719,12 +719,22 @@ class ModernPasswordManagerGUI:
 
         self.root.update_idletasks()
         width = 400
-        height = 250
+        height = 320
         x = (self.root.winfo_screenwidth() // 2) - (width // 2)
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         loading_window.geometry(f"{width}x{height}+{x}+{y}")
 
-        ctk.CTkLabel(loading_window, text="SecureVault", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=20)
+        try:
+            load_icon_path = os.path.join("icons", "load.png")
+            if os.path.exists(load_icon_path):
+                load_image = Image.open(load_icon_path)
+                load_icon = ctk.CTkImage(light_image=load_image, size=(64, 64))
+                icon_label = ctk.CTkLabel(loading_window, image=load_icon, text="")
+                icon_label.pack(pady=(20, 0))
+        except Exception as e:
+            logger.warning(f"Could not display loading icon: {e}")
+
+        ctk.CTkLabel(loading_window, text="SecureVault", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=10)
 
         progress_bar = ctk.CTkProgressBar(loading_window, width=300)
         progress_bar.pack(pady=10)

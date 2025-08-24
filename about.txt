@@ -1,0 +1,67 @@
+==================================
+SecureVault Password Manager
+==================================
+
+Version: 1.0
+Developer: Hamza Saadi (_EAGLESHADOW 2025)
+
+----------------------------------
+Introduction
+----------------------------------
+
+SecureVault Password Manager is a robust, desktop-based application designed to securely store and manage your sensitive login credentials. Built with a focus on security and user privacy, it uses strong encryption algorithms to protect your data locally on your computer. This document provides a detailed overview of its features and functionalities.
+
+----------------------------------
+Core Features
+----------------------------------
+
+1.  **Secure Encrypted Vault:**
+    *   **Master Password:** The entire vault is protected by a single, strong Master Password that you create. This is the only password you need to remember.
+    *   **End-to-End Encryption:** All your data, including usernames, passwords, URLs, and notes, is encrypted using the industry-standard AES-256 GCM algorithm. The encryption and decryption happen locally on your device, ensuring that only you can access your information.
+    *   **Key Derivation:** The encryption key is derived from your Master Password using PBKDF2 with SHA-256 and a unique salt, making it highly resistant to brute-force attacks.
+    *   **Data Integrity:** The application uses HMAC-SHA256 signatures to verify the integrity of your vault files, protecting them from tampering or corruption.
+
+2.  **Account Management:**
+    *   **Add, Edit, and Delete Accounts:** Easily manage your login credentials for various websites and applications.
+    *   **Detailed Entries:** Each entry can store a name, username/email, password, website URL, and personal notes.
+    *   **Quick Search:** A search bar allows you to instantly find the account you're looking for by name, email, or URL.
+    *   **Copy to Clipboard:** Securely copy your password to the clipboard with a single click. For security, the clipboard is automatically cleared after 30 seconds.
+
+3.  **Password Generator:**
+    *   **Customizable Generation:** Create strong, random passwords with customizable length (from 8 to 64 characters).
+    *   **Character Options:** You can choose to include uppercase letters, lowercase letters, digits, and symbols.
+    *   **Exclude Ambiguous Characters:** An option to exclude characters that can be easily confused (e.g., '0' and 'O', '1' and 'l') is available.
+    *   **Strength Analysis:** The generator provides real-time feedback on the strength of the generated password.
+
+4.  **Security Dashboard:**
+    *   **Security Report:** Get an overview of your password security health. The report identifies weak passwords, reused (duplicate) passwords, and provides overall statistics.
+    *   **Two-Factor Authentication (2FA):** Add an extra layer of security to your vault. When enabled, you'll need a 6-digit code from an authenticator app (like Google Authenticator or Authy) in addition to your Master Password to log in.
+
+5.  **Data Backup and Restore:**
+    *   **Encrypted Backups:** Create encrypted backup files (`.svbk`) of your entire vault. These backups are protected with a separate backup code that you provide.
+    *   **Secure Restore:** Restore your vault from a backup file. This is useful for migrating to a new computer or recovering from data loss.
+    *   **Backup Preview:** You can preview the contents (manifest) of a backup file before restoring it.
+
+6.  **User Interface and Experience:**
+    *   **Modern UI:** A clean, intuitive graphical user interface built with CustomTkinter, available in a dark theme.
+    *   **Inactivity Lock:** The application automatically locks and closes after 2 minutes of inactivity to prevent unauthorized access.
+    *   **Loading Screen:** A startup screen provides feedback while the application initializes its secure components.
+
+----------------------------------
+How It Works
+----------------------------------
+
+When you first set up SecureVault, you create a Master Password. This password, combined with a randomly generated salt, is used to create a powerful encryption key. This key is never stored directly. Instead, it is generated on-the-fly each time you log in.
+
+All the account information you save is encrypted with this key before being written to the database files on your computer's disk. When you need to view or copy a password, the application decrypts it in memory just long enough for you to use it.
+
+This design ensures that even if someone gains access to your computer's files, they cannot read your passwords without knowing your Master Password.
+
+----------------------------------
+Security Best Practices
+----------------------------------
+
+*   **Use a Strong Master Password:** Make it long, complex, and something you have never used anywhere else.
+*   **Enable 2FA:** This provides a critical second layer of defense.
+*   **Keep Backup Codes Safe:** Write down your backup codes and store them in a secure physical location, separate from your computer and your backup files.
+*   **Create Regular Backups:** Store your backup files in a safe place, such as an external hard drive or a secure cloud storage service.
