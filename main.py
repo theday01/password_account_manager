@@ -703,23 +703,19 @@ class ModernPasswordManagerGUI:
         self.start_lockout_validation_timer()
 
     def show_loading_screen(self):
-        loading_window = ctk.CTkToplevel(self.root)
+        bg_color = "#f5f5f5"      # light gray background
+        accent_color = "#2b6cb0"  # deep blue
+        slogan_color = "#1a202c"  # dark gray/black
+        subtext_color = "#4a5568" # softer gray
+        
+        width, height = 420, 380
+        loading_window = ctk.CTkToplevel(self.root, fg_color=bg_color)
         loading_window.title("Loading...")
-        loading_window.geometry("400x320")
+        loading_window.geometry(f"{width}x{height}")
         loading_window.resizable(False, False)
         loading_window.overrideredirect(True)
         loading_window.grab_set()
-
-        try:
-            icon_path = os.path.join("icons", "main.ico")
-            if os.path.exists(icon_path):
-                loading_window.iconbitmap(default=icon_path)
-        except Exception as e:
-            logger.warning(f"Could not set loading screen icon: {e}")
-
         self.root.update_idletasks()
-        width = 400
-        height = 320
         x = (self.root.winfo_screenwidth() // 2) - (width // 2)
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         loading_window.geometry(f"{width}x{height}+{x}+{y}")
@@ -728,52 +724,80 @@ class ModernPasswordManagerGUI:
             load_icon_path = os.path.join("icons", "load.png")
             if os.path.exists(load_icon_path):
                 load_image = Image.open(load_icon_path)
-                load_icon = ctk.CTkImage(light_image=load_image, size=(64, 64))
-                icon_label = ctk.CTkLabel(loading_window, image=load_icon, text="")
-                icon_label.pack(pady=(20, 0))
+                load_icon = ctk.CTkImage(light_image=load_image, size=(160, 120))  # balanced size
+                icon_label = ctk.CTkLabel(loading_window, image=load_icon, text="", fg_color=bg_color)
+                icon_label.pack(pady=(20, 30))
         except Exception as e:
             logger.warning(f"Could not display loading icon: {e}")
 
-        ctk.CTkLabel(loading_window, text="SecureVault Pro", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=10)
+        ctk.CTkLabel(
+            loading_window,
+            text="SecureVault Pro",
+            font=ctk.CTkFont(size=24, weight="bold"),
+            text_color=accent_color
+        ).pack(pady=(0, 3))
 
-        progress_bar = ctk.CTkProgressBar(loading_window, width=300)
+        ctk.CTkLabel(
+            loading_window,
+            text="~ ONLY YOU OPEN IT !",
+            font=ctk.CTkFont(size=11, slant="italic"),
+            text_color=slogan_color
+        ).pack(pady=(0, 15))
+
+        progress_bar = ctk.CTkProgressBar(
+            loading_window,
+            width=320,
+            height=12,
+            progress_color=accent_color,
+            corner_radius=10
+        )
         progress_bar.pack(pady=10)
         progress_bar.set(0)
 
-        status_label = ctk.CTkLabel(loading_window, text="Initializing...", font=ctk.CTkFont(size=14))
-        status_label.pack(pady=10)
+        status_label = ctk.CTkLabel(
+            loading_window,
+            text="Initializing...",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=accent_color
+        )
+        status_label.pack(pady=(15, 5))
 
-        details_label = ctk.CTkLabel(loading_window, text="Starting up the engine...", font=ctk.CTkFont(size=10), text_color="gray")
+        details_label = ctk.CTkLabel(
+            loading_window,
+            text="Starting up the engine...",
+            font=ctk.CTkFont(size=10),
+            text_color=subtext_color
+        )
         details_label.pack()
 
         def update_loading(step):
             if step == 1:
-                progress_bar.set(0.2)
+                progress_bar.set(0.25)
                 status_label.configure(text="Loading components...")
                 details_label.configure(text="Loading GUI elements and icons...")
                 loading_window.after(700, lambda: update_loading(2))
             elif step == 2:
-                progress_bar.set(0.5)
+                progress_bar.set(0.55)
                 status_label.configure(text="Verifying security...")
                 details_label.configure(text="Checking vault integrity and loading settings...")
                 loading_window.after(1000, lambda: update_loading(3))
             elif step == 3:
-                progress_bar.set(0.8)
+                progress_bar.set(0.85)
                 status_label.configure(text="Preparing workspace...")
                 details_label.configure(text="Setting up the main interface...")
-                loading_window.after(500, lambda: update_loading(4))
+                loading_window.after(600, lambda: update_loading(4))
             elif step == 4:
                 progress_bar.set(1.0)
                 status_label.configure(text="Done!")
                 details_label.configure(text="Launching application...")
-                loading_window.after(500, lambda: finish_loading())
+                loading_window.after(600, lambda: finish_loading())
 
         def finish_loading():
             loading_window.destroy()
             self.root.deiconify()
             self._initialize_app()
 
-        loading_window.after(100, lambda: update_loading(1))
+        loading_window.after(200, lambda: update_loading(1))
 
     def _setup_secure_file_manager(self):
         try:
@@ -981,7 +1005,7 @@ class ModernPasswordManagerGUI:
         title.pack(pady=(30, 20), padx=40)
         subtitle = ctk.CTkLabel(
             login_card,
-            text="only you open it!",
+            text="~ ONLY YOU OPEN IT!",
             font=ctk.CTkFont(size=16),
             text_color="#888888"
         )
@@ -1298,14 +1322,6 @@ class ModernPasswordManagerGUI:
                 self.secure_file_manager.sync_all_files()
             messagebox.showinfo("Success", "SecureVault Pro has been set up successfully!")
             
-            # Show tutorial on first setup
-            if not self.settings.get('tutorial_completed', False):
-                tutorial = TutorialManager(setup_window)
-                tutorial.show_tutorial_window()
-                # The tutorial window is modal, so execution will wait here until it's closed.
-                self.settings['tutorial_completed'] = True
-                self.save_settings_to_file()
-
             setup_window.destroy()
             self.show_login_screen()
         except Exception as e:
@@ -1320,6 +1336,13 @@ class ModernPasswordManagerGUI:
         self.root.bind("<KeyPress>", self.reset_inactivity_timer)
         self.root.bind("<Motion>", self.reset_inactivity_timer)
         self.root.bind("<Button-1>", self.reset_inactivity_timer)
+
+        # Show tutorial on first-time login
+        if not self.settings.get('tutorial_completed', False):
+            tutorial = TutorialManager(self.root)
+            tutorial.show_tutorial_window()
+            self.settings['tutorial_completed'] = True
+            self.save_settings_to_file()
 
         toolbar = ctk.CTkFrame(self.main_frame, height=70)
         toolbar.pack(fill="x", padx=10, pady=10)
@@ -1860,7 +1883,6 @@ class ModernPasswordManagerGUI:
         try:
             if self.secure_file_manager and self.authenticated:
                 logger.info("Syncing files to secure storage before lock...")
-                self.secure_file_manager.sync_all_files()
                 
                 if not self.secure_file_manager.perform_integrity_check():
                     logger.error("Integrity check failed during vault lock")
@@ -1900,7 +1922,7 @@ class ModernPasswordManagerGUI:
                 logger.info("Performing final sync and cleanup...")
                 try:
                     if self.authenticated:
-                        self.secure_file_manager.sync_all_files()
+                        pass
                     self.secure_file_manager.cleanup_temp_files()
                     logger.info("Secure cleanup completed")
                 except Exception as e:
@@ -2419,9 +2441,6 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="🔍 Search by name, email, or URL...",
                                          width=400, height=45)
         self.search_entry.pack(side="left", padx=25, pady=15)
-
-        search_button = ctk.CTkButton(search_frame, text="Search", command=self.search_accounts, height=45)
-        search_button.pack(side="left", padx=(0, 25), pady=15)
 
         self.search_entry.bind("<KeyRelease>", self.search_accounts)
 
