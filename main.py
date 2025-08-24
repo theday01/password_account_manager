@@ -668,6 +668,7 @@ class ModernPasswordManagerGUI:
         self.security_monitor = None
         ctk.set_appearance_mode("dark")  
         self.root = ctk.CTk()
+        self.root.withdraw()
         self.root.title("Secure Password Manager")
         self.root.geometry("1200x800")
         try:
@@ -676,6 +677,11 @@ class ModernPasswordManagerGUI:
                 self.root.iconbitmap(default=icon_path)
         except Exception as e:
             logger.warning(f"Could not set application icon: {e}")
+        
+        self.show_loading_screen()
+
+    def _initialize_app(self):
+        """Contains the original initialization logic."""
         self.authenticated = False
         self.accounts = []
         self.failed_attempts = 0
@@ -689,6 +695,61 @@ class ModernPasswordManagerGUI:
         self.validate_lockout_integrity()
         self.setup_ui()
         self.start_lockout_validation_timer()
+
+    def show_loading_screen(self):
+        loading_window = ctk.CTkToplevel(self.root)
+        loading_window.title("Loading...")
+        loading_window.geometry("400x250")
+        loading_window.resizable(False, False)
+        loading_window.grab_set()
+
+        self.root.update_idletasks()
+        width = 400
+        height = 250
+        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.root.winfo_screenheight() // 2) - (height // 2)
+        loading_window.geometry(f"{width}x{height}+{x}+{y}")
+
+        ctk.CTkLabel(loading_window, text="SecureVault", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=20)
+
+        progress_bar = ctk.CTkProgressBar(loading_window, width=300)
+        progress_bar.pack(pady=10)
+        progress_bar.set(0)
+
+        status_label = ctk.CTkLabel(loading_window, text="Initializing...", font=ctk.CTkFont(size=14))
+        status_label.pack(pady=10)
+
+        details_label = ctk.CTkLabel(loading_window, text="Starting up the engine...", font=ctk.CTkFont(size=10), text_color="gray")
+        details_label.pack()
+
+        def update_loading(step):
+            if step == 1:
+                progress_bar.set(0.2)
+                status_label.configure(text="Loading components...")
+                details_label.configure(text="Loading GUI elements and icons...")
+                loading_window.after(700, lambda: update_loading(2))
+            elif step == 2:
+                progress_bar.set(0.5)
+                status_label.configure(text="Verifying security...")
+                details_label.configure(text="Checking vault integrity and loading settings...")
+                loading_window.after(1000, lambda: update_loading(3))
+            elif step == 3:
+                progress_bar.set(0.8)
+                status_label.configure(text="Preparing workspace...")
+                details_label.configure(text="Setting up the main interface...")
+                loading_window.after(500, lambda: update_loading(4))
+            elif step == 4:
+                progress_bar.set(1.0)
+                status_label.configure(text="Done!")
+                details_label.configure(text="Launching application...")
+                loading_window.after(500, lambda: finish_loading())
+
+        def finish_loading():
+            loading_window.destroy()
+            self.root.deiconify()
+            self._initialize_app()
+
+        loading_window.after(100, lambda: update_loading(1))
 
     def _setup_secure_file_manager(self):
         try:
