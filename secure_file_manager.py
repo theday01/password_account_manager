@@ -1,34 +1,3 @@
-# secure_file_manager.py
-"""
-Production-ready SecureFileManager for SecureVault application.
-
-This file contains a complete implementation intended for production use (within the
-constraints of a local application). It provides:
- - Secure vault initialization (sqlite files, PRAGMA hints)
- - Robust key derivation and optional integration with signature HMAC
- - Atomic integrity-signature write & verification
- - Temp-file staging, safe sync and atomic backups
- - Permission hardening across POSIX/Windows (best-effort)
- - A full-featured SecurityMonitor that supports polling or optional watchdog integration,
-   realtime alert callbacks, quarantine, automated permission enforcement, and detailed audits
- - Migration helpers for legacy file layouts
- - Utility APIs: create_backup, restore_backup, reset_vault, list_files_with_hashes
-
-Design decisions:
- - Integrity signatures use HMAC-SHA256 when an encryption key is available; otherwise plain SHA256.
- - Atomic file writes use a temp file + os.replace for robustness.
- - SecurityMonitor uses a background daemon thread (polling) by default, but will use the
-   `watchdog` package if it is installed. The monitor raises alerts via a user-supplied callback.
-
-Limitations:
- - This module assumes the application is responsible for secure master-password entry and
-   not storing the derived key persistently in plaintext.
- - File-level encryption of SQLite files is *not* performed here: encrypting a sqlite DB in-place
-   is nontrivial for use as a live DB; if you require encrypted storage, consider an encrypted
-   filesystem or use per-field encryption in the DatabaseManager layer.
-
-"""
-
 import os
 import sqlite3
 import json
