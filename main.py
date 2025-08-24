@@ -488,10 +488,6 @@ class DatabaseManager:
             ))
             metadata_conn.commit()
             sensitive_conn = sqlite3.connect(self.sensitive_db)
-            if cursor.fetchone():
-                metadata_conn.execute("DELETE FROM accounts WHERE id = ?", (account.id,))
-                metadata_conn.commit()
-                raise ValueError(f"Credentials for account ID '{account.id}' already exist")
             encrypted_username = self.crypto.encrypt_data(username, self.encryption_key)
             encrypted_password = self.crypto.encrypt_data(password, self.encryption_key)
             sensitive_conn.execute("""
@@ -499,6 +495,15 @@ class DatabaseManager:
                 VALUES (?, ?, ?)
             """, (account.id, encrypted_username, encrypted_password))
             sensitive_conn.commit()
+
+            # Close connections to ensure data is flushed to disk before rotating signature
+            if metadata_conn:
+                metadata_conn.close()
+                metadata_conn = None
+            if sensitive_conn:
+                sensitive_conn.close()
+                sensitive_conn = None
+            
             self.log_action("CREATE", "ACCOUNT", account.id, f"Created account: {account.name}")
             self.secure_file_manager.rotate_integrity_signature()
             logger.info(f"Account '{account.name}' created successfully with ID: {account.id}")
@@ -704,6 +709,13 @@ class ModernPasswordManagerGUI:
         loading_window.resizable(False, False)
         loading_window.overrideredirect(True)
         loading_window.grab_set()
+
+        try:
+            icon_path = os.path.join("icons", "load.ico")
+            if os.path.exists(icon_path):
+                loading_window.iconbitmap(default=icon_path)
+        except Exception as e:
+            logger.warning(f"Could not set loading screen icon: {e}")
 
         self.root.update_idletasks()
         width = 400
@@ -2395,45 +2407,71 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         search_frame = ctk.CTkFrame(self.main_panel)
         search_frame.pack(fill="x", padx=15, pady=10)
         
-        self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="🔍 Search Account ...", 
+        self.search_entry = ctk.CTkEntry(search_frame, placeholder_text="🔍 Search by name, email, or URL...",
                                          width=400, height=45)
         self.search_entry.pack(side="left", padx=25, pady=15)
+
+        search_button = ctk.CTkButton(search_frame, text="Search", command=self.search_accounts, height=45)
+        search_button.pack(side="left", padx=(0, 25), pady=15)
+
+        self.search_entry.bind("<KeyRelease>", self.search_accounts)
+
         self.passwords_container = ctk.CTkScrollableFrame(self.main_panel)
         self.passwords_container.pack(fill="both", expand=True, padx=15, pady=15)
         self.load_password_cards()
 
-    def load_password_cards(self):
+    def load_password_cards(self, query: str = None):
         for widget in self.passwords_container.winfo_children():
             widget.destroy()
         if not self.database:
             return
         try:
             metadata_conn = sqlite3.connect(self.database.metadata_db)
-            cursor = metadata_conn.execute("""
-                SELECT id, name, email, url, notes, created_at, updated_at, tags, security_level
-                FROM accounts 
-                WHERE id != 'master_account'
-                ORDER BY updated_at DESC
-            """)
+            if query:
+                sql = """
+                    SELECT id, name, email, url, notes, created_at, updated_at, tags, security_level
+                    FROM accounts 
+                    WHERE id != 'master_account' AND (name LIKE ? OR email LIKE ? OR url LIKE ?)
+                    ORDER BY updated_at DESC
+                """
+                params = (f"%{query}%", f"%{query}%", f"%{query}%")
+                cursor = metadata_conn.execute(sql, params)
+            else:
+                sql = """
+                    SELECT id, name, email, url, notes, created_at, updated_at, tags, security_level
+                    FROM accounts 
+                    WHERE id != 'master_account'
+                    ORDER BY updated_at DESC
+                """
+                cursor = metadata_conn.execute(sql)
+
             accounts = cursor.fetchall()
             metadata_conn.close()
             if not accounts:
-                self.show_no_accounts_message()
+                if query:
+                    self.show_no_accounts_message("No accounts found matching your search.")
+                else:
+                    self.show_no_accounts_message()
                 return
             for account_row in accounts:
                 self.create_account_card(account_row)
         except Exception as e:
             self.show_error_message(f"Error loading accounts: {str(e)}")
 
-    def show_no_accounts_message(self):
+    def search_accounts(self, event=None):
+        query = self.search_entry.get().strip()
+        self.load_password_cards(query=query)
+
+    def show_no_accounts_message(self, message="📝 No accounts found"):
         frame = ctk.CTkFrame(self.passwords_container)
         frame.pack(fill="x", padx=10, pady=20)
-        ctk.CTkLabel(frame, text="📝 No accounts found", 
-                     font=ctk.CTkFont(size=18, weight="bold"), 
+        ctk.CTkLabel(frame, text=message,
+                     font=ctk.CTkFont(size=18, weight="bold"),
                      text_color="#888888").pack(pady=20)
-        ctk.CTkLabel(frame, text="Click 'Add New Account' to get started", 
-                     font=ctk.CTkFont(size=14), 
-                     text_color="#666666").pack(pady=(0, 20))
+        if "search" not in message.lower():
+            ctk.CTkLabel(frame, text="Click 'Add New Account' to get started",
+                         font=ctk.CTkFont(size=14),
+                         text_color="#666666").pack(pady=(0, 20))
 
     def show_error_message(self, message):
         frame = ctk.CTkFrame(self.passwords_container)

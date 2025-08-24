@@ -41,6 +41,7 @@ class TutorialManager:
         self.tutorial_window.title("Welcome to SecureVault")
         self.tutorial_window.geometry("500x400")
         self.tutorial_window.resizable(False, False)
+        self.tutorial_window.overrideredirect(True)
         self.tutorial_window.grab_set()
 
         self.main_frame = ctk.CTkFrame(self.tutorial_window)
