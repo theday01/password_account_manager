@@ -1,5 +1,5 @@
 ==================================
-SecureVault Password Manager
+SecureVault Pro
 ==================================
 
 Version: 1.0
@@ -9,7 +9,7 @@ Developer: Hamza Saadi (_EAGLESHADOW 2025)
 Introduction
 ----------------------------------
 
-SecureVault Password Manager is a robust, desktop-based application designed to securely store and manage your sensitive login credentials. Built with a focus on security and user privacy, it uses strong encryption algorithms to protect your data locally on your computer. This document provides a detailed overview of its features and functionalities.
+SecureVault Pro is a robust, desktop-based application designed to securely store and manage your sensitive login credentials. Built with a focus on security and user privacy, it uses strong encryption algorithms to protect your data locally on your computer. This document provides a detailed overview of its features and functionalities.
 
 ----------------------------------
 Core Features

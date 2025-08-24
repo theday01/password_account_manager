@@ -1,0 +1,450 @@
+2025-08-24 20:23:03,097 - root - INFO - Logging has been set up.
+2025-08-24 20:23:03,098 - __main__ - INFO - Starting SecureVault Pro...
+2025-08-24 20:23:03,174 - __main__ - INFO - Windows desktop shortcut created
+2025-08-24 20:23:03,382 - __main__ - INFO - Application initialized successfully
+2025-08-24 20:23:06,250 - __main__ - INFO - Initializing secure file management system...
+2025-08-24 20:23:06,251 - __main__ - INFO - Secure file manager initialized
+2025-08-24 20:23:06,253 - __main__ - INFO - Validating lockout state integrity...
+2025-08-24 20:23:22,651 - secure_file_manager - INFO - Initializing encryption...
+2025-08-24 20:23:22,651 - secure_file_manager - INFO - Salt file not found, creating a new one.
+2025-08-24 20:23:22,672 - secure_file_manager - INFO - Salt loaded from secure_vault\salt_file
+2025-08-24 20:23:22,673 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-08-24 20:23:22,797 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-08-24 20:23:22,797 - secure_file_manager - INFO - Initializing vault files...
+2025-08-24 20:23:22,798 - secure_file_manager - INFO - Metadata database not found, creating at secure_vault\metadata.db
+2025-08-24 20:23:22,811 - secure_file_manager - INFO - Sensitive database not found, creating at secure_vault\sensitive.db
+2025-08-24 20:23:22,823 - secure_file_manager - INFO - Rotating integrity signature.
+2025-08-24 20:23:22,826 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-08-24 20:23:22,828 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-08-24 20:23:22,828 - secure_file_manager - INFO - Enforcing permissions...
+2025-08-24 20:23:22,829 - secure_file_manager - INFO - Applying Windows permissions (best-effort).
+2025-08-24 20:23:22,830 - secure_file_manager - INFO - Permissions enforced successfully.
+2025-08-24 20:23:22,830 - secure_file_manager - INFO - Vault files initialized successfully.
+2025-08-24 20:23:22,830 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-08-24 20:23:22,832 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_3g1qpf52
+2025-08-24 20:23:22,837 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-08-24 20:23:22,839 - __main__ - INFO - Starting database initialization...
+2025-08-24 20:23:22,960 - __main__ - INFO - Generated salt (32 bytes) and encryption keys
+2025-08-24 20:23:22,961 - __main__ - INFO - Salt saved to secure_vault\salt_file
+2025-08-24 20:23:22,965 - __main__ - INFO - Metadata database created
+2025-08-24 20:23:22,967 - __main__ - INFO - Sensitive database created
+2025-08-24 20:23:22,967 - __main__ - INFO - Creating master account for authentication...
+2025-08-24 20:23:22,981 - __main__ - INFO - Master account created successfully
+2025-08-24 20:23:22,982 - secure_file_manager - INFO - Rotating integrity signature.
+2025-08-24 20:23:22,985 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-08-24 20:23:22,987 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-08-24 20:23:22,991 - __main__ - INFO - Integrity signature created
+2025-08-24 20:23:22,991 - __main__ - INFO - Testing authentication with new password...
+2025-08-24 20:23:22,991 - __main__ - INFO - Attempting authentication...
+2025-08-24 20:23:22,992 - __main__ - INFO - Salt path: secure_vault\salt_file
+2025-08-24 20:23:22,994 - __main__ - INFO - Metadata DB path: secure_vault\metadata.db
+2025-08-24 20:23:22,994 - __main__ - INFO - Sensitive DB path: secure_vault\sensitive.db
+2025-08-24 20:23:22,994 - __main__ - INFO - Integrity path: secure_vault\integrity_file
+2025-08-24 20:23:23,003 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-08-24 20:23:23,124 - __main__ - INFO - Encryption keys generated
+2025-08-24 20:23:23,124 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:23:23,133 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:23:23,133 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:23:23,134 - __main__ - INFO - Database integrity check: PASSED
+2025-08-24 20:23:23,137 - __main__ - INFO - Test decryption successful
+2025-08-24 20:23:23,139 - __main__ - INFO - Authentication successful!
+2025-08-24 20:23:23,140 - __main__ - INFO - Authentication test successful
+2025-08-24 20:23:23,140 - __main__ - INFO - DB Action: CREATE, Type: SYSTEM, ID: database, Details: Database initialized successfully
+2025-08-24 20:23:23,148 - __main__ - INFO - Database initialization completed successfully!
+2025-08-24 20:23:23,148 - secure_file_manager - INFO - Syncing all files...
+2025-08-24 20:23:23,148 - secure_file_manager - INFO - Syncing from temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_3g1qpf52
+2025-08-24 20:23:23,152 - secure_file_manager - INFO - Rotating integrity signature.
+2025-08-24 20:23:23,156 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-08-24 20:23:23,158 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-08-24 20:23:23,160 - secure_file_manager - INFO - Sync from temp directory completed.
+2025-08-24 20:23:35,196 - secure_file_manager - INFO - Initializing encryption...
+2025-08-24 20:23:35,199 - secure_file_manager - INFO - Salt loaded from secure_vault\salt_file
+2025-08-24 20:23:35,200 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-08-24 20:23:35,340 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-08-24 20:23:35,341 - __main__ - INFO - Loading files from secure storage...
+2025-08-24 20:23:35,341 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-08-24 20:23:35,341 - secure_file_manager - INFO - Removing old temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_3g1qpf52
+2025-08-24 20:23:35,343 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_hrwbvz8a
+2025-08-24 20:23:35,347 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-08-24 20:23:35,348 - __main__ - INFO - Attempting authentication...
+2025-08-24 20:23:35,348 - __main__ - INFO - Salt path: secure_vault\salt_file
+2025-08-24 20:23:35,348 - __main__ - INFO - Metadata DB path: secure_vault\metadata.db
+2025-08-24 20:23:35,349 - __main__ - INFO - Sensitive DB path: secure_vault\sensitive.db
+2025-08-24 20:23:35,349 - __main__ - INFO - Integrity path: secure_vault\integrity_file
+2025-08-24 20:23:35,350 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-08-24 20:23:35,470 - __main__ - INFO - Encryption keys generated
+2025-08-24 20:23:35,471 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:23:35,479 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:23:35,480 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:23:35,480 - __main__ - INFO - Database integrity check: PASSED
+2025-08-24 20:23:35,483 - __main__ - WARNING - No master account found for test decryption
+2025-08-24 20:23:35,483 - __main__ - INFO - Authentication successful!
+2025-08-24 20:23:35,483 - __main__ - INFO - Clearing lockout state
+2025-08-24 20:23:35,485 - secure_file_manager - ERROR - Failed to start watchdog observer
+Traceback (most recent call last):
+  File "c:\Users\Hamza\Desktop\scripts\3 - Control Ur PassWord & Gen\secure_file_manager.py", line 748, in _start_watchdog
+    self._observer.schedule(event_handler, self.sfm.secure_dir, recursive=True)
+    ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'schedule'
+2025-08-24 20:23:35,489 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:23:35,490 - secure_file_manager - INFO - SecurityMonitor polling thread started (interval=2.0)
+2025-08-24 20:23:35,491 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:23:35,492 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:23:37,494 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:23:37,497 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:23:37,498 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:23:39,500 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:23:39,503 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:23:39,505 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:23:39,732 - __main__ - INFO - Performing final sync and cleanup...
+2025-08-24 20:23:39,748 - secure_file_manager - INFO - Syncing all files...
+2025-08-24 20:23:39,748 - secure_file_manager - INFO - Syncing from temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_hrwbvz8a
+2025-08-24 20:23:39,775 - secure_file_manager - INFO - Rotating integrity signature.
+2025-08-24 20:23:39,783 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-08-24 20:23:39,796 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-08-24 20:23:39,801 - secure_file_manager - INFO - Sync from temp directory completed.
+2025-08-24 20:23:39,815 - secure_file_manager - INFO - Cleaning up temporary files...
+2025-08-24 20:23:39,825 - secure_file_manager - INFO - Removing temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_hrwbvz8a
+2025-08-24 20:23:39,828 - secure_file_manager - INFO - Temporary files cleaned up successfully.
+2025-08-24 20:23:39,830 - __main__ - INFO - Secure cleanup completed
+2025-08-24 20:31:35,989 - root - INFO - Logging has been set up.
+2025-08-24 20:31:35,990 - __main__ - INFO - Starting SecureVault Pro...
+2025-08-24 20:31:36,076 - __main__ - INFO - Windows desktop shortcut created
+2025-08-24 20:31:36,281 - __main__ - INFO - Application initialized successfully
+2025-08-24 20:31:39,147 - __main__ - INFO - Initializing secure file management system...
+2025-08-24 20:31:39,149 - __main__ - INFO - Secure file manager initialized
+2025-08-24 20:31:39,149 - __main__ - INFO - Validating lockout state integrity...
+2025-08-24 20:31:47,478 - secure_file_manager - INFO - Initializing encryption...
+2025-08-24 20:31:47,480 - secure_file_manager - INFO - Salt loaded from secure_vault\salt_file
+2025-08-24 20:31:47,480 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-08-24 20:31:47,626 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-08-24 20:31:47,626 - __main__ - INFO - Loading files from secure storage...
+2025-08-24 20:31:47,626 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-08-24 20:31:47,628 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_h427j97s
+2025-08-24 20:31:47,633 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-08-24 20:31:47,633 - __main__ - INFO - Attempting authentication...
+2025-08-24 20:31:47,634 - __main__ - INFO - Salt path: secure_vault\salt_file
+2025-08-24 20:31:47,634 - __main__ - INFO - Metadata DB path: secure_vault\metadata.db
+2025-08-24 20:31:47,634 - __main__ - INFO - Sensitive DB path: secure_vault\sensitive.db
+2025-08-24 20:31:47,634 - __main__ - INFO - Integrity path: secure_vault\integrity_file
+2025-08-24 20:31:47,635 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-08-24 20:31:47,760 - __main__ - INFO - Encryption keys generated
+2025-08-24 20:31:47,760 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:31:47,761 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:31:47,762 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:31:47,762 - __main__ - INFO - Database integrity check: PASSED
+2025-08-24 20:31:47,765 - __main__ - WARNING - No master account found for test decryption
+2025-08-24 20:31:47,765 - __main__ - INFO - Authentication successful!
+2025-08-24 20:31:47,766 - __main__ - INFO - Clearing lockout state
+2025-08-24 20:31:47,768 - secure_file_manager - ERROR - Failed to start watchdog observer
+Traceback (most recent call last):
+  File "c:\Users\Hamza\Desktop\scripts\3 - Control Ur PassWord & Gen\secure_file_manager.py", line 748, in _start_watchdog
+    self._observer.schedule(event_handler, self.sfm.secure_dir, recursive=True)
+    ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'schedule'
+2025-08-24 20:31:47,770 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:31:47,770 - secure_file_manager - INFO - SecurityMonitor polling thread started (interval=2.0)
+2025-08-24 20:31:47,771 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:31:47,775 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:31:49,780 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:31:49,782 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:31:49,782 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:31:51,783 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:31:51,786 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:31:51,786 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:31:53,791 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:31:53,794 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:31:53,794 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:31:55,796 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:31:55,798 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:31:55,798 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:31:57,799 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:31:57,802 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:31:57,803 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:31:59,807 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:31:59,810 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:31:59,810 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:01,812 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:01,814 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:01,814 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:03,815 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:03,818 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:03,819 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:05,823 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:05,827 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:05,828 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:07,842 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:07,900 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:07,906 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:09,907 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:09,909 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:09,910 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:11,911 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:11,912 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:11,913 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:13,913 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:13,916 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:13,917 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:15,918 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:15,922 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:15,923 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:17,924 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:17,927 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:17,928 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:19,930 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:19,933 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:19,933 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:21,935 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:21,940 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:21,941 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:23,943 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:23,945 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:23,945 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:30,001 - root - INFO - Logging has been set up.
+2025-08-24 20:32:30,001 - __main__ - INFO - Starting SecureVault Pro...
+2025-08-24 20:32:30,082 - __main__ - INFO - Windows desktop shortcut created
+2025-08-24 20:32:30,296 - __main__ - INFO - Application initialized successfully
+2025-08-24 20:32:33,144 - __main__ - INFO - Initializing secure file management system...
+2025-08-24 20:32:33,145 - __main__ - INFO - Secure file manager initialized
+2025-08-24 20:32:33,155 - __main__ - INFO - Validating lockout state integrity...
+2025-08-24 20:32:36,505 - secure_file_manager - INFO - Initializing encryption...
+2025-08-24 20:32:36,505 - secure_file_manager - INFO - Salt loaded from secure_vault\salt_file
+2025-08-24 20:32:36,506 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-08-24 20:32:36,631 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-08-24 20:32:36,632 - __main__ - INFO - Loading files from secure storage...
+2025-08-24 20:32:36,632 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-08-24 20:32:36,634 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_h6cs1tnw
+2025-08-24 20:32:36,639 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-08-24 20:32:36,640 - __main__ - INFO - Attempting authentication...
+2025-08-24 20:32:36,640 - __main__ - INFO - Salt path: secure_vault\salt_file
+2025-08-24 20:32:36,640 - __main__ - INFO - Metadata DB path: secure_vault\metadata.db
+2025-08-24 20:32:36,641 - __main__ - INFO - Sensitive DB path: secure_vault\sensitive.db
+2025-08-24 20:32:36,641 - __main__ - INFO - Integrity path: secure_vault\integrity_file
+2025-08-24 20:32:36,641 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-08-24 20:32:36,763 - __main__ - INFO - Encryption keys generated
+2025-08-24 20:32:36,763 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:36,765 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:36,765 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:36,765 - __main__ - INFO - Database integrity check: PASSED
+2025-08-24 20:32:36,768 - __main__ - WARNING - No master account found for test decryption
+2025-08-24 20:32:36,769 - __main__ - INFO - Authentication successful!
+2025-08-24 20:32:36,769 - __main__ - INFO - Clearing lockout state
+2025-08-24 20:32:36,772 - secure_file_manager - ERROR - Failed to start watchdog observer
+Traceback (most recent call last):
+  File "c:\Users\Hamza\Desktop\scripts\3 - Control Ur PassWord & Gen\secure_file_manager.py", line 748, in _start_watchdog
+    self._observer.schedule(event_handler, self.sfm.secure_dir, recursive=True)
+    ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'schedule'
+2025-08-24 20:32:36,775 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:36,775 - secure_file_manager - INFO - SecurityMonitor polling thread started (interval=2.0)
+2025-08-24 20:32:36,776 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:36,776 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:38,778 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:38,781 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:38,781 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:40,783 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:40,787 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:40,789 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:42,792 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:42,794 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:42,795 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:44,797 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:44,800 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:44,801 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:46,802 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:46,808 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:46,809 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:48,811 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:48,813 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:48,814 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:50,816 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:50,817 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:50,817 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:52,821 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:52,824 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:52,825 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:54,828 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:54,829 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:54,829 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:56,830 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:56,833 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:56,834 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:32:58,837 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:32:58,840 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:32:58,841 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:00,843 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:00,846 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:00,846 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:02,848 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:02,851 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:02,854 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:04,857 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:04,859 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:04,859 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:06,861 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:06,863 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:06,864 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:08,866 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:08,871 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:08,872 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:10,875 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:10,878 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:10,879 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:12,881 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:12,884 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:12,889 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:14,892 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:14,894 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:14,894 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:16,896 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:16,897 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:16,898 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:18,898 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:18,901 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:18,904 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:20,907 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:20,908 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:20,909 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:22,909 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:22,911 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:22,911 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:24,915 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:24,917 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:24,919 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:27,000 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:27,054 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:27,082 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:29,149 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:29,182 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:29,209 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:31,244 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:31,245 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:31,246 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:33,247 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:33,249 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:33,249 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:35,291 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:35,317 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:35,356 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:37,399 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:37,408 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:37,410 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:39,423 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:39,425 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:39,425 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:41,427 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:41,428 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:41,430 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:43,432 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:43,436 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:43,438 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:45,441 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:45,443 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:45,443 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:47,444 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:47,446 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:47,446 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:49,448 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:49,450 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:49,450 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:51,453 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:51,465 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:51,472 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:53,474 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:53,477 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:53,477 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:55,479 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:55,481 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:55,482 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:57,484 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:57,486 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:57,487 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:33:59,489 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:33:59,491 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:33:59,492 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:01,494 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:01,497 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:01,498 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:03,499 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:03,503 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:03,504 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:05,506 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:05,508 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:05,509 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:07,510 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:07,513 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:07,514 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:09,515 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:09,519 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:09,519 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:11,520 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:11,523 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:11,523 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:13,525 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:13,528 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:13,529 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:15,530 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:15,533 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:15,534 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:17,536 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:17,539 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:17,540 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:19,542 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:19,545 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:19,545 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:21,547 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:21,548 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:21,549 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:23,551 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:23,554 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:23,555 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:25,556 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:25,559 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:25,560 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:27,561 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:27,564 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:27,565 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:29,568 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:29,571 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:29,571 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:31,573 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:31,576 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:31,577 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:33,578 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:33,581 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:33,582 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:35,584 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:35,587 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:35,588 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:37,590 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:37,592 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:37,593 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:39,595 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:39,598 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:39,600 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:41,605 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:41,607 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:41,607 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:43,608 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:43,611 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:43,612 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:44,125 - __main__ - INFO - Logging out due to inactivity.
+2025-08-24 20:34:44,126 - __main__ - INFO - Syncing files to secure storage before lock...
+2025-08-24 20:34:44,127 - secure_file_manager - INFO - Syncing all files...
+2025-08-24 20:34:44,127 - secure_file_manager - INFO - Syncing from temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_h6cs1tnw
+2025-08-24 20:34:44,138 - secure_file_manager - INFO - Rotating integrity signature.
+2025-08-24 20:34:44,145 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-08-24 20:34:44,150 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-08-24 20:34:44,152 - secure_file_manager - INFO - Sync from temp directory completed.
+2025-08-24 20:34:44,153 - secure_file_manager - INFO - Verifying integrity...
+2025-08-24 20:34:44,160 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-08-24 20:34:44,161 - secure_file_manager - INFO - Integrity verification result: OK
+2025-08-24 20:34:44,161 - secure_file_manager - INFO - Cleaning up temporary files...
+2025-08-24 20:34:44,162 - secure_file_manager - INFO - Removing temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_h6cs1tnw
+2025-08-24 20:34:44,164 - secure_file_manager - INFO - Temporary files cleaned up successfully.
+2025-08-24 20:34:44,164 - __main__ - INFO - Temporary files cleaned up
+2025-08-24 20:34:44,242 - __main__ - INFO - Vault locked successfully
+2025-08-24 20:34:44,243 - __main__ - INFO - Performing final sync and cleanup...
+2025-08-24 20:34:44,243 - secure_file_manager - INFO - Cleaning up temporary files...
+2025-08-24 20:34:44,243 - secure_file_manager - INFO - Temporary files cleaned up successfully.
+2025-08-24 20:34:44,243 - __main__ - INFO - Secure cleanup completed

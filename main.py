@@ -34,7 +34,7 @@ restore_icon = ctk.CTkImage(
     size=(24, 24)  # adjust size
 )
 log = ctk.CTkImage(
-    light_image=Image.open("icons/log.png"),   # path to your icon
+    light_image=Image.open("icons/load.png"),   # path to your icon
     size=(24, 24)  # adjust size
 )
 logout = ctk.CTkImage(
@@ -675,7 +675,7 @@ class ModernPasswordManagerGUI:
         ctk.set_appearance_mode("dark")  
         self.root = ctk.CTk()
         self.root.withdraw()
-        self.root.title("Secure Password Manager")
+        self.root.title("SecureVault Pro")
         self.root.geometry("1200x800")
         try:
             icon_path = os.path.join("icons", "main.ico")
@@ -711,7 +711,7 @@ class ModernPasswordManagerGUI:
         loading_window.grab_set()
 
         try:
-            icon_path = os.path.join("icons", "load.ico")
+            icon_path = os.path.join("icons", "main.ico")
             if os.path.exists(icon_path):
                 loading_window.iconbitmap(default=icon_path)
         except Exception as e:
@@ -734,7 +734,7 @@ class ModernPasswordManagerGUI:
         except Exception as e:
             logger.warning(f"Could not display loading icon: {e}")
 
-        ctk.CTkLabel(loading_window, text="SecureVault", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=10)
+        ctk.CTkLabel(loading_window, text="SecureVault Pro", font=ctk.CTkFont(size=24, weight="bold")).pack(pady=10)
 
         progress_bar = ctk.CTkProgressBar(loading_window, width=300)
         progress_bar.pack(pady=10)
@@ -975,13 +975,13 @@ class ModernPasswordManagerGUI:
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         title = ctk.CTkLabel(
             login_card, 
-            text="🔒 Secure Password Manager", 
+            text="🔒 SecureVault Pro", 
             font=ctk.CTkFont(size=28, weight="bold")
         )
         title.pack(pady=(30, 20), padx=40)
         subtitle = ctk.CTkLabel(
             login_card,
-            text="Secure Password Management",
+            text="only you open it!",
             font=ctk.CTkFont(size=16),
             text_color="#888888"
         )
@@ -1233,7 +1233,7 @@ class ModernPasswordManagerGUI:
         
         self.update_login_button_states()
         setup_window = ctk.CTkToplevel(self.root)
-        setup_window.title("SecureVault Setup Wizard")
+        setup_window.title("SecureVault Pro Setup Wizard")
         setup_window.geometry("600x370")
         setup_window.resizable(0,0)
         setup_window.grab_set()
@@ -1296,7 +1296,7 @@ class ModernPasswordManagerGUI:
             
             if self.secure_file_manager:
                 self.secure_file_manager.sync_all_files()
-            messagebox.showinfo("Success", "SecureVault has been set up successfully!")
+            messagebox.showinfo("Success", "SecureVault Pro has been set up successfully!")
             
             # Show tutorial on first setup
             if not self.settings.get('tutorial_completed', False):
@@ -1327,7 +1327,7 @@ class ModernPasswordManagerGUI:
         
         ctk.CTkLabel(
             toolbar, 
-            text="🔒 Secure Password Manager", 
+            text="🔒 SecureVault Pro", 
             font=ctk.CTkFont(size=24, weight="bold")
         ).pack(side="left", padx=25, pady=20)
         
@@ -1810,7 +1810,6 @@ class ModernPasswordManagerGUI:
         icon_accounts   = ctk.CTkImage(Image.open("icons/user.png"), size=(24, 24))
         icon_generator  = ctk.CTkImage(Image.open("icons/password.png"), size=(24, 24))
         icon_report     = ctk.CTkImage(Image.open("icons/security.png"), size=(24, 24))
-        icon_audit      = ctk.CTkImage(Image.open("icons/log.png"), size=(24, 24))
 
         sidebar_configs = [
             ("Your Accounts", icon_accounts, self.show_passwords),
@@ -1929,10 +1928,10 @@ class ModernPasswordManagerGUI:
                 try:
                     import win32com.client
                     shell = win32com.client.Dispatch("WScript.Shell")
-                    shortcut = shell.CreateShortCut(str(desktop_path / "SecureVault Password Manager.lnk"))
+                    shortcut = shell.CreateShortCut(str(desktop_path / "SecureVault Pro.lnk"))
                     shortcut.Targetpath = str(app_path)
                     shortcut.WorkingDirectory = str(app_dir)
-                    shortcut.Description = "SecureVault Password Manager - Secure Password Storage"
+                    shortcut.Description = "SecureVault Pro - Secure Password Storage"
                     shortcut.save()
                     logger.info("Windows desktop shortcut created")
                 except ImportError:
@@ -1941,7 +1940,7 @@ class ModernPasswordManagerGUI:
     "{app_path}"
     pause
     """
-                    with open(desktop_path / "SecureVault Password Manager.bat", "w") as f:
+                    with open(desktop_path / "SecureVault Pro.bat", "w") as f:
                         f.write(batch_content)
                     logger.info("Windows batch file created")
                     
@@ -1950,7 +1949,7 @@ class ModernPasswordManagerGUI:
                     script = f'''
                     tell application "Finder"
                         make alias file to file POSIX file "{app_path}" at desktop
-                        set name of result to "SecureVault Password Manager"
+                        set name of result to "SecureVault Pro"
                     end tell
                     '''
                     subprocess.run(["osascript", "-e", script], check=True)
@@ -1961,7 +1960,7 @@ class ModernPasswordManagerGUI:
                 desktop_file_content = f"""[Desktop Entry]
     Version=1.0
     Type=Application
-    Name=SecureVault Password Manager
+    Name=SecureVault Pro
     Comment=Secure Password Storage and Management
     Exec="{app_path}"
     Icon=application-x-executable
@@ -1969,7 +1968,7 @@ class ModernPasswordManagerGUI:
     StartupNotify=true
     Categories=Utility;Security;
     """
-                desktop_file_path = desktop_path / "SecureVault Password Manager.desktop"
+                desktop_file_path = desktop_path / "SecureVault Pro.desktop"
                 with open(desktop_file_path, "w") as f:
                     f.write(desktop_file_content)
                 desktop_file_path.chmod(0o755)
@@ -2027,7 +2026,7 @@ class ModernPasswordManagerGUI:
 
     def show_about_dialog(self):
         about_dialog = ctk.CTkToplevel(self.root)
-        about_dialog.title("About Secure Password Manager")
+        about_dialog.title("About SecureVault Pro")
         about_dialog.geometry("1000x450")
         about_dialog.resizable(False, False)
         about_dialog.grab_set()
@@ -2035,11 +2034,11 @@ class ModernPasswordManagerGUI:
         main_frame = ctk.CTkFrame(about_dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-        title_label = ctk.CTkLabel(main_frame, text="Your Digital Safe", font=ctk.CTkFont(size=20, weight="bold"))
+        title_label = ctk.CTkLabel(main_frame, text="only you open it!", font=ctk.CTkFont(size=20, weight="bold"))
         title_label.pack(pady=(0, 15))
 
         about_text = """
-This program is your personal digital safe for passwords.
+This program is your personal digital safe for passwords, only you open it!
 
 How it works:
 1. You create a single, strong Master Password. This is the only password you need to remember.
@@ -3196,7 +3195,7 @@ Duplicate Passwords: {len(duplicate_passwords)}
 def main():
     try:
         setup_logging()
-        logger.info("Starting SecureVault Password Manager...")
+        logger.info("Starting SecureVault Pro...")
         ModernPasswordManagerGUI.create_desktop_integration()
         app = ModernPasswordManagerGUI()
         logger.info("Application initialized successfully")
@@ -3209,7 +3208,7 @@ def main():
         try:
             import tkinter.messagebox as msgbox
             msgbox.showerror("Startup Error", 
-                           f"Failed to start SecureVault:\n\n{str(e)}\n\n"
+                           f"Failed to start SecureVault Pro:\n\n{str(e)}\n\n"
                            f"Please check the console for more details.")
         except:
             pass

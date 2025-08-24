@@ -10,7 +10,7 @@ class TutorialManager:
 
         self.steps = [
             {
-                "title": "Welcome to SecureVault!",
+                "title": "Welcome to SecureVault Pro!",
                 "text": "This quick tutorial will guide you through the main features of the application.",
                 "image": "info.png" 
             },
@@ -31,14 +31,14 @@ class TutorialManager:
             },
             {
                 "title": "All Done!",
-                "text": "You're now ready to use SecureVault. Stay secure!",
+                "text": "You're now ready to use SecureVault Pro. Stay secure!",
                 "image": "logout.png"
             }
         ]
 
     def show_tutorial_window(self):
         self.tutorial_window = ctk.CTkToplevel(self.parent)
-        self.tutorial_window.title("Welcome to SecureVault")
+        self.tutorial_window.title("Welcome to SecureVault Pro")
         self.tutorial_window.geometry("500x400")
         self.tutorial_window.resizable(False, False)
         self.tutorial_window.overrideredirect(True)
