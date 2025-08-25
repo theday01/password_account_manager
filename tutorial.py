@@ -11,8 +11,8 @@ class TutorialManager:
         self._current_image = None  # keep a reference to the image to avoid GC
 
         # Window dimensions (increased width so titles won't be clipped)
-        self.win_width = 620
-        self.win_height = 420
+        self.win_width = 650
+        self.win_height = 470
 
         self.steps = self.get_translated_steps()
 
@@ -167,6 +167,8 @@ class TutorialManager:
             prev_button.pack(side="left", padx=4)
 
         if self.current_step < len(self.steps) - 1:
+            skip_button = ctk.CTkButton(right_container, text=self.lang_manager.get_string("skip_button"), command=self.finish_tutorial, width=110)
+            skip_button.pack(side="right", padx=4)
             next_button = ctk.CTkButton(right_container, text=self.lang_manager.get_string("next_button"), command=self.next_step, width=110)
             next_button.pack(side="right", padx=4)
         else:

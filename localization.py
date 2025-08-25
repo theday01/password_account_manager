@@ -109,6 +109,8 @@ LANGUAGES = {
         "auth_failed": "Authentication failed",
         "setup_wizard_title": "SecureVault Pro Setup Wizard",
         "create_master_password_title": "Create Your Master Password",
+        "email_placeholder": "Enter your email",
+        "email_required_error": "Email is a required field",
         "confirm_password_placeholder": "Confirm Password",
         "complete_setup_button": "Complete Setup",
         "passwords_dont_match": "Passwords don't match or are empty",
@@ -347,6 +349,7 @@ before restoring. The UI is built with CustomTkinter (dark theme available), inc
         "previous_button": "Previous",
         "next_button": "Next",
         "finish_button": "Finish",
+        "skip_button": "Skip",
     },
     "Arabic": {
         "loading": "جار التحميل...",

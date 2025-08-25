@@ -263,7 +263,7 @@ class DatabaseManager:
         self.encryption_key = None
         self.last_integrity_error = False
         
-    def initialize_database(self, master_password: str):
+    def initialize_database(self, master_password: str, email: str):
         logger.info("Starting database initialization...")
         salt = self.crypto.generate_salt()
         self.encryption_key = self.crypto.generate_key_from_password(master_password, salt)
@@ -333,7 +333,7 @@ class DatabaseManager:
             """, (
                 "master_account", 
                 "Master Account", 
-                "", 
+                email, 
                 "", 
                 "System account for authentication verification",
                 datetime.now().isoformat(), 
@@ -554,6 +554,15 @@ class DatabaseManager:
             return username, password
         return None, None
     
+    def get_master_account_email(self) -> Optional[str]:
+        metadata_conn = sqlite3.connect(self.metadata_db)
+        cursor = metadata_conn.execute("SELECT email FROM accounts WHERE id = 'master_account'")
+        row = cursor.fetchone()
+        metadata_conn.close()
+        if row:
+            return row[0]
+        return None
+
     def update_account(self, account_id: str, name: str, email: str, url: str, notes: str, username: str, password: str):
         metadata_conn = sqlite3.connect(self.metadata_db)
         metadata_conn.execute("""
@@ -1264,7 +1273,7 @@ class ModernPasswordManagerGUI:
         self.update_login_button_states()
         setup_window = ctk.CTkToplevel(self.root)
         setup_window.title(self.lang_manager.get_string("setup_wizard_title"))
-        setup_window.geometry("600x370")
+        setup_window.geometry("600x450")
         setup_window.resizable(0,0)
         setup_window.grab_set()
         main_frame = ctk.CTkFrame(setup_window)
@@ -1272,6 +1281,11 @@ class ModernPasswordManagerGUI:
         
         ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("create_master_password_title"), 
                      font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+        
+        self.setup_email_entry = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("email_placeholder"), 
+                                                 width=300, height=40)
+        self.setup_email_entry.pack(pady=10)
+        
         self.setup_master_password = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("master_password_placeholder"), 
                                                   show="*", width=300, height=40)
         self.setup_master_password.pack(pady=10)
@@ -1304,6 +1318,11 @@ class ModernPasswordManagerGUI:
     def complete_setup(self, setup_window):
         master_password = self.setup_master_password.get()
         confirm_password = self.setup_confirm_password.get()
+        email = self.setup_email_entry.get().strip()
+
+        if not email:
+            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("email_required_error"))
+            return
         if not master_password or master_password != confirm_password:
             messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("passwords_dont_match"))
             return
@@ -1322,7 +1341,7 @@ class ModernPasswordManagerGUI:
             
             db_path = "manageyouraccount"
             self.database = DatabaseManager(db_path, self.crypto, self.secure_file_manager)
-            self.database.initialize_database(master_password)
+            self.database.initialize_database(master_password, email)
             
             if self.secure_file_manager:
                 self.secure_file_manager.sync_all_files()
@@ -2070,7 +2089,8 @@ class ModernPasswordManagerGUI:
                      font=ctk.CTkFont(size=16, weight="bold")).pack(pady=10)
 
         secret = self.tfa_manager.generate_secret()
-        uri = self.tfa_manager.get_provisioning_uri(secret, "user@securevault")
+        email = self.database.get_master_account_email() or "user@securevault"
+        uri = self.tfa_manager.get_provisioning_uri(secret, email)
         qr_image_data = self.tfa_manager.generate_qr_code(uri)
         qr_image = Image.open(qr_image_data)
         qr_photo = ImageTk.PhotoImage(qr_image)
