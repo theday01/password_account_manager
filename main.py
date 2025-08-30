@@ -720,6 +720,25 @@ class ModernPasswordManagerGUI:
         
         self.show_loading_screen()
 
+    def show_message(self, title_key: str, message_key: str, msg_type: str = "info", ask: str = None, **kwargs) -> bool:
+        current_lang = self.lang_manager.language
+        self.lang_manager.set_language("English")
+
+        title = self.lang_manager.get_string(title_key)
+        message = self.lang_manager.get_string(message_key, **kwargs)
+
+        result = None
+        if ask == "yesno":
+            result = messagebox.askyesno(title, message)
+        elif msg_type == "info":
+            messagebox.showinfo(title, message)
+        elif msg_type == "error":
+            messagebox.showerror(title, message)
+        
+        self.lang_manager.set_language(current_lang)
+
+        return result if result is not None else False
+
     def _initialize_app(self):
         """Contains the original initialization logic."""
         self.authenticated = False
@@ -1091,21 +1110,21 @@ class ModernPasswordManagerGUI:
     def authenticate_user(self):
         master_password = self.master_password_entry.get().strip()
         if not master_password:
-            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("enter_master_password_error"))
+            self.show_message("error", "enter_master_password_error", msg_type="error")
             return
         if not self.is_vault_initialized():
-            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("vault_not_initialized_error"))
+            self.show_message("error", "vault_not_initialized_error", msg_type="error")
             return
         if self.secure_file_manager:
             legacy_setup = SecureVaultSetup(self.secure_file_manager)
             if legacy_setup.has_legacy_files():
                 logger.info("Legacy files detected, starting migration...")
                 if not legacy_setup.migrate_legacy_files(master_password):
-                    messagebox.showerror(self.lang_manager.get_string("migration_error_title"), self.lang_manager.get_string("migration_error_body"))
+                    self.show_message("migration_error_title", "migration_error_body", msg_type="error")
                     return
         if self.secure_file_manager:
             if not self.secure_file_manager.initialize_encryption(master_password):
-                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("secure_storage_init_error"))
+                self.show_message("error", "secure_storage_init_error", msg_type="error")
                 return
             logger.info("Loading files from secure storage...")
             if not self.secure_file_manager.load_files_to_temp():
@@ -1131,22 +1150,18 @@ class ModernPasswordManagerGUI:
                 self.show_main_interface()
         else:
             if hasattr(self.database, 'last_integrity_error') and self.database.last_integrity_error:
-                result = messagebox.askyesno(
-                    self.lang_manager.get_string("integrity_error_title"),
-                    self.lang_manager.get_string("integrity_error_body")
-                )
+                result = self.show_message("integrity_error_title", "integrity_error_body", ask="yesno")
                 
                 if result:
                     try:
                         if self.database.force_integrity_reset():
-                            messagebox.showinfo(self.lang_manager.get_string("success"),
-                                            self.lang_manager.get_string("integrity_fix_success"))
+                            self.show_message("success", "integrity_fix_success")
                             self.database.last_integrity_error = False
                             return
                         else:
-                            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("integrity_fix_fail"))
+                            self.show_message("error", "integrity_fix_fail", msg_type="error")
                     except Exception as e:
-                        messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("integrity_fix_error", error=str(e)))
+                        self.show_message("error", "integrity_fix_error", msg_type="error", error=str(e))
             
             self.failed_attempts += 1
             if self.failed_attempts >= 3:
@@ -1154,12 +1169,11 @@ class ModernPasswordManagerGUI:
                 lockout_minutes = 3 * self.consecutive_lockouts
                 self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
                 self.save_lockout_state()
-                messagebox.showerror(self.lang_manager.get_string("account_locked_error_title"),
-                            self.lang_manager.get_string("account_locked_error", minutes=lockout_minutes))
+                self.show_message("account_locked_error_title", "account_locked_error", msg_type="error", minutes=lockout_minutes)
                 self.failed_attempts = 0
                 self.disable_login_button_with_countdown(lockout_minutes)
             else:
-                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("invalid_master_password_error", attempts=3 - self.failed_attempts))
+                self.show_message("error", "invalid_master_password_error", msg_type="error", attempts=3 - self.failed_attempts)
 
     def _start_security_monitoring(self):
         if self.security_monitor:
@@ -1174,13 +1188,13 @@ class ModernPasswordManagerGUI:
         full_message = f"{message}\n\nDetails: {details}"
         
         if severity == "CRITICAL":
-            messagebox.showerror(title, full_message)
+            self.show_message(title, full_message, msg_type="error")
             # Consider more drastic action for critical alerts, like locking the vault
             self.lock_vault()
         elif severity == "HIGH":
-            messagebox.showwarning(title, full_message)
+            self.show_message(title, full_message, msg_type="warning")
         else:
-            messagebox.showinfo(title, full_message)
+            self.show_message(title, full_message, msg_type="info")
 
     def disable_login_button_with_countdown(self, lockout_minutes):
         if hasattr(self, 'login_btn'):
@@ -1275,19 +1289,18 @@ class ModernPasswordManagerGUI:
                     lockout_minutes = 3 * self.consecutive_lockouts
                     self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
                     self.save_lockout_state()
-                    messagebox.showerror(self.lang_manager.get_string("account_locked_error_title"),
-                                    self.lang_manager.get_string("account_locked_error", minutes=lockout_minutes))
+                    self.show_message("account_locked_error_title", "account_locked_error", msg_type="error", minutes=lockout_minutes)
                     self.failed_attempts = 0
                 else:
-                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("invalid_master_password"))
+                    self.show_message("error", "invalid_master_password", msg_type="error")
                 return False
         except Exception:
-            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("auth_failed"))
+            self.show_message("error", "auth_failed", msg_type="error")
             return False
 
     def show_setup_wizard(self):
         if self.is_vault_initialized():
-            messagebox.showinfo(self.lang_manager.get_string("setup_wizard_title"), self.lang_manager.get_string("vault_not_initialized_error"))
+            self.show_message("setup_wizard_title", "vault_not_initialized_error")
             return
         
         self.update_login_button_states()
@@ -1341,21 +1354,21 @@ class ModernPasswordManagerGUI:
         email = self.setup_email_entry.get().strip()
 
         if not email:
-            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("email_required_error"))
+            self.show_message("error", "email_required_error", msg_type="error")
             return
         if not master_password or master_password != confirm_password:
-            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("passwords_dont_match"))
+            self.show_message("error", "passwords_dont_match", msg_type="error")
             return
         if len(master_password) < 1:
-            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("password_too_short"))
+            self.show_message("error", "password_too_short", msg_type="error")
             return
         try:
             if self.secure_file_manager:
                 if not self.secure_file_manager.initialize_encryption(master_password):
-                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("secure_storage_init_error"))
+                    self.show_message("error", "secure_storage_init_error", msg_type="error")
                     return
                 if not self.secure_file_manager.initialize_vault_files():
-                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("create_vault_files_error"))
+                    self.show_message("error", "create_vault_files_error", msg_type="error")
                     return
                 self.secure_file_manager.load_files_to_temp()
             
@@ -1365,12 +1378,12 @@ class ModernPasswordManagerGUI:
             
             if self.secure_file_manager:
                 self.secure_file_manager.sync_all_files()
-            messagebox.showinfo(self.lang_manager.get_string("success"), self.lang_manager.get_string("setup_success_message"))
+            self.show_message("success", "setup_success_message")
             
             setup_window.destroy()
             self.show_login_screen()
         except Exception as e:
-            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("setup_failed_message", error=str(e)))
+            self.show_message("error", "setup_failed_message", msg_type="error", error=str(e))
 
     def show_main_interface(self):
         self.root.state('zoomed')
@@ -1471,7 +1484,7 @@ class ModernPasswordManagerGUI:
         from backup_manager import BackupManager, BackupError
 
         if not getattr(self, "database", None):
-            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("database_not_available_error"))
+            self.show_message("error", "database_not_available_error", msg_type="error")
             return
 
         backup_folder = os.path.join(os.getcwd(), "backups")
@@ -1557,7 +1570,7 @@ class ModernPasswordManagerGUI:
         def preview_contents():
             sel = listbox.curselection()
             if not sel:
-                messagebox.showerror(self.lang_manager.get_string("no_selection_error"), self.lang_manager.get_string("select_backup_to_preview_error"))
+                self.show_message("no_selection_error", "select_backup_to_preview_error", msg_type="error")
                 return
             idx = sel[0]
             backup_path = backups[idx]
@@ -1580,10 +1593,10 @@ class ModernPasswordManagerGUI:
                 try:
                     restored = bm.restore_backup(backup_path, code, restore_to_dir=tempdir)
                 except BackupError as be:
-                    messagebox.showerror(self.lang_manager.get_string("preview_failed_error"), self.lang_manager.get_string("preview_failed_error", be=be))
+                    self.show_message("preview_failed_error", "preview_failed_error", msg_type="error", be=be)
                     return
                 except Exception as e:
-                    messagebox.showerror(self.lang_manager.get_string("preview_failed_error"), self.lang_manager.get_string("unexpected_preview_error", e=e))
+                    self.show_message("preview_failed_error", "unexpected_preview_error", msg_type="error", e=e)
                     return
 
                 manifest_path = os.path.join(tempdir, "backup_manifest.json")
@@ -1611,7 +1624,7 @@ class ModernPasswordManagerGUI:
         def perform_restore():
             sel = listbox.curselection()
             if not sel:
-                messagebox.showerror(self.lang_manager.get_string("no_selection_error"), self.lang_manager.get_string("select_backup_to_restore_error"))
+                self.show_message("no_selection_error", "select_backup_to_restore_error", msg_type="error")
                 return
             idx = sel[0]
             backup_path = backups[idx]
@@ -1620,10 +1633,7 @@ class ModernPasswordManagerGUI:
             if code is None:
                 return
 
-            proceed = messagebox.askyesno(
-                self.lang_manager.get_string("confirm_restore_title"),
-                self.lang_manager.get_string("confirm_restore_message")
-            )
+            proceed = self.show_message("confirm_restore_title", "confirm_restore_message", ask="yesno")
             if not proceed:
                 return
 
@@ -1643,12 +1653,12 @@ class ModernPasswordManagerGUI:
                     restored = bm.restore_backup(backup_path, code, restore_to_dir=tempdir)
                 except BackupError as be:
                     shutil.rmtree(tempdir, ignore_errors=True)
-                    messagebox.showerror(self.lang_manager.get_string("restore_failed_error"), self.lang_manager.get_string("restore_failed_error", be=be))
+                    self.show_message("restore_failed_error", "restore_failed_error", msg_type="error", be=be)
                     status_var.set("")
                     return
                 except Exception as e:
                     shutil.rmtree(tempdir, ignore_errors=True)
-                    messagebox.showerror(self.lang_manager.get_string("restore_failed_error"), self.lang_manager.get_string("unexpected_restore_error", e=e))
+                    self.show_message("restore_failed_error", "unexpected_restore_error", msg_type="error", e=e)
                     status_var.set("")
                     return
 
@@ -1679,7 +1689,7 @@ class ModernPasswordManagerGUI:
                 status_var.set(self.lang_manager.get_string("restore_complete_status"))
                 message = self.lang_manager.get_string("restore_complete_message", moved="\n".join(os.path.basename(p) for p in moved), backups="\n".join(backups_created))
 
-                if messagebox.askyesno(self.lang_manager.get_string("restore_complete_message_title"), message):
+                if self.show_message("restore_complete_message_title", message, ask="yesno"):
                     try:
                         try:
                             self.root.destroy()
@@ -1689,12 +1699,12 @@ class ModernPasswordManagerGUI:
                     except SystemExit:
                         raise
                     except Exception as e:
-                        messagebox.showinfo(self.lang_manager.get_string("exit_failed_error"), self.lang_manager.get_string("exit_failed_error", e=e))
+                        self.show_message("exit_failed_error", "exit_failed_error", e=e)
                 else:
-                    messagebox.showinfo(self.lang_manager.get_string("restore_complete_info"), self.lang_manager.get_string("restore_complete_info"))
+                    self.show_message("restore_complete_info", "restore_complete_info")
                 win.destroy()
             except Exception as e:
-                messagebox.showerror(self.lang_manager.get_string("restore_error_title"), self.lang_manager.get_string("restore_error_message", e=e))
+                self.show_message("restore_error_title", "restore_error_message", msg_type="error", e=e)
                 status_var.set("")
                 try:
                     shutil.rmtree(tempdir, ignore_errors=True)
@@ -1720,7 +1730,7 @@ class ModernPasswordManagerGUI:
     def show_backup_dialog(self):
         import tkinter.simpledialog as simpledialog
         if not self.database:
-            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("database_not_available_error"))
+            self.show_message("error", "database_not_available_error", msg_type="error")
             return
 
         dialog = ctk.CTkToplevel(self.root)
@@ -1779,15 +1789,15 @@ class ModernPasswordManagerGUI:
         def create_backup():
             code = code_entry.get().strip()
             if not code:
-                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("backup_code_required_error"))
+                self.show_message("error", "backup_code_required_error", msg_type="error")
                 return
 
             if len(code) < 8:
-                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("backup_code_min_length_error"))
+                self.show_message("error", "backup_code_min_length_error", msg_type="error")
                 return
             confirm_msg = self.lang_manager.get_string("final_backup_confirmation_message", code_length=len(code))
 
-            if not messagebox.askyesno(self.lang_manager.get_string("final_backup_confirmation_title"), confirm_msg):
+            if not self.show_message("final_backup_confirmation_title", confirm_msg, ask="yesno"):
                 return
             try:
                 if self.secure_file_manager:
@@ -1804,11 +1814,10 @@ class ModernPasswordManagerGUI:
                 
                 success_msg = self.lang_manager.get_string("backup_complete_message", out_path=out_path)
                 
-                messagebox.showinfo(self.lang_manager.get_string("backup_complete_title"), success_msg)
+                self.show_message("backup_complete_title", success_msg)
                 dialog.destroy()
             except Exception as e:
-                messagebox.showerror(self.lang_manager.get_string("backup_failed_title"), 
-                                self.lang_manager.get_string("backup_failed_message", error=str(e)))
+                self.show_message("backup_failed_title", "backup_failed_message", msg_type="error", error=str(e))
 
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
@@ -1888,8 +1897,7 @@ class ModernPasswordManagerGUI:
                 
                 if not self.secure_file_manager.perform_integrity_check():
                     logger.error("Integrity check failed during vault lock")
-                    messagebox.showwarning("Security Warning", 
-                                        "File integrity check failed.")
+                    self.show_message("Security Warning", "File integrity check failed.", msg_type="warning")
                 
                 self.secure_file_manager.cleanup_temp_files()
                 logger.info("Temporary files cleaned up")
@@ -2131,10 +2139,10 @@ class ModernPasswordManagerGUI:
                 encrypted_secret = self.crypto.encrypt_data(secret, self.database.encryption_key)
                 self.settings['tfa_secret'] = base64.b64encode(encrypted_secret).decode('utf-8')
                 self.save_settings_to_file()
-                messagebox.showinfo(self.lang_manager.get_string("success"), self.lang_manager.get_string("tfa_enabled_success"))
+                self.show_message("success", "tfa_enabled_success")
                 dialog.destroy()
             else:
-                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("invalid_code_try_again"))
+                self.show_message("error", "invalid_code_try_again", msg_type="error")
 
         verify_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("verify_and_enable_button"), command=verify_and_enable)
         verify_button.pack(pady=20)
@@ -2162,10 +2170,10 @@ class ModernPasswordManagerGUI:
             if self.tfa_manager.verify_code(secret, code):
                 self.settings['tfa_secret'] = None
                 self.save_settings_to_file()
-                messagebox.showinfo(self.lang_manager.get_string("success"), self.lang_manager.get_string("tfa_disabled_success"))
+                self.show_message("success", "tfa_disabled_success")
                 dialog.destroy()
             else:
-                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("invalid_code"))
+                self.show_message("error", "invalid_code", msg_type="error")
 
         verify_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("verify_and_disable_button"), command=verify_and_disable)
         verify_button.pack(pady=20)
@@ -2202,15 +2210,14 @@ class ModernPasswordManagerGUI:
                 dialog.destroy()
                 self.show_main_interface()
             else:
-                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("invalid_2fa_code"))
+                self.show_message("error", "invalid_2fa_code", msg_type="error")
                 self.failed_attempts += 1
                 if self.failed_attempts >= 3:
                     self.consecutive_lockouts += 1
                     lockout_minutes = 3 * self.consecutive_lockouts
                     self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
                     self.save_lockout_state()
-                    messagebox.showerror(self.lang_manager.get_string("account_locked_error_title"),
-                                self.lang_manager.get_string("account_locked_error", minutes=lockout_minutes))
+                    self.show_message("account_locked_error_title", "account_locked_error", msg_type="error", minutes=lockout_minutes)
                     self.failed_attempts = 0
                     dialog.destroy()
                     self.lock_vault()
@@ -2263,7 +2270,7 @@ class ModernPasswordManagerGUI:
                 try:
                     progress_label.configure(text=self.lang_manager.get_string("current_password_required_error"), text_color="#FF4444")
                 except:
-                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("current_password_required_error"))
+                    self.show_message("error", "current_password_required_error", msg_type="error")
                     return
                 current_entry.focus()
                 return
@@ -2271,7 +2278,7 @@ class ModernPasswordManagerGUI:
                 try:
                     progress_label.configure(text=self.lang_manager.get_string("new_password_required_error"), text_color="#FF4444")
                 except:
-                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("new_password_required_error"))
+                    self.show_message("error", "new_password_required_error", msg_type="error")
                     return
                 new_entry.focus()
                 return
@@ -2279,7 +2286,7 @@ class ModernPasswordManagerGUI:
                 try:
                     progress_label.configure(text=self.lang_manager.get_string("new_password_min_length_error"), text_color="#FF4444")
                 except:
-                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("new_password_min_length_error"))
+                    self.show_message("error", "new_password_min_length_error", msg_type="error")
                     return
                 new_entry.focus()
                 return
@@ -2287,7 +2294,7 @@ class ModernPasswordManagerGUI:
                 try:
                     progress_label.configure(text=self.lang_manager.get_string("new_passwords_no_match_error"), text_color="#FF4444")
                 except:
-                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("new_passwords_no_match_error"))
+                    self.show_message("error", "new_passwords_no_match_error", msg_type="error")
                     return
                 confirm_entry.focus()
                 return
@@ -2295,7 +2302,7 @@ class ModernPasswordManagerGUI:
                 try:
                     progress_label.configure(text=self.lang_manager.get_string("new_password_must_be_different_error"), text_color="#FF4444")
                 except:
-                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("new_password_must_be_different_error"))
+                    self.show_message("error", "new_password_must_be_different_error", msg_type="error")
                     return
                 new_entry.focus()
                 return
@@ -2312,8 +2319,7 @@ class ModernPasswordManagerGUI:
                     dialog.update()
                 except:
                     pass
-                restart_result = messagebox.showinfo(self.lang_manager.get_string("password_changed_success_title"),
-                                                    self.lang_manager.get_string("password_changed_success_message"))
+                restart_result = self.show_message("password_changed_success_title", "password_changed_success_message")
                 dialog.destroy()
                 self.restart_program()
                 
@@ -2323,21 +2329,21 @@ class ModernPasswordManagerGUI:
                     try:
                         progress_label.configure(text=self.lang_manager.get_string("current_password_incorrect_error"), text_color="#FF4444")
                     except:
-                        messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("current_password_incorrect_error"))
+                        self.show_message("error", "current_password_incorrect_error", msg_type="error")
                     current_entry.focus()
                     current_entry.select_range(0, tk.END)
                 else:
                     try:
                         progress_label.configure(text=f"❌ {error_msg}", text_color="#FF4444")
                     except:
-                        messagebox.showerror(self.lang_manager.get_string("error"), error_msg)
+                        self.show_message("error", error_msg, msg_type="error")
             except Exception as e:
                 error_msg = self.lang_manager.get_string("password_change_failed_error", error=str(e))
                 logger.error(f"PASSWORD CHANGE ERROR: {error_msg}")
                 try:
                     progress_label.configure(text=self.lang_manager.get_string("password_change_failed_status"), text_color="#FF4444")
                 except:
-                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("password_change_failed_status"))
+                    self.show_message("error", "password_change_failed_status", msg_type="error")
         
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
@@ -2358,10 +2364,7 @@ class ModernPasswordManagerGUI:
         self.lang_manager.set_language(language)
         self.settings['language'] = language
         self.save_settings_to_file()
-        messagebox.showinfo(
-            self.lang_manager.get_string('language_change_title'),
-            self.lang_manager.get_string('language_change_message')
-        )
+        self.show_message('language_change_title', 'language_change_message')
 
     def restart_program(self):
         import sys
@@ -2373,8 +2376,7 @@ class ModernPasswordManagerGUI:
                 self.secure_file_manager.sync_all_files()
                 if not self.secure_file_manager.perform_integrity_check():
                     logger.warning("Integrity check failed during restart")
-                    messagebox.showwarning("Security Warning", 
-                                        "File integrity check failed during restart.")
+                    self.show_message("Security Warning", "File integrity check failed during restart.", msg_type="warning")
                 self.secure_file_manager.cleanup_temp_files()
                 logger.info("Temporary files cleaned up")
             
@@ -2400,9 +2402,7 @@ class ModernPasswordManagerGUI:
             sys.exit(0)
         except Exception as e:
             logger.error(f"Error during program restart: {e}")
-            messagebox.showerror("Restart Error", 
-                            f"Failed to restart program automatically: {str(e)}\n\n"
-                            "Please manually restart the application.")
+            self.show_message("Restart Error", f"Failed to restart program automatically: {str(e)}\n\nPlease manually restart the application.", msg_type="error")
             try:
                 self.root.quit()
             except:
@@ -2414,18 +2414,13 @@ class ModernPasswordManagerGUI:
             temp_db = DatabaseManager(self.database.db_path, self.crypto, self.secure_file_manager)
             if temp_db.authenticate(new_password):
                 logger.info("New password verification successful")
-                messagebox.showinfo("Verification", 
-                                "Password change verified successfully!\n"
-                                "Your new password is working correctly.")
+                self.show_message("Verification", "Password change verified successfully!\nYour new password is working correctly.")
             else:
                 logger.warning("New password verification failed")
-                messagebox.showwarning("Verification Warning", 
-                                    "Password was changed but verification failed.\n"
-                                    "Please try logging in again.")
+                self.show_message("Verification Warning", "Password was changed but verification failed.\nPlease try logging in again.", msg_type="warning")
         except Exception as e:
             logger.error(f"Password verification error: {e}")
-            messagebox.showwarning("Verification Warning", 
-                                f"Password was changed but couldn't verify: {str(e)}")
+            self.show_message("Verification Warning", f"Password was changed but couldn't verify: {str(e)}", msg_type="warning")
                                         
     def show_passwords(self):
         for widget in self.main_panel.winfo_children():
@@ -2585,17 +2580,14 @@ class ModernPasswordManagerGUI:
                           fg_color=color).pack(side="left", padx=5)
 
     def delete_account(self, account):
-        result = messagebox.askyesno(self.lang_manager.get_string("delete_confirm_title"),
-                                     self.lang_manager.get_string("delete_confirm_message", account_name=account['name']))
+        result = self.show_message("delete_confirm_title", "delete_confirm_message", ask="yesno", account_name=account['name'])
         if result:
             try:
                 self.database.delete_account(account['id'])
-                messagebox.showinfo(self.lang_manager.get_string("delete_success_title"),
-                                  self.lang_manager.get_string("delete_success_message", account_name=account['name']))
+                self.show_message("delete_success_title", "delete_success_message", account_name=account['name'])
                 self.load_password_cards()
             except Exception as e:
-                messagebox.showerror(self.lang_manager.get_string("error"),
-                                   self.lang_manager.get_string("delete_failed_message", error=str(e)))
+                self.show_message("error", "delete_failed_message", msg_type="error", error=str(e))
 
     def view_account_details(self, account):
         if not self.verify_master_password_dialog():
@@ -2674,18 +2666,15 @@ class ModernPasswordManagerGUI:
             if password:
                 self.root.clipboard_clear()
                 self.root.clipboard_append(password)
-                messagebox.showinfo(self.lang_manager.get_string("copied_title"),
-                                  self.lang_manager.get_string("copy_success_message", account_name=account['name']))
+                self.show_message("copied_title", "copy_success_message", account_name=account['name'])
                 self.root.after(30000, lambda: self.root.clipboard_clear())
             else:
-                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("password_not_found"))
+                self.show_message("error", "password_not_found", msg_type="error")
         except Exception as e:
-            messagebox.showerror(self.lang_manager.get_string("error"),
-                                   self.lang_manager.get_string("copy_failed_message", error=str(e)))
+            self.show_message("error", "copy_failed_message", msg_type="error", error=str(e))
 
     def open_website(self, account):
-        messagebox.showinfo(self.lang_manager.get_string("website_open_disabled_title"),
-                              self.lang_manager.get_string("website_open_disabled_message"))
+        self.show_message("website_open_disabled_title", "website_open_disabled_message")
 
     def show_account_dialog(self, account=None):
         is_edit = account is not None
@@ -2789,14 +2778,14 @@ class ModernPasswordManagerGUI:
             notes = entries["notes"].get("1.0", tk.END).strip()
             
             if not name:
-                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("account_name_required"))
+                self.show_message("error", "account_name_required", msg_type="error")
                 return
             if not password:
-                messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("password_required"))
+                self.show_message("error", "password_required", msg_type="error")
                 return
             if account:  # Update existing account
                 self.database.update_account(account["id"], name, username, url, notes, username, password)
-                messagebox.showinfo(self.lang_manager.get_string("success"), self.lang_manager.get_string("update_success_message", account_name=name))
+                self.show_message("success", "update_success_message", account_name=name)
             else:  # Create new account
                 max_attempts = 10
                 account_id = None
@@ -2815,7 +2804,7 @@ class ModernPasswordManagerGUI:
                         logger.error(f"Error checking account ID uniqueness: {e}")
                         continue
                 if not account_id:
-                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("id_generation_failed"))
+                    self.show_message("error", "id_generation_failed", msg_type="error")
                     return
                 try:
                     metadata_conn = sqlite3.connect(self.database.metadata_db)
@@ -2824,8 +2813,7 @@ class ModernPasswordManagerGUI:
                     metadata_conn.close()
                     
                     if existing_name:
-                        result = messagebox.askyesno(self.lang_manager.get_string("duplicate_name_title"),
-                                                     self.lang_manager.get_string("duplicate_name_message", account_name=name))
+                        result = self.show_message("duplicate_name_title", "duplicate_name_message", ask="yesno", account_name=name)
                         if not result:
                             return
                 except Exception as e:
@@ -2846,24 +2834,23 @@ class ModernPasswordManagerGUI:
                     )
                     
                     self.database.add_account(new_account, username, password)
-                    messagebox.showinfo(self.lang_manager.get_string("success"), self.lang_manager.get_string("add_success_message", account_name=name))
+                    self.show_message("success", "add_success_message", account_name=name)
                     
                 except sqlite3.IntegrityError as e:
                     if "UNIQUE constraint failed" in str(e):
-                        messagebox.showerror(self.lang_manager.get_string("error"),
-                                             self.lang_manager.get_string("duplicate_account_error", error=str(e)))
+                        self.show_message("error", "duplicate_account_error", msg_type="error", error=str(e))
                     else:
-                        messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("database_error", error=str(e)))
+                        self.show_message("error", "database_error", msg_type="error", error=str(e))
                     return
                 except Exception as e:
-                    messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("create_failed_message", error=str(e)))
+                    self.show_message("error", "create_failed_message", msg_type="error", error=str(e))
                     return
             
             dialog.destroy()
             self.load_password_cards()
             
         except Exception as e:
-            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("save_failed_message", error=str(e)))
+            self.show_message("error", "save_failed_message", msg_type="error", error=str(e))
             logger.error(f"Full error details: {e}")
             import traceback
             traceback.print_exc()
@@ -2972,7 +2959,7 @@ class ModernPasswordManagerGUI:
             self.generated_password_entry.insert(0, password)
             self.update_strength_analysis(password)
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to generate password: {str(e)}")
+            self.show_message("Error", f"Failed to generate password: {str(e)}", msg_type="error")
 
     def update_strength_analysis(self, password):
         score, strength, recommendations = self.password_generator.assess_strength(password)
@@ -2987,9 +2974,9 @@ class ModernPasswordManagerGUI:
         if password:
             self.root.clipboard_clear()
             self.root.clipboard_append(password)
-            messagebox.showinfo(self.lang_manager.get_string("copied_title"), self.lang_manager.get_string("copied_message"))
+            self.show_message("copied_title", "copied_message")
         else:
-            messagebox.showerror(self.lang_manager.get_string("error"), self.lang_manager.get_string("no_password_to_copy"))
+            self.show_message("error", "no_password_to_copy", msg_type="error")
 
     def show_security_report(self):
         for widget in self.main_panel.winfo_children():
@@ -3086,8 +3073,7 @@ class ModernPasswordManagerGUI:
             remaining_time = self.get_remaining_lockout_time()
             minutes = remaining_time // 60
             seconds = remaining_time % 60
-            messagebox.showerror("Account Locked", 
-                               f"Account is locked for {minutes:02d}:{seconds:02d} due to failed attempts.")
+            self.show_message("Account Locked", f"Account is locked for {minutes:02d}:{seconds:02d} due to failed attempts.", msg_type="error")
             self.log_security_event("LOCKOUT_ENFORCED", "Login attempt blocked - user locked out")
             return True
         return False
@@ -3235,7 +3221,7 @@ def main():
         logger.info("pip install customtkinter cryptography pillow")
         try:
             import tkinter.messagebox as msgbox
-            msgbox.showerror("Startup Error", 
+            msgbox.showerror("Startup Error",
                            f"Failed to start SecureVault Pro:\n\n{str(e)}\n\n"
                            f"Please check the console for more details.")
         except:

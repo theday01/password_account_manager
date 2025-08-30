@@ -720,12 +720,7 @@ class LanguageManager:
 
         if self.language == "Arabic":
             lines = string.split('\n')
-            processed_lines = []
-            for line in lines:
-                rtl_line = '\u200F' + line
-                reshaped_line = arabic_reshaper.reshape(rtl_line)
-                bidi_line = get_display(reshaped_line)
-                processed_lines.append(bidi_line)
-            return '\n'.join(processed_lines)
+            reshaped_lines = [get_display(arabic_reshaper.reshape(line)) for line in lines]
+            return '\n'.join(reshaped_lines)
 
         return string
