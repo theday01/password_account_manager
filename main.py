@@ -27,6 +27,7 @@ from audit_logger import setup_logging
 from two_factor_auth import TwoFactorAuthManager
 from tutorial import TutorialManager
 from localization import LanguageManager
+from secure_screen_protection import ScreenProtector
 
 logger = logging.getLogger(__name__)
 
@@ -689,6 +690,7 @@ class ModernPasswordManagerGUI:
         self.root.withdraw()
         self.root.title(self.lang_manager.get_string("app_title"))
         self.root.geometry("1200x800")
+        self.screen_protector = None
         try:
             icon_path = os.path.join("icons", "main.ico")
             if os.path.exists(icon_path):
@@ -1369,6 +1371,23 @@ class ModernPasswordManagerGUI:
             self.settings['tutorial_completed'] = True
             self.save_settings_to_file()
 
+        if not self.screen_protector:
+            try:
+                email = self.database.get_master_account_email() if self.database else "user"
+                watermark_text = f"{email} - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                self.screen_protector = ScreenProtector(
+                    self.root,
+                    action="watermark",
+                    watermark_text=watermark_text
+                )
+                self.screen_protector.start()
+                # The watermark is created immediately if the action is 'watermark'
+                # and not based on the monitor loop, so we call it here.
+                self.screen_protector._apply_protection_ui(reason="session_start")
+                logger.info("Screen protector started with watermark.")
+            except Exception as e:
+                logger.error(f"Failed to start screen protector: {e}")
+
         toolbar = ctk.CTkFrame(self.main_frame, height=70)
         toolbar.pack(fill="x", padx=10, pady=10)
         toolbar.pack_propagate(False)
@@ -1862,6 +1881,13 @@ class ModernPasswordManagerGUI:
             self.active_button = active_button
 
     def lock_vault(self):
+        if self.screen_protector:
+            try:
+                self.screen_protector.stop()
+                self.screen_protector = None
+                logger.info("Screen protector stopped.")
+            except Exception as e:
+                logger.error(f"Failed to stop screen protector: {e}")
         try:
             if self.secure_file_manager and self.authenticated:
                 logger.info("Syncing files to secure storage before lock...")
