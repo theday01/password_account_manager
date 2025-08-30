@@ -673,6 +673,30 @@ class DatabaseManager:
         """, (datetime.now().isoformat(), action, entity_type, entity_id, details))
         metadata_conn.commit()
         metadata_conn.close()
+class SecureEntry(ctk.CTkEntry):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bind("<Control-c>", lambda e: "break")
+        self.bind("<Control-x>", lambda e: "break")
+        self.bind("<Control-v>", lambda e: "break")
+        self.bind("<Button-3>", lambda e: "break")
+
+        self.tooltip = None
+        self.bind("<Enter>", self.show_tooltip)
+        self.bind("<Leave>", self.hide_tooltip)
+
+    def show_tooltip(self, event):
+        self.tooltip = tk.Toplevel(self)
+        self.tooltip.wm_overrideredirect(True)
+        self.tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+        label = tk.Label(self.tooltip, text="Copy/Paste is disabled for this field.", background="#FFFFE0", relief="solid", borderwidth=1)
+        label.pack()
+
+    def hide_tooltip(self, event):
+        if self.tooltip:
+            self.tooltip.destroy()
+            self.tooltip = None
+
 class ModernPasswordManagerGUI:
     def __init__(self):
         self.lang_manager = LanguageManager()
@@ -1025,10 +1049,10 @@ class ModernPasswordManagerGUI:
             text_color="#888888"
         )
         subtitle.pack(pady=(0, 30), padx=40)
-        self.master_password_entry = ctk.CTkEntry(
-            login_card, 
+        self.master_password_entry = SecureEntry(
+            login_card,
             placeholder_text=self.lang_manager.get_string("enter_master_password"),
-            show="*", 
+            show="*",
             width=350,
             height=45,
             font=ctk.CTkFont(size=16)
@@ -1060,7 +1084,6 @@ class ModernPasswordManagerGUI:
             state="disabled" if self.is_vault_initialized() else "normal"
         )
         self.setup_btn.pack(pady=8)
-        self.master_password_entry.bind('<Return>', lambda e: self.authenticate_user())
         if self.lockout_until and datetime.now() < self.lockout_until:
             self.update_lockout_countdown()
         self.update_login_button_states()
@@ -1215,7 +1238,7 @@ class ModernPasswordManagerGUI:
         ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("auth_required"),
                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
         
-        password_entry = ctk.CTkEntry(main_frame, width=300, height=40, show="*",
+        password_entry = SecureEntry(main_frame, width=300, height=40, show="*",
                                     placeholder_text=self.lang_manager.get_string("master_password_placeholder"))
         password_entry.pack(pady=15)
         password_entry.focus()
@@ -1229,7 +1252,6 @@ class ModernPasswordManagerGUI:
             result["confirmed"] = False
             dialog.destroy()
         
-        password_entry.bind('<Return>', lambda e: on_ok())
         
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=10)
@@ -1284,10 +1306,10 @@ class ModernPasswordManagerGUI:
                                                  width=300, height=40)
         self.setup_email_entry.pack(pady=10)
         
-        self.setup_master_password = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("master_password_placeholder"), 
+        self.setup_master_password = SecureEntry(main_frame, placeholder_text=self.lang_manager.get_string("master_password_placeholder"),
                                                   show="*", width=300, height=40)
         self.setup_master_password.pack(pady=10)
-        self.setup_confirm_password = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("confirm_password_placeholder"), 
+        self.setup_confirm_password = SecureEntry(main_frame, placeholder_text=self.lang_manager.get_string("confirm_password_placeholder"),
                                                    show="*", width=300, height=40)
         self.setup_confirm_password.pack(pady=10)
         self.strength_label = ctk.CTkLabel(main_frame, text="")
@@ -1738,7 +1760,7 @@ class ModernPasswordManagerGUI:
                     font=ctk.CTkFont(size=12), 
                     text_color="#ff4444").pack(pady=(0, 10))
 
-        code_entry = ctk.CTkEntry(code_frame, width=400, height=40, show="*",
+        code_entry = SecureEntry(code_frame, width=400, height=40, show="*",
                                 placeholder_text=self.lang_manager.get_string("backup_code_placeholder"))
         code_entry.pack(pady=(0, 10))
 
@@ -2100,7 +2122,7 @@ class ModernPasswordManagerGUI:
         ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("enter_6_digit_code_verify_label"),
                      font=ctk.CTkFont(size=14)).pack(pady=10)
         
-        code_entry = ctk.CTkEntry(main_frame, width=200)
+        code_entry = SecureEntry(main_frame, width=200)
         code_entry.pack(pady=5)
 
         def verify_and_enable():
@@ -2129,7 +2151,7 @@ class ModernPasswordManagerGUI:
         ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("enter_6_digit_code_disable_label"),
                      font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
         
-        code_entry = ctk.CTkEntry(main_frame, width=200)
+        code_entry = SecureEntry(main_frame, width=200)
         code_entry.pack(pady=10)
 
         def verify_and_disable():
@@ -2160,7 +2182,7 @@ class ModernPasswordManagerGUI:
         ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("enter_2fa_code_label"),
                      font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
         
-        code_entry = ctk.CTkEntry(main_frame, width=200)
+        code_entry = SecureEntry(main_frame, width=200)
         code_entry.pack(pady=10)
 
         def verify_tfa():
@@ -2211,19 +2233,19 @@ class ModernPasswordManagerGUI:
         
         ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("current_password_label"), 
                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
-        current_entry = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("current_password_placeholder"), 
+        current_entry = SecureEntry(main_frame, placeholder_text=self.lang_manager.get_string("current_password_placeholder"),
                                     show="*", width=350, height=40)
         current_entry.pack(padx=20, pady=(0, 10))
         
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("new_password_label"), 
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("new_password_label"),
                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
-        new_entry = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("new_password_placeholder"), 
+        new_entry = SecureEntry(main_frame, placeholder_text=self.lang_manager.get_string("new_password_placeholder"),
                                 show="*", width=350, height=40)
         new_entry.pack(padx=20, pady=(0, 10))
         
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("confirm_new_password_label"), 
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("confirm_new_password_label"),
                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
-        confirm_entry = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("confirm_new_password_placeholder"), 
+        confirm_entry = SecureEntry(main_frame, placeholder_text=self.lang_manager.get_string("confirm_new_password_placeholder"),
                                     show="*", width=350, height=40)
         confirm_entry.pack(padx=20, pady=(0, 15))
         progress_label = ctk.CTkLabel(main_frame, text="", font=ctk.CTkFont(size=12))
@@ -2330,12 +2352,6 @@ class ModernPasswordManagerGUI:
                                 font=ctk.CTkFont(size=16, weight="bold"))
         change_btn.pack(side="right", padx=15)
         
-        def on_enter(event):
-            validate_and_change_password()
-        
-        current_entry.bind('<Return>', on_enter)
-        new_entry.bind('<Return>', on_enter)
-        confirm_entry.bind('<Return>', on_enter)
         current_entry.focus()
 
     def change_language(self, language: str):
@@ -2727,7 +2743,7 @@ class ModernPasswordManagerGUI:
     def create_password_field(self, parent, default_value=""):
         password_frame = ctk.CTkFrame(parent, fg_color="transparent")
         password_frame.pack(padx=25, pady=(0, 15))
-        password_entry = ctk.CTkEntry(password_frame, width=320, height=40, show="*")
+        password_entry = SecureEntry(password_frame, width=320, height=40, show="*")
         password_entry.pack(side="left", padx=(0, 10))
         if default_value:
             password_entry.insert(0, default_value)
