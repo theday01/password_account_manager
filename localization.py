@@ -169,7 +169,7 @@ LANGUAGES = {
         "disable_2fa_button": "Disable 2FA",
         "enable_2fa_button": "Enable 2FA",
         "auto_logout_title": "Automatic Logout",
-        "auto_logout_message": "For your security, the application will automatically\\nlock and close after 2 minutes of inactivity",
+        "auto_logout_message": "For your security, the application will automatically \n lock and close after 2 minutes of inactivity",
         "enable_tfa_dialog_title": "Enable Two-Factor Authentication",
         "scan_qr_code_label": "Scan QR Code with your Authenticator App",
         "enter_6_digit_code_verify_label": "Enter the 6-digit code to verify:",

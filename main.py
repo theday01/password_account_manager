@@ -5,22 +5,20 @@ import hashlib
 import hmac
 import base64
 import sqlite3
-import threading
 import time
-import requests
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass, asdict
+from typing import List, Optional, Tuple
+from dataclasses import dataclass 
 from enum import Enum
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import messagebox, filedialog
 import customtkinter as ctk
 from secure_file_manager import SecureFileManager, SecureVaultSetup, SecurityMonitor, setup_secure_vault
-from backup_manager import BackupManager, BackupError
+from backup_manager import BackupManager
 from PIL import Image, ImageTk
 import logging
 from audit_logger import setup_logging
@@ -689,7 +687,6 @@ class ModernPasswordManagerGUI:
         self.root.withdraw()
         self.root.title(self.lang_manager.get_string("app_title"))
         self.root.geometry("1200x800")
-        self.screen_protector = None
         try:
             icon_path = os.path.join("icons", "main.ico")
             if os.path.exists(icon_path):
