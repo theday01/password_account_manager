@@ -2679,6 +2679,8 @@ class ModernPasswordManagerGUI:
             try:
                 url = account.get('url')
                 if url and url != self.lang_manager.get_string("no_url"):
+                    if not url.startswith(('http://', 'https://')):
+                        url = f"https://{url}"
                     logger.info(f"Opening website for account {account['name']}: {url}")
                     webbrowser.open_new_tab(url)
                 else:
