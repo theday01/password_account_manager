@@ -2567,8 +2567,8 @@ class ModernPasswordManagerGUI:
         button_frame.pack()
         buttons = [
             (self.lang_manager.get_string("view_action"), lambda: self.view_account_details(account)),
-            (self.lang_manager.get_string("copy_password_action"), lambda: self.copy_password_to_clipboard(account)),
             (self.lang_manager.get_string("edit_action"), lambda: self.show_account_dialog(account)),
+            (self.lang_manager.get_string("copy_password_action"), lambda: self.copy_password_to_clipboard(account)),
             (self.lang_manager.get_string("delete_action"), lambda: self.delete_account(account))
         ]
         if account['url'] and account['url'] != self.lang_manager.get_string("no_url"):
@@ -2681,7 +2681,7 @@ class ModernPasswordManagerGUI:
         title = self.lang_manager.get_string("edit_account_title", account_name=account['name']) if is_edit else self.lang_manager.get_string("add_account_title")
         dialog = ctk.CTkToplevel(self.root)
         dialog.title(title)
-        dialog.geometry("550x720")
+        dialog.geometry("550x800")
         dialog.resizable(0,0)
         dialog.grab_set()
         main_frame = ctk.CTkFrame(dialog)
@@ -2702,7 +2702,8 @@ class ModernPasswordManagerGUI:
         
         fields = [
             ("name", self.lang_manager.get_string("account_name_label"), account['name'] if account else ""),
-            ("username", self.lang_manager.get_string("username_email_label"), username),
+            ("username", self.lang_manager.get_string("username_label"), username),
+            ("email", self.lang_manager.get_string("email_label"), account.get('email', '') if account else ""),
             ("url", self.lang_manager.get_string("website_url_label"), account.get('url', '') if account else ""),
             ("password", self.lang_manager.get_string("password_label"), password),
             ("notes", self.lang_manager.get_string("notes_label"), account.get('notes', '') if account else "")
@@ -2783,8 +2784,9 @@ class ModernPasswordManagerGUI:
             if not password:
                 self.show_message("error", "password_required", msg_type="error")
                 return
+            email = entries["email"].get().strip()
             if account:  # Update existing account
-                self.database.update_account(account["id"], name, username, url, notes, username, password)
+                self.database.update_account(account["id"], name, email, url, notes, username, password)
                 self.show_message("success", "update_success_message", account_name=name)
             else:  # Create new account
                 max_attempts = 10
@@ -2824,7 +2826,7 @@ class ModernPasswordManagerGUI:
                         id=account_id,
                         name=name,
                         username=username,
-                        email=username if "@" in username else "",
+                        email=email,
                         url=url,
                         notes=notes,
                         created_at=datetime.now(),
