@@ -6,6 +6,7 @@ import hmac
 import base64
 import sqlite3
 import time
+import webbrowser
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 from dataclasses import dataclass 
@@ -2674,7 +2675,17 @@ class ModernPasswordManagerGUI:
             self.show_message("error", "copy_failed_message", msg_type="error", error=str(e))
 
     def open_website(self, account):
-        self.show_message("website_open_disabled_title", "website_open_disabled_message")
+        if self.verify_master_password_dialog():
+            try:
+                url = account.get('url')
+                if url and url != self.lang_manager.get_string("no_url"):
+                    logger.info(f"Opening website for account {account['name']}: {url}")
+                    webbrowser.open_new_tab(url)
+                else:
+                    self.show_message("error", "no_url_for_account", msg_type="error")
+            except Exception as e:
+                logger.error(f"Failed to open website for account {account['name']}: {e}")
+                self.show_message("error", "website_open_failed", msg_type="error", error=str(e))
 
     def show_account_dialog(self, account=None):
         is_edit = account is not None
