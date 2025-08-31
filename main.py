@@ -262,7 +262,7 @@ class DatabaseManager:
         self.encryption_key = None
         self.last_integrity_error = False
         
-    def initialize_database(self, master_password: str, email: str):
+    def initialize_database(self, master_password: str, email: str, full_name: str):
         logger.info("Starting database initialization...")
         salt = self.crypto.generate_salt()
         self.encryption_key = self.crypto.generate_key_from_password(master_password, salt)
@@ -331,7 +331,7 @@ class DatabaseManager:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 "master_account", 
-                "Master Account", 
+                full_name, 
                 email, 
                 "", 
                 "System account for authentication verification",
@@ -1313,7 +1313,7 @@ class ModernPasswordManagerGUI:
         setup_window = ctk.CTkToplevel(self.root)
         setup_window.title(self.lang_manager.get_string("setup_wizard_title"))
         
-        width, height = 600, 450
+        width, height = 600, 480
         x = (setup_window.winfo_screenwidth() // 2) - (width // 2)
         y = (setup_window.winfo_screenheight() // 2) - (height // 2)
         setup_window.geometry(f"{width}x{height}+{x}+{y}")
@@ -1330,6 +1330,13 @@ class ModernPasswordManagerGUI:
             font=ctk.CTkFont(size=18, weight="bold")
         ).pack(pady=20)
         
+        self.setup_full_name_entry = ctk.CTkEntry(
+            main_frame, 
+            placeholder_text="Enter Your Full Name", 
+            width=300, height=40
+        )
+        self.setup_full_name_entry.pack(pady=10)
+
         self.setup_email_entry = ctk.CTkEntry(
             main_frame, 
             placeholder_text=self.lang_manager.get_string("email_placeholder"), 
@@ -1380,8 +1387,12 @@ class ModernPasswordManagerGUI:
     def complete_setup(self, setup_window):
         master_password = self.setup_master_password.get()
         confirm_password = self.setup_confirm_password.get()
+        full_name = self.setup_full_name_entry.get().strip()
         email = self.setup_email_entry.get().strip()
 
+        if not full_name:
+            self.show_message("error", "Full name is required", msg_type="error")
+            return
         if not email:
             self.show_message("error", "email_required_error", msg_type="error")
             return
@@ -1403,7 +1414,7 @@ class ModernPasswordManagerGUI:
             
             db_path = "manageyouraccount"
             self.database = DatabaseManager(db_path, self.crypto, self.secure_file_manager)
-            self.database.initialize_database(master_password, email)
+            self.database.initialize_database(master_password, email, full_name)
             
             if self.secure_file_manager:
                 self.secure_file_manager.sync_all_files()
