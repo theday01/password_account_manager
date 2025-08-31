@@ -26,6 +26,8 @@ from audit_logger import setup_logging
 from two_factor_auth import TwoFactorAuthManager
 from tutorial import TutorialManager
 from localization import LanguageManager
+import threading
+from notification_manager import start_notification_loop
 
 logger = logging.getLogger(__name__)
 
@@ -1153,6 +1155,10 @@ class ModernPasswordManagerGUI:
                     self.security_monitor = SecurityMonitor(self.secure_file_manager)
                     self.security_monitor.set_alert_callback(self.handle_security_alert)
                     self._start_security_monitoring()
+                
+                notification_thread = threading.Thread(target=start_notification_loop, daemon=True)
+                notification_thread.start()
+                
                 self.show_main_interface()
         else:
             if hasattr(self.database, 'last_integrity_error') and self.database.last_integrity_error:

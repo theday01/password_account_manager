@@ -162,7 +162,7 @@ LANGUAGES = {
         "create_failed_message": "Failed to create account: {error}",
         "save_failed_message": "Failed to save account: {error}",
         "create_vault_files_error": "Failed to create secure vault files",
-        "security_settings_title": "🔐 Security Settings",
+        "security_settings_title": "Security Settings",
         "master_password_label": "Master Password",
         "change_master_password_button": "Change Master Password",
         "tfa_title": "Two-Factor Authentication",
