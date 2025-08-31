@@ -2121,7 +2121,7 @@ class ModernPasswordManagerGUI:
     def show_about_dialog(self):
         about_dialog = ctk.CTkToplevel(self.root)
         about_dialog.title(self.lang_manager.get_string("about_dialog_title"))
-        about_dialog.geometry("1000x450")
+        about_dialog.geometry("1000x600")
         about_dialog.resizable(False, False)
         about_dialog.grab_set()
 
@@ -2132,8 +2132,11 @@ class ModernPasswordManagerGUI:
         title_label.pack(pady=(0, 15))
 
         about_text = self.lang_manager.get_string("about_text")
-        text_label = ctk.CTkLabel(main_frame, text=about_text, justify="left")
-        text_label.pack(pady=10)
+        
+        textbox = ctk.CTkTextbox(main_frame, wrap="word", height=400, font=ctk.CTkFont(size=14))
+        textbox.pack(fill="both", expand=True, pady=10)
+        textbox.insert("1.0", about_text)
+        textbox.configure(state="disabled")
 
         close_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("close_button"), command=about_dialog.destroy, width=100)
         close_button.pack(pady=(15, 0))

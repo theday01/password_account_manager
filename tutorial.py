@@ -68,17 +68,22 @@ class TutorialManager:
             {
                 "title": self.lang_manager.get_string("tutorial_step_4_title"),
                 "text": self.lang_manager.get_string("tutorial_step_4_text"),
-                "image": "user.png"
+                "image": "settings.png"
             },
             {
                 "title": self.lang_manager.get_string("tutorial_step_5_title"),
                 "text": self.lang_manager.get_string("tutorial_step_5_text"),
-                "image": "password.png"
+                "image": "user.png"
             },
             {
                 "title": self.lang_manager.get_string("tutorial_step_6_title"),
                 "text": self.lang_manager.get_string("tutorial_step_6_text"),
-                "image": "logout.png"
+                "image": "password.png"
+            },
+            {
+                "title": self.lang_manager.get_string("tutorial_step_7_title"),
+                "text": self.lang_manager.get_string("tutorial_step_7_text"),
+                "image": "done.png"
             }
         ]
 

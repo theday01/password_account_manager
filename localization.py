@@ -207,24 +207,25 @@ LANGUAGES = {
         "password_change_failed_status": "❌ Password change failed",
         "about_dialog_title": "About SecureVault Pro",
         "about_slogan": "~ ONLY YOU OPEN IT !",
-        "about_text": """
-This program is your personal digital safe for passwords, only you open it!
+        "about_text": """SecureVault Pro is a robust, desktop-based application designed to securely store and manage your sensitive login credentials. Built with a focus on security and user privacy, it uses strong encryption algorithms to protect your data locally on your computer.
 
-How it works:
-1. You create a single, strong Master Password. This is the only password you need to remember.
+### How It Works
 
-2. When you save a password for a website or app, the program scrambles it into a secret code using your Master Password.
+When you first set up SecureVault, you create a Master Password. This password, combined with a randomly generated salt, is used to create a powerful encryption key. This key is never stored directly. Instead, it is generated on-the-fly each time you log in.
 
-3. This secret code is stored securely on your computer. Without your Master Password, it's just gibberish to anyone else.
+All the account information you save is encrypted with this key before being written to the database files on your computer's disk. When you need to view or copy a password, the application decrypts it in memory just long enough for you to use it.
 
-4. When you need a password, you unlock the program with your Master Password, and it unscrambles the secret code back into your password for you to use.
+This design ensures that even if someone gains access to your computer's files, they cannot read your passwords without knowing your Master Password.
 
-Think of it like a locked diary. Only you have the key (your Master Password) to open it and read what's inside.
+### Security Best Practices
 
+*   **Use a Strong Master Password:** Make it long, complex, and something you have never used anywhere else.
+*   **Enable 2FA:** This provides a critical second layer of defense.
+*   **Keep Backup Codes Safe:** Write down your backup codes and store them in a secure physical location, separate from your computer and your backup files.
+*   **Create Regular Backups:** Store your backup files in a safe place, such as an external hard drive or a secure cloud storage service.
 
-
-
-THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
+---
+_THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025_
 """,
         "close_button": "Close",
         "backup_dialog_title": "Create Secure Backup",
@@ -319,33 +320,26 @@ THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025
         "browse_button": "Browse...",
         "preview_contents_button": "Preview contents",
         "restore_selected_backup_button": "Restore Selected Backup",
-        "tutorial_title": "Welcome to SecureVault Pro",
+        "tutorial_title": "Tutorial",
         "tutorial_step_1_title": "Welcome to SecureVault Pro!",
-        "tutorial_step_1_text": "This quick tutorial will guide you through the main features of the application.",
-        "tutorial_step_2_title": "Program Overview",
-        "tutorial_step_2_text": """
-SecureVault Pro is a desktop password manager focused on strong local security and privacy.
-All vault data (usernames, passwords, URLs, notes) is encrypted locally using AES-256-GCM.
-The encryption key is derived from your Master Password via PBKDF2 (SHA-256) with a unique salt,
-and file integrity is verified with HMAC-SHA256.
-
-Core capabilities include adding/editing/deleting detailed account entries, a quick search,
-secure copy-to-clipboard (automatically cleared after 30 seconds), and a customizable password generator
-(length 8–64, uppercase/lowercase/digits/symbols, option to exclude ambiguous characters).
-A Security Dashboard provides a password-health report (weak/duplicate passwords) and optional 2FA support.
-
-Backups are encrypted `.svbk` files protected by a separate backup code; you can preview a backup's manifest
-before restoring. The UI is built with CustomTkinter (dark theme available), includes an inactivity lock
-(2 minutes) and a startup loading screen that checks vault integrity during initialization.
-""",
+        "tutorial_step_1_text": "This quick tutorial will guide you through the main features of our secure password manager.",
+        "tutorial_step_2_title": "Secure, Local-First Storage",
+        "tutorial_step_2_text": """SecureVault Pro is a desktop password manager that prioritizes your privacy and security.
+All your data—usernames, passwords, and notes—is encrypted on your local machine using AES-256-GCM,
+an industry-standard encryption algorithm. Your Master Password is the only key to unlock your vault,
+and it is never stored or transmitted anywhere.""",
         "tutorial_step_3_title": "The Master Password",
         "tutorial_step_3_text": "Your Master Password is the one and only key to your vault. Keep it safe and don't forget it!",
-        "tutorial_step_4_title": "Adding an Account",
-        "tutorial_step_4_text": "Click 'Add New Account' to save new login credentials. You can generate a strong password or enter your own.",
-        "tutorial_step_5_title": "Password Generator",
-        "tutorial_step_5_text": "Use the built-in generator to create strong, unique passwords for your accounts.",
-        "tutorial_step_6_title": "All Done!",
-        "tutorial_step_6_text": "You're now ready to use SecureVault Pro. Stay secure!",
+        "tutorial_step_4_title": "Feature Overview",
+        "tutorial_step_4_text": """• **Password Generator**: Create strong, customizable passwords.
+• **Security Dashboard**: Get a report on weak or duplicate passwords.
+• **Secure Backup**: Create encrypted backups of your vault.""",
+        "tutorial_step_5_title": "Adding an Account",
+        "tutorial_step_5_text": "Click 'Add New Account' to save new login credentials. You can generate a strong password or enter your own.",
+        "tutorial_step_6_title": "Password Generator",
+        "tutorial_step_6_text": "Use the built-in generator to create strong, unique passwords for your accounts.",
+        "tutorial_step_7_title": "All Done!",
+        "tutorial_step_7_text": "You're now ready to use SecureVault Pro. Stay secure!",
         "previous_button": "Previous",
         "next_button": "Next",
         "finish_button": "Finish",
