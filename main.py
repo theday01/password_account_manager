@@ -1415,7 +1415,6 @@ class ModernPasswordManagerGUI:
             self.show_message("error", "setup_failed_message", msg_type="error", error=str(e))
 
     def show_main_interface(self):
-        self.root.state('zoomed')
         for widget in self.main_frame.winfo_children():
             widget.destroy()
 
@@ -1424,7 +1423,6 @@ class ModernPasswordManagerGUI:
         self.root.bind("<Motion>", self.reset_inactivity_timer)
         self.root.bind("<Button-1>", self.reset_inactivity_timer)
 
-        # Show tutorial on first-time login
         if not self.settings.get('tutorial_completed', False):
             tutorial = TutorialManager(self.root, self.lang_manager)
             tutorial.show_tutorial_window()
