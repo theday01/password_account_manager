@@ -206,7 +206,7 @@ LANGUAGES = {
         "password_change_failed_error": "Password change failed: {error}",
         "password_change_failed_status": "❌ Password change failed",
         "about_dialog_title": "About SecureVault Pro",
-        "about_slogan": "only you open it!",
+        "about_slogan": "~ ONLY YOU OPEN IT !",
         "about_text": """
 This program is your personal digital safe for passwords, only you open it!
 

@@ -741,7 +741,6 @@ class ModernPasswordManagerGUI:
         return result if result is not None else False
 
     def _initialize_app(self):
-        """Contains the original initialization logic."""
         self.authenticated = False
         self.accounts = []
         self.failed_attempts = 0
@@ -756,13 +755,13 @@ class ModernPasswordManagerGUI:
         self.setup_ui()
         self.start_lockout_validation_timer()
 
-    def show_loading_screen(self):
+    def show_loading_screen(self): 
         bg_color = "#f5f5f5"      # light gray background
         accent_color = "#2b6cb0"  # deep blue
         slogan_color = "#1a202c"  # dark gray/black
         subtext_color = "#4a5568" # softer gray
         
-        width, height = 420, 380
+        width, height = 550, 220   # wider for side-by-side layout
         loading_window = ctk.CTkToplevel(self.root, fg_color=bg_color)
         loading_window.title(self.lang_manager.get_string("loading"))
         loading_window.geometry(f"{width}x{height}")
@@ -774,55 +773,61 @@ class ModernPasswordManagerGUI:
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         loading_window.geometry(f"{width}x{height}+{x}+{y}")
 
+        main_frame = ctk.CTkFrame(loading_window, fg_color=bg_color, corner_radius=0)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        main_frame.columnconfigure(0, weight=1)  # image column
+        main_frame.columnconfigure(1, weight=2)  # text column
+
         try:
             load_icon_path = os.path.join("icons", "load.png")
             if os.path.exists(load_icon_path):
                 load_image = Image.open(load_icon_path)
-                load_icon = ctk.CTkImage(light_image=load_image, size=(160, 120))  # balanced size
-                icon_label = ctk.CTkLabel(loading_window, image=load_icon, text="", fg_color=bg_color)
-                icon_label.pack(pady=(20, 30))
+                load_icon = ctk.CTkImage(light_image=load_image, size=(200, 150))  
+                icon_label = ctk.CTkLabel(main_frame, image=load_icon, text="", fg_color=bg_color)
+                icon_label.grid(row=0, column=0, rowspan=5, padx=(10, 20), pady=10, sticky="n")
         except Exception as e:
             logger.warning(f"Could not display loading icon: {e}")
 
         ctk.CTkLabel(
-            loading_window,
+            main_frame,
             text=self.lang_manager.get_string("app_title"),
             font=ctk.CTkFont(size=24, weight="bold"),
             text_color=accent_color
-        ).pack(pady=(0, 3))
+        ).grid(row=0, column=1, pady=(5, 3), sticky="w")
 
         ctk.CTkLabel(
-            loading_window,
+            main_frame,
             text=self.lang_manager.get_string("app_slogan"),
-            font=ctk.CTkFont(size=11, slant="italic"),
+            font=ctk.CTkFont(size=11),
             text_color=slogan_color
-        ).pack(pady=(0, 15))
+        ).grid(row=1, column=1, pady=(0, 15), sticky="w")
 
         progress_bar = ctk.CTkProgressBar(
-            loading_window,
-            width=320,
+            main_frame,
+            width=300,
             height=12,
             progress_color=accent_color,
             corner_radius=10
         )
-        progress_bar.pack(pady=10)
+        progress_bar.grid(row=2, column=1, pady=10, sticky="w")
         progress_bar.set(0)
 
         status_label = ctk.CTkLabel(
-            loading_window,
+            main_frame,
             text=self.lang_manager.get_string("initializing"),
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color=accent_color
         )
-        status_label.pack(pady=(15, 5))
+        status_label.grid(row=3, column=1, pady=(15, 5), sticky="w")
 
         details_label = ctk.CTkLabel(
-            loading_window,
+            main_frame,
             text=self.lang_manager.get_string("starting_engine"),
             font=ctk.CTkFont(size=10),
             text_color=subtext_color
         )
-        details_label.pack()
+        details_label.grid(row=4, column=1, sticky="w")
 
         def update_loading(step):
             if step == 1:
@@ -1307,32 +1312,55 @@ class ModernPasswordManagerGUI:
         self.update_login_button_states()
         setup_window = ctk.CTkToplevel(self.root)
         setup_window.title(self.lang_manager.get_string("setup_wizard_title"))
-        setup_window.geometry("600x450")
-        setup_window.resizable(0,0)
+        
+        width, height = 600, 450
+        x = (setup_window.winfo_screenwidth() // 2) - (width // 2)
+        y = (setup_window.winfo_screenheight() // 2) - (height // 2)
+        setup_window.geometry(f"{width}x{height}+{x}+{y}")
+
+        setup_window.resizable(0, 0)
         setup_window.grab_set()
+
         main_frame = ctk.CTkFrame(setup_window)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("create_master_password_title"), 
-                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+        ctk.CTkLabel(
+            main_frame, 
+            text=self.lang_manager.get_string("create_master_password_title"), 
+            font=ctk.CTkFont(size=18, weight="bold")
+        ).pack(pady=20)
         
-        self.setup_email_entry = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("email_placeholder"), 
-                                                 width=300, height=40)
+        self.setup_email_entry = ctk.CTkEntry(
+            main_frame, 
+            placeholder_text=self.lang_manager.get_string("email_placeholder"), 
+            width=300, height=40
+        )
         self.setup_email_entry.pack(pady=10)
         
-        self.setup_master_password = SecureEntry(main_frame, placeholder_text=self.lang_manager.get_string("master_password_placeholder"),
-                                                  show="*", width=300, height=40)
+        self.setup_master_password = SecureEntry(
+            main_frame, 
+            placeholder_text=self.lang_manager.get_string("master_password_placeholder"),
+            show="*", width=300, height=40
+        )
         self.setup_master_password.pack(pady=10)
-        self.setup_confirm_password = SecureEntry(main_frame, placeholder_text=self.lang_manager.get_string("confirm_password_placeholder"),
-                                                   show="*", width=300, height=40)
+
+        self.setup_confirm_password = SecureEntry(
+            main_frame, 
+            placeholder_text=self.lang_manager.get_string("confirm_password_placeholder"),
+            show="*", width=300, height=40
+        )
         self.setup_confirm_password.pack(pady=10)
+
         self.strength_label = ctk.CTkLabel(main_frame, text="")
         self.strength_label.pack(pady=10)
         self.setup_master_password.bind("<KeyRelease>", self.update_password_strength)
         
-        finish_btn = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("complete_setup_button"), 
-                                   command=lambda: self.complete_setup(setup_window),
-                                   height=45, font=ctk.CTkFont(size=16))
+        finish_btn = ctk.CTkButton(
+            main_frame, 
+            text=self.lang_manager.get_string("complete_setup_button"), 
+            command=lambda: self.complete_setup(setup_window),
+            height=45, font=ctk.CTkFont(size=16)
+        )
         finish_btn.pack(pady=20)
 
     def update_password_strength(self, event):

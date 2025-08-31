@@ -1,0 +1,12 @@
+{
+    "theme": "dark",
+    "font_size": 12,
+    "lockout_until": null,
+    "failed_attempts": 0,
+    "consecutive_lockouts": 0,
+    "last_modified": 1756643702.1014438,
+    "secure_storage_enabled": true,
+    "tfa_secret": null,
+    "tutorial_completed": true,
+    "language": "English"
+}
