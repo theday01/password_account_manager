@@ -757,6 +757,53 @@ class ModernPasswordManagerGUI:
         self.setup_ui()
         self.start_lockout_validation_timer()
 
+    def show_welcome_dialog(self):
+        # Create a Toplevel window for the welcome message
+        welcome_window = ctk.CTkToplevel(self.root)
+        welcome_window.title("Welcome!")
+        welcome_window.geometry("500x250")
+        welcome_window.resizable(False, False)
+        welcome_window.grab_set()  # Make the window modal
+
+        # Center the window
+        self.root.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (500 // 2)
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (250 // 2)
+        welcome_window.geometry(f"+{x}+{y}")
+
+        main_frame = ctk.CTkFrame(welcome_window)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(
+            main_frame,
+            text="Welcome to SecureVault Pro!",
+            font=ctk.CTkFont(size=24, weight="bold")
+        ).pack(pady=(10, 15))
+
+        welcome_message = (
+            "It looks like this is your first time using the application.\n\n"
+            "Please click the 'First Time Setup' button on the main screen "
+            "to create your account and secure your vault."
+        )
+        ctk.CTkLabel(
+            main_frame,
+            text=welcome_message,
+            font=ctk.CTkFont(size=14),
+            justify="left"
+        ).pack(pady=10, padx=10)
+
+        close_button = ctk.CTkButton(
+            main_frame,
+            text="OK",
+            command=welcome_window.destroy,
+            width=100,
+            height=40
+        )
+        close_button.pack(pady=20)
+
+        # Wait for the window to be closed before returning
+        welcome_window.wait_window()
+
     def show_loading_screen(self): 
         bg_color = "#f5f5f5"      # light gray background
         accent_color = "#2b6cb0"  # deep blue
@@ -1048,6 +1095,9 @@ class ModernPasswordManagerGUI:
             self.update_login_button_states()
         else:
             self.show_main_interface()
+
+        if not self.is_vault_initialized():
+            self.root.after(100, self.show_welcome_dialog)
 
     def show_login_screen(self):
         for widget in self.main_frame.winfo_children():
