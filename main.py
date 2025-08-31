@@ -1418,6 +1418,10 @@ class ModernPasswordManagerGUI:
         for widget in self.main_frame.winfo_children():
             widget.destroy()
 
+        self.root.state('zoomed')
+        self.root.resizable(True, True)
+        self.root.minsize(800, 600)
+
         self.reset_inactivity_timer()
         self.root.bind("<KeyPress>", self.reset_inactivity_timer)
         self.root.bind("<Motion>", self.reset_inactivity_timer)
