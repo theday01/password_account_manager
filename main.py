@@ -758,10 +758,9 @@ class ModernPasswordManagerGUI:
         self.start_lockout_validation_timer()
 
     def show_welcome_dialog(self):
-        # Create a Toplevel window for the welcome message
         welcome_window = ctk.CTkToplevel(self.root)
-        welcome_window.title("Welcome!")
-        welcome_window.geometry("500x250")
+        welcome_window.title("Welcome")
+        welcome_window.geometry("500x350")
         welcome_window.resizable(False, False)
         welcome_window.grab_set()  # Make the window modal
 
@@ -776,14 +775,16 @@ class ModernPasswordManagerGUI:
 
         ctk.CTkLabel(
             main_frame,
-            text="Welcome to SecureVault Pro!",
+            text="Welcome to SecureVault Pro",
             font=ctk.CTkFont(size=24, weight="bold")
         ).pack(pady=(10, 15))
 
         welcome_message = (
             "It looks like this is your first time using the application.\n\n"
-            "Please click the 'First Time Setup' button on the main screen "
-            "to create your account and secure your vault."
+            "Please click the 'First Time Setup' button on the main screen  \n"
+            "to create your account and secure your vault. \n\n\n"
+            "If you encounter any problems, please contact the developer directly.\n\n"
+            "Enjoy your time with SecureVault Pro!"
         )
         ctk.CTkLabel(
             main_frame,
@@ -794,10 +795,10 @@ class ModernPasswordManagerGUI:
 
         close_button = ctk.CTkButton(
             main_frame,
-            text="OK",
+            text="Okay, thanks!",
             command=welcome_window.destroy,
-            width=100,
-            height=40
+            width=120,
+            height=50
         )
         close_button.pack(pady=20)
 
@@ -1388,7 +1389,7 @@ class ModernPasswordManagerGUI:
         
         self.setup_full_name_entry = ctk.CTkEntry(
             main_frame, 
-            placeholder_text="Enter Your Full Name", 
+            placeholder_text="Full Name Ex. Hamza Saadi", 
             width=300, height=40
         )
         self.setup_full_name_entry.pack(pady=10)

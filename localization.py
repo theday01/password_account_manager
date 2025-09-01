@@ -109,7 +109,7 @@ LANGUAGES = {
         "auth_failed": "Authentication failed",
         "setup_wizard_title": "SecureVault Pro Setup Wizard",
         "create_master_password_title": "Create Your Master Password",
-        "email_placeholder": "Enter your email",
+        "email_placeholder": "Your E-mail Ex. example@gmail.com",
         "email_required_error": "Email is a required field",
         "confirm_password_placeholder": "Confirm Password",
         "complete_setup_button": "Complete Setup",
