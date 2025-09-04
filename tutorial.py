@@ -14,7 +14,7 @@ class TutorialManager:
         self.win_width = 650
         self.win_height = 470
 
-        self.steps = self.get_translated_steps()
+        self.steps = self._get_tutorial_steps()
 
     def _center_window(self, window, width, height, parent=None):
         """
@@ -48,7 +48,10 @@ class TutorialManager:
         if y < 0: y = 0
         window.geometry(f"{width}x{height}+{x}+{y}")
 
-    def get_translated_steps(self):
+    def _get_tutorial_steps(self):
+        """
+        Defines the tutorial steps with translated content.
+        """
         return [
             {
                 "title": self.lang_manager.get_string("tutorial_step_1_title"),
@@ -58,7 +61,7 @@ class TutorialManager:
             {
                 "title": self.lang_manager.get_string("tutorial_step_2_title"),
                 "text": self.lang_manager.get_string("tutorial_step_2_text"),
-                "image": None
+                "image": "user.png"
             },
             {
                 "title": self.lang_manager.get_string("tutorial_step_3_title"),
@@ -73,11 +76,6 @@ class TutorialManager:
             {
                 "title": self.lang_manager.get_string("tutorial_step_5_title"),
                 "text": self.lang_manager.get_string("tutorial_step_5_text"),
-                "image": "user.png"
-            },
-            {
-                "title": self.lang_manager.get_string("tutorial_step_6_title"),
-                "text": self.lang_manager.get_string("tutorial_step_6_text"),
                 "image": "password.png"
             },
             {
@@ -97,7 +95,7 @@ class TutorialManager:
         self.tutorial_window = ctk.CTkToplevel(self.parent)
         self.tutorial_window.title(self.lang_manager.get_string("tutorial_title"))
         width, height = self.win_width, self.win_height
-        self.tutorial_window.overrideredirect(True)
+        self.tutorial_window.overrideredirect(False)
         self.tutorial_window.resizable(False, False)
         self.tutorial_window.grab_set()
         self.tutorial_window.transient(self.parent)
@@ -133,6 +131,21 @@ class TutorialManager:
         )
         # fill the horizontal space and give horizontal padding
         title_label.pack(fill="x", padx=12, pady=(6, 12))
+
+        # Progress indicator
+        progress_text = self.lang_manager.get_string(
+            "tutorial_progress_text",
+            current_step=self.current_step + 1,
+            total_steps=len(self.steps)
+        )
+        progress_label = ctk.CTkLabel(
+            self.main_frame,
+            text=progress_text,
+            font=ctk.CTkFont(size=12, slant="italic"),
+            anchor="center",
+            justify="center"
+        )
+        progress_label.pack(fill="x", padx=12, pady=(0, 10))
 
         # Image (optional)
         if step_data.get("image"):
