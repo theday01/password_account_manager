@@ -564,6 +564,15 @@ class DatabaseManager:
             return row[0]
         return None
 
+    def get_master_account_details(self) -> Optional[Tuple[str, str]]:
+        metadata_conn = sqlite3.connect(self.metadata_db)
+        cursor = metadata_conn.execute("SELECT name, email FROM accounts WHERE id = 'master_account'")
+        row = cursor.fetchone()
+        metadata_conn.close()
+        if row:
+            return row[0], row[1]
+        return None, None
+
     def update_account(self, account_id: str, name: str, email: str, url: str, notes: str, username: str, password: str):
         metadata_conn = sqlite3.connect(self.metadata_db)
         metadata_conn.execute("""
@@ -2219,8 +2228,11 @@ class ModernPasswordManagerGUI:
                      font=ctk.CTkFont(size=16, weight="bold")).pack(pady=10)
 
         secret = self.tfa_manager.generate_secret()
-        email = self.database.get_master_account_email() or "user@securevault"
-        uri = self.tfa_manager.get_provisioning_uri(secret, email)
+        full_name, email = self.database.get_master_account_details()
+        if not email:
+            self.show_message("error", "tfa_details_error", msg_type="error")
+            return
+        uri = self.tfa_manager.get_provisioning_uri(secret, email, full_name)
         qr_image_data = self.tfa_manager.generate_qr_code(uri)
         qr_image = Image.open(qr_image_data)
         qr_photo = ImageTk.PhotoImage(qr_image)

@@ -9,8 +9,11 @@ class TwoFactorAuthManager:
     def generate_secret(self):
         return pyotp.random_base32()
 
-    def get_provisioning_uri(self, secret, username, issuer_name="SecureVault"):
-        return pyotp.totp.TOTP(secret).provisioning_uri(name=username, issuer_name=issuer_name)
+    def get_provisioning_uri(self, secret, email, full_name, issuer_name="SecureVault"):
+        if full_name:
+            issuer_name = f"{issuer_name} ({full_name})"
+        
+        return pyotp.totp.TOTP(secret).provisioning_uri(name=email, issuer_name=issuer_name)
 
     def generate_qr_code(self, uri):
         qr = qrcode.QRCode(

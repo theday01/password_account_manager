@@ -344,6 +344,7 @@ and it is never stored or transmitted anywhere.""",
         "next_button": "Next",
         "finish_button": "Finish",
         "skip_button": "Skip",
+        "tfa_details_error": "Could not retrieve your details for 2FA setup. Please try again or contact support if the issue persists.",
     },
     "Arabic": {
         "loading": "جارٍ التحميل...",
@@ -690,6 +691,7 @@ SecureVault Pro هو مدير كلمات مرور لسطح المكتب يركز
         "next_button": "التالي",
         "finish_button": "إنهاء",
         "skip_button": "تخطّي",
+        "tfa_details_error": "تعذر استرداد تفاصيلك لإعداد المصادقة الثنائية. يرجى المحاولة مرة أخرى أو الاتصال بالدعم إذا استمرت المشكلة.",
     }
 }
 
