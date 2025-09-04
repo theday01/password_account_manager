@@ -81,6 +81,11 @@ class TutorialManager:
                 "image": "password.png"
             },
             {
+                "title": self.lang_manager.get_string("tutorial_step_6_title"),
+                "text": self.lang_manager.get_string("tutorial_step_6_text"),
+                "image": "done.png"
+            },
+            {
                 "title": self.lang_manager.get_string("tutorial_step_7_title"),
                 "text": self.lang_manager.get_string("tutorial_step_7_text"),
                 "image": "done.png"
