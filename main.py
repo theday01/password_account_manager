@@ -28,6 +28,7 @@ from tutorial import TutorialManager
 from localization import LanguageManager
 import threading
 from notification_manager import start_notification_loop
+from trial_manager import TrialManager
 
 logger = logging.getLogger(__name__)
 
@@ -718,6 +719,7 @@ class ModernPasswordManagerGUI:
         self.database = None
         self.secure_file_manager = None
         self.security_monitor = None
+        self.trial_manager = None
         ctk.set_appearance_mode("dark")  
         self.root = ctk.CTk()
         self.root.withdraw()
@@ -760,7 +762,6 @@ class ModernPasswordManagerGUI:
         self.consecutive_lockouts = 0
         self.inactivity_timer = None
         self.INACTIVITY_TIMEOUT = 2 * 60 * 1000  # 2 minutes in milliseconds
-        self._setup_secure_file_manager()
         self.load_settings()
         self.validate_lockout_integrity()
         self.setup_ui()
@@ -913,6 +914,16 @@ class ModernPasswordManagerGUI:
         def finish_loading():
             loading_window.destroy()
             self.root.deiconify()
+
+            # Initialize SFM early for trial manager
+            self._setup_secure_file_manager()
+            
+            self.trial_manager = TrialManager(self.root, self.secure_file_manager)
+            if self.trial_manager.status == "EXPIRED":
+                if not self.trial_manager.show_trial_expired_dialog():
+                    self.root.quit()
+                    return
+
             self._initialize_app()
 
         loading_window.after(200, lambda: update_loading(1))
@@ -1514,6 +1525,16 @@ class ModernPasswordManagerGUI:
         toolbar.pack(fill="x", padx=10, pady=10)
         toolbar.pack_propagate(False)
         
+        if self.trial_manager and self.trial_manager.is_trial_active:
+            remaining_minutes = int(self.trial_manager.minutes_remaining)
+            trial_label = ctk.CTkLabel(
+                toolbar,
+                text=f"Trial Version: {remaining_minutes} minutes remaining",
+                font=ctk.CTkFont(size=14),
+                text_color="yellow"
+            )
+            trial_label.pack(side="left", padx=20)
+        
         ctk.CTkLabel(
             toolbar, 
             text=self.lang_manager.get_string("main_toolbar_title"), 
@@ -1553,15 +1574,21 @@ class ModernPasswordManagerGUI:
             font=ctk.CTkFont(size=18)
         ).pack(side="right", padx=10, pady=8)
 
+        # Determine state for backup/restore buttons based on trial status
+        backup_restore_state = "normal"
+        if self.trial_manager and self.trial_manager.status == 'TRIAL':
+            backup_restore_state = "disabled"
+
         ctk.CTkButton(
             toolbar,
             text=self.lang_manager.get_string("backup"),
             width=120,
             height=55,
             image=save,
-            compound="left",  # icon on the left, text on the right            
+            compound="left",
             command=self.show_backup_dialog,
-            font=ctk.CTkFont(size=18)
+            font=ctk.CTkFont(size=18),
+            state=backup_restore_state
         ).pack(side="right", padx=10, pady=8)
 
         ctk.CTkButton(
@@ -1570,9 +1597,10 @@ class ModernPasswordManagerGUI:
             width=160,
             height=55,
             image=restore_icon,
-            compound="left",  # icon on the left, text on the right
+            compound="left",
             command=self.show_restore_dialog,
-            font=ctk.CTkFont(size=16)
+            font=ctk.CTkFont(size=16),
+            state=backup_restore_state
         ).pack(side="right", padx=8, pady=8)
         
         content_frame = ctk.CTkFrame(self.main_frame)
