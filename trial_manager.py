@@ -232,7 +232,7 @@ class TrialManager:
         main_frame = ctk.CTkFrame(dialog, corner_radius=15)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         ctk.CTkLabel(main_frame, text="Trial Period Expired", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=20)
-        ctk.CTkLabel(main_frame, text="Your 7-day trial has ended or tampering was detected.\nPlease purchase a license to continue.", justify="center").pack(pady=10)
+        ctk.CTkLabel(main_frame, text="The 7-day trial period has ended. Please upgrade your current version to the full version.\nContact the developer if you want the full version now.", justify="center").pack(pady=10)
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
         def on_contact():

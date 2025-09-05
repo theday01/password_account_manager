@@ -1529,9 +1529,9 @@ class ModernPasswordManagerGUI:
             remaining_minutes = int(self.trial_manager.minutes_remaining)
             trial_label = ctk.CTkLabel(
                 toolbar,
-                text=f"Trial Version: {remaining_minutes} minutes remaining",
+                text=f"Trial Version: {remaining_minutes} minutes remaining.\nOnce the trial ends, you must activate the full version to continue.",
                 font=ctk.CTkFont(size=14),
-                text_color="yellow"
+                text_color="red"
             )
             trial_label.pack(side="left", padx=20)
         
