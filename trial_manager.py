@@ -36,7 +36,18 @@ class TrialManager:
         self.restart_callback = restart_callback
         self.is_trial_active = False
         self.minutes_remaining = 0
+        self.failed_license_attempts = 0
+        self.consecutive_license_lockouts = 0
+        self.license_lockout_until = None
         self.status = self.check_trial_status()
+
+    def _save_trial_status(self, trial_data):
+        trial_data['failed_license_attempts'] = self.failed_license_attempts
+        trial_data['consecutive_license_lockouts'] = self.consecutive_license_lockouts
+        trial_data['license_lockout_until'] = self.license_lockout_until
+        self._write_primary_storage(trial_data)
+        self._write_secondary_storage(trial_data)
+        self._write_tertiary_storage(trial_data)
 
     def _get_machine_id(self):
         if TrialManager._machine_id is None:
@@ -58,6 +69,30 @@ class TrialManager:
         json_data = ''.join(chr(ord(c) ^ ord(k)) for c, k in zip(xored, key * (len(xored) // len(key) + 1)))
         return json.loads(json_data)
 
+    def _serialize_trial_data(self, data_dict):
+        serializable = {
+            'start_date': data_dict['start_date'].isoformat(),
+            'last_run_date': data_dict['last_run_date'].isoformat(),
+            'failed_license_attempts': data_dict.get('failed_license_attempts', 0),
+            'consecutive_license_lockouts': data_dict.get('consecutive_license_lockouts', 0),
+        }
+        if data_dict.get('license_lockout_until'):
+            serializable['license_lockout_until'] = data_dict['license_lockout_until'].isoformat()
+        else:
+            serializable['license_lockout_until'] = None
+        return serializable
+
+    def _deserialize_trial_data(self, decrypted_dict):
+        decrypted_dict['start_date'] = datetime.fromisoformat(decrypted_dict['start_date'])
+        decrypted_dict['last_run_date'] = datetime.fromisoformat(decrypted_dict['last_run_date'])
+        if 'license_lockout_until' in decrypted_dict and decrypted_dict['license_lockout_until']:
+            decrypted_dict['license_lockout_until'] = datetime.fromisoformat(decrypted_dict['license_lockout_until'])
+        else:
+            decrypted_dict['license_lockout_until'] = None
+        decrypted_dict.setdefault('failed_license_attempts', 0)
+        decrypted_dict.setdefault('consecutive_license_lockouts', 0)
+        return decrypted_dict
+
     def _get_os_specific_storage_path(self):
         system = platform.system()
         if system == 'Windows' and winreg:
@@ -76,20 +111,14 @@ class TrialManager:
                 with open(self.DOTFILE_PATH, 'r') as f: encrypted_data = f.read()
             
             decrypted_dict = self._decrypt_data(encrypted_data)
-            decrypted_dict['start_date'] = datetime.fromisoformat(decrypted_dict['start_date'])
-            decrypted_dict['last_run_date'] = datetime.fromisoformat(decrypted_dict['last_run_date'])
-            return decrypted_dict
+            return self._deserialize_trial_data(decrypted_dict)
         except Exception:
             return None
 
     def _write_primary_storage(self, data_dict):
         storage_type = self._get_os_specific_storage_path()
         try:
-            serializable_dict = {
-                'start_date': data_dict['start_date'].isoformat(),
-                'last_run_date': data_dict['last_run_date'].isoformat()
-            }
-            encrypted_data = self._encrypt_data(serializable_dict)
+            encrypted_data = self._encrypt_data(self._serialize_trial_data(data_dict))
             if storage_type == 'registry':
                 with winreg.CreateKey(winreg.HKEY_CURRENT_USER, self.REGISTRY_PATH) as key:
                     winreg.SetValueEx(key, self.REGISTRY_KEY, 0, winreg.REG_SZ, encrypted_data)
@@ -105,10 +134,7 @@ class TrialManager:
             if not self.secure_file_manager: return None
             settings = self.secure_file_manager.read_settings()
             if settings and 'trial_data' in settings and settings['trial_data']:
-                trial_data = settings['trial_data']
-                trial_data['start_date'] = datetime.fromisoformat(trial_data['start_date'])
-                trial_data['last_run_date'] = datetime.fromisoformat(trial_data['last_run_date'])
-                return trial_data
+                return self._deserialize_trial_data(settings['trial_data'])
             return None
         except Exception:
             return None
@@ -118,11 +144,7 @@ class TrialManager:
             if not self.secure_file_manager: return False
             settings = self.secure_file_manager.read_settings()
             if not settings: settings = {}
-            serializable_dict = {
-                'start_date': data_dict['start_date'].isoformat(),
-                'last_run_date': data_dict['last_run_date'].isoformat()
-            }
-            settings['trial_data'] = serializable_dict
+            settings['trial_data'] = self._serialize_trial_data(data_dict)
             self.secure_file_manager.write_settings(settings)
             return True
         except Exception:
@@ -151,20 +173,14 @@ class TrialManager:
             with open(self.TERTIARY_PATH, 'r') as f:
                 encrypted_data = f.read()
             decrypted_dict = self._decrypt_data(encrypted_data)
-            decrypted_dict['start_date'] = datetime.fromisoformat(decrypted_dict['start_date'])
-            decrypted_dict['last_run_date'] = datetime.fromisoformat(decrypted_dict['last_run_date'])
-            return decrypted_dict
+            return self._deserialize_trial_data(decrypted_dict)
         except Exception:
             return None
 
     def _write_tertiary_storage(self, data_dict):
         if not self.TERTIARY_PATH: return False
         try:
-            serializable_dict = {
-                'start_date': data_dict['start_date'].isoformat(),
-                'last_run_date': data_dict['last_run_date'].isoformat()
-            }
-            encrypted_data = self._encrypt_data(serializable_dict)
+            encrypted_data = self._encrypt_data(self._serialize_trial_data(data_dict))
             with open(self.TERTIARY_PATH, 'w') as f:
                 f.write(encrypted_data)
             # Make the file hidden on systems that support it
@@ -211,6 +227,12 @@ class TrialManager:
             self._write_primary_storage(trial_data)
             self._write_secondary_storage(trial_data)
             self._write_tertiary_storage(trial_data)
+
+        self.trial_data = trial_data
+        # Populate lockout state from trial_data
+        self.failed_license_attempts = trial_data.get('failed_license_attempts', 0)
+        self.consecutive_license_lockouts = trial_data.get('consecutive_license_lockouts', 0)
+        self.license_lockout_until = trial_data.get('license_lockout_until')
 
         # Clock tampering detection
         now = datetime.now()
@@ -264,13 +286,13 @@ class TrialManager:
         screen_width = dialog.winfo_screenwidth()
         screen_height = dialog.winfo_screenheight()
         window_width = 780
-        window_height = 300
+        window_height = 380
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
         dialog.geometry(f"{window_width}x{window_height}+{x}+{y}")
         
         dialog.grab_set()
-        #dialog.resizable(False, False)
+        dialog.resizable(False, False)
         main_frame = ctk.CTkFrame(dialog, corner_radius=15)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         ctk.CTkLabel(main_frame, text="Trial Period Expired", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=20)
@@ -283,6 +305,22 @@ class TrialManager:
         machine_id_entry.insert(0, self._get_machine_id())
         machine_id_entry.configure(state="readonly")
         machine_id_entry.pack(side="left")
+        
+        def copy_machine_id():
+            dialog.clipboard_clear()
+            dialog.clipboard_append(self._get_machine_id())
+            dialog.update()  # Keep the clipboard content
+            # Show temporary feedback
+            copy_button.configure(text="✓ Copied!")
+            dialog.after(2000, lambda: copy_button.configure(text="📋"))
+        
+        copy_button = ctk.CTkButton(machine_id_frame, text="📋", width=30, height=30, 
+                                command=copy_machine_id, 
+                                font=ctk.CTkFont(size=14))
+        copy_button.pack(side="left", padx=(5, 0))
+
+        error_label = ctk.CTkLabel(main_frame, text="", text_color="red")
+        error_label.pack(pady=5)
 
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
@@ -293,7 +331,22 @@ class TrialManager:
         def on_exit():
             self.parent_window.destroy()
 
+        def update_countdown():
+            if self.license_lockout_until and datetime.now() < self.license_lockout_until:
+                remaining_time = self.license_lockout_until - datetime.now()
+                hours, remainder = divmod(remaining_time.total_seconds(), 3600)
+                minutes, seconds = divmod(remainder, 60)
+                error_label.configure(text=f"Too many failed attempts. Please try again in {int(hours)}h {int(minutes)}m {int(seconds)}s.")
+                dialog.after(1000, update_countdown) # Reschedule
+            else:
+                error_label.configure(text="") # Clear the message when lockout expires
+
         def on_activate():
+            if self.license_lockout_until and datetime.now() < self.license_lockout_until:
+                return
+
+            error_label.configure(text="") # Clear previous errors
+
             input_dialog = ctk.CTkInputDialog(text="Please enter your license key:", title="Activate Full Version")
             license_key = input_dialog.get_input()
             if not license_key:
@@ -307,12 +360,29 @@ class TrialManager:
             expected_key = hashlib.sha256((machine_id + SECRET_SALT).encode()).hexdigest()
 
             if license_key.strip() == expected_key:
+                self.failed_license_attempts = 0
+                self.consecutive_license_lockouts = 0
+                self.license_lockout_until = None
+                self._save_trial_status(self.trial_data)
                 if self.activate_full_version():
                     dialog.destroy()
                     if self.restart_callback:
                         self.restart_callback()
             else:
-                messagebox.showerror("Activation Failed", "The license key is incorrect for this machine.")
+                self.failed_license_attempts += 1
+                if self.failed_license_attempts >= 3:
+                    self.consecutive_license_lockouts += 1
+                    lockout_hours = self.consecutive_license_lockouts
+                    self.license_lockout_until = datetime.now() + timedelta(hours=lockout_hours)
+                    self.failed_license_attempts = 0
+                    update_countdown() # Start the countdown
+                else:
+                    attempts_left = 3 - self.failed_license_attempts
+                    error_label.configure(text=f"Incorrect license key. You have {attempts_left} attempt(s) left.")
+                self._save_trial_status(self.trial_data)
+
+        if self.license_lockout_until and datetime.now() < self.license_lockout_until:
+            update_countdown()
 
         ctk.CTkButton(button_frame, text="Contact Developer", command=on_contact, width=180, height=40).pack(side="left", padx=10)
         ctk.CTkButton(button_frame, text="Activate", command=on_activate, width=120, height=40,fg_color="#4CAF50", hover_color="#45a049").pack(side="left", padx=10)
