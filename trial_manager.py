@@ -8,6 +8,7 @@ import tkinter as tk
 import webbrowser
 from tkinter import messagebox
 import customtkinter as ctk
+import hashlib
 
 try:
     import winreg
@@ -17,7 +18,7 @@ except ImportError:
 class TrialManager:
     _machine_id = None  # Cache for machine ID
 
-    def __init__(self, parent_window, secure_file_manager):
+    def __init__(self, parent_window, secure_file_manager, restart_callback=None):
         self.TRIAL_MINUTES = 2  # Set trial duration to 2 minutes for testing
         self.LICENSE_FILE = os.path.expanduser("~/.sv_license")
 
@@ -31,6 +32,7 @@ class TrialManager:
 
         self.secure_file_manager = secure_file_manager
         self.parent_window = parent_window
+        self.restart_callback = restart_callback
         self.is_trial_active = False
         self.minutes_remaining = 0
         self.status = self.check_trial_status()
@@ -295,11 +297,20 @@ class TrialManager:
         dialog.geometry(f"{window_width}x{window_height}+{x}+{y}")
         
         dialog.grab_set()
-        dialog.resizable(False, False)
+        #dialog.resizable(False, False)
         main_frame = ctk.CTkFrame(dialog, corner_radius=15)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         ctk.CTkLabel(main_frame, text="Trial Period Expired", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=20)
         ctk.CTkLabel(main_frame, text="The 7-day trial period has ended. Please upgrade your current version to the full version.\n\n\nNote: All your accounts are saved and will not be deleted, but you will not be able to access them until you obtain the full version.\n\nContact the developer if you want the full version now.", justify="center").pack(pady=10)
+        
+        machine_id_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        machine_id_frame.pack(pady=10)
+        ctk.CTkLabel(machine_id_frame, text="Your Machine ID:").pack(side="left", padx=(10, 5))
+        machine_id_entry = ctk.CTkEntry(machine_id_frame, width=300)
+        machine_id_entry.insert(0, self._get_machine_id())
+        machine_id_entry.configure(state="readonly")
+        machine_id_entry.pack(side="left")
+
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
         
@@ -309,7 +320,29 @@ class TrialManager:
         def on_exit():
             self.parent_window.destroy()
 
+        def on_activate():
+            input_dialog = ctk.CTkInputDialog(text="Please enter your license key:", title="Activate Full Version")
+            license_key = input_dialog.get_input()
+            if not license_key:
+                return
+
+            machine_id = self._get_machine_id()
+            
+            # This salt must be identical to the one in generate_license.py
+            SECRET_SALT = "a-very-secret-and-long-salt-that-is-hard-to-guess"
+            
+            expected_key = hashlib.sha256((machine_id + SECRET_SALT).encode()).hexdigest()
+
+            if license_key.strip() == expected_key:
+                if self.activate_full_version():
+                    dialog.destroy()
+                    if self.restart_callback:
+                        self.restart_callback()
+            else:
+                messagebox.showerror("Activation Failed", "The license key is incorrect for this machine.")
+
         ctk.CTkButton(button_frame, text="Contact Developer", command=on_contact, width=180, height=40).pack(side="left", padx=10)
+        ctk.CTkButton(button_frame, text="Activate", command=on_activate, width=120, height=40).pack(side="left", padx=10)
         ctk.CTkButton(button_frame, text="Exit", command=on_exit, width=100, height=40, fg_color="#D32F2F").pack(side="right", padx=10)
         dialog.wait_window()
         return self.status == "FULL"

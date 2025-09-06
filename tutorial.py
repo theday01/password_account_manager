@@ -86,7 +86,7 @@ class TutorialManager:
             {
                 "title": self.lang_manager.get_string("tutorial_step_7_title"),
                 "text": self.lang_manager.get_string("tutorial_step_7_text"),
-                "image": "done.png"
+                "image": "love.png"
             }
         ]
 
