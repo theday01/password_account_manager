@@ -9,6 +9,7 @@ import webbrowser
 from tkinter import messagebox
 import customtkinter as ctk
 import hashlib
+from machine_id_utils import generate_machine_id
 
 try:
     import winreg
@@ -38,37 +39,9 @@ class TrialManager:
         self.status = self.check_trial_status()
 
     def _get_machine_id(self):
-        if TrialManager._machine_id:
-            return TrialManager._machine_id
-
-        try:
-            system = platform.system()
-            if system == 'Windows':
-                command = "wmic csproduct get uuid"
-                output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
-                machine_id = output.split('\n')[1].strip()
-            elif system == 'Linux':
-                try:
-                    with open('/sys/class/dmi/id/product_uuid', 'r') as f:
-                        machine_id = f.read().strip()
-                except FileNotFoundError:
-                    with open('/var/lib/dbus/machine-id', 'r') as f:
-                        machine_id = f.read().strip()
-            elif system == 'Darwin': # macOS
-                command = "ioreg -d2 -c IOPlatformExpertDevice | awk -F\\\" '/IOPlatformUUID/{print $(NF-1)}'"
-                output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
-                machine_id = output.strip()
-            else:
-                machine_id = "unknown_platform_fallback_key"
-            
-            if not machine_id: # Handle cases where command returns empty string
-                machine_id = "default_fallback_key_on_empty"
-
-        except Exception:
-            machine_id = "default_fallback_key_on_error"
-
-        TrialManager._machine_id = machine_id
-        return machine_id
+        if TrialManager._machine_id is None:
+            TrialManager._machine_id = generate_machine_id()
+        return TrialManager._machine_id
 
     def _encrypt_data(self, data_dict):
         key = self._get_machine_id()
@@ -342,7 +315,7 @@ class TrialManager:
                 messagebox.showerror("Activation Failed", "The license key is incorrect for this machine.")
 
         ctk.CTkButton(button_frame, text="Contact Developer", command=on_contact, width=180, height=40).pack(side="left", padx=10)
-        ctk.CTkButton(button_frame, text="Activate", command=on_activate, width=120, height=40).pack(side="left", padx=10)
-        ctk.CTkButton(button_frame, text="Exit", command=on_exit, width=100, height=40, fg_color="#D32F2F").pack(side="right", padx=10)
+        ctk.CTkButton(button_frame, text="Activate", command=on_activate, width=120, height=40,fg_color="#4CAF50", hover_color="#45a049").pack(side="left", padx=10)
+        ctk.CTkButton(button_frame, text="Exit", command=on_exit, width=100, height=40, fg_color="#D32F2F", hover_color="#D10E00").pack(side="right", padx=10)
         dialog.wait_window()
         return self.status == "FULL"
