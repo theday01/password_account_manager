@@ -26,6 +26,9 @@ class TrialManager:
         self.REGISTRY_KEY = "InstallInfo"
         self.DOTFILE_PATH = os.path.expanduser("~/.sv_meta")
 
+        # Tertiary storage (covert)
+        self.TERTIARY_PATH = self._get_tertiary_path()
+
         self.secure_file_manager = secure_file_manager
         self.parent_window = parent_window
         self.is_trial_active = False
@@ -150,36 +153,90 @@ class TrialManager:
         except Exception:
             return False
 
+    def _get_tertiary_path(self):
+        system = platform.system()
+        if system == 'Windows':
+            path = os.path.join(os.environ.get("ProgramData", "C:\\ProgramData"), "SystemLogs")
+            if not os.path.exists(path): os.makedirs(path, exist_ok=True)
+            return os.path.join(path, "updater.log")
+        elif system == 'Linux':
+            path = os.path.expanduser("~/.config/systemd")
+            if not os.path.exists(path): os.makedirs(path, exist_ok=True)
+            return os.path.join(path, "user.log")
+        elif system == 'Darwin':
+            path = os.path.expanduser("~/Library/Application Support")
+            if not os.path.exists(path): os.makedirs(path, exist_ok=True)
+            return os.path.join(path, ".system_events.log")
+        return None # Fallback for unsupported systems
+
+    def _read_tertiary_storage(self):
+        if not self.TERTIARY_PATH or not os.path.exists(self.TERTIARY_PATH):
+            return None
+        try:
+            with open(self.TERTIARY_PATH, 'r') as f:
+                encrypted_data = f.read()
+            decrypted_dict = self._decrypt_data(encrypted_data)
+            decrypted_dict['start_date'] = datetime.fromisoformat(decrypted_dict['start_date'])
+            decrypted_dict['last_run_date'] = datetime.fromisoformat(decrypted_dict['last_run_date'])
+            return decrypted_dict
+        except Exception:
+            return None
+
+    def _write_tertiary_storage(self, data_dict):
+        if not self.TERTIARY_PATH: return False
+        try:
+            serializable_dict = {
+                'start_date': data_dict['start_date'].isoformat(),
+                'last_run_date': data_dict['last_run_date'].isoformat()
+            }
+            encrypted_data = self._encrypt_data(serializable_dict)
+            with open(self.TERTIARY_PATH, 'w') as f:
+                f.write(encrypted_data)
+            # Make the file hidden on systems that support it
+            if platform.system() == 'Windows':
+                os.system(f"attrib +h {self.TERTIARY_PATH}")
+            return True
+        except Exception:
+            return False
+
     def check_trial_status(self):
         if os.path.exists(self.LICENSE_FILE):
             return "FULL"
 
         data1 = self._read_primary_storage()
         data2 = self._read_secondary_storage()
+        data3 = self._read_tertiary_storage()
+        
+        all_data = [data1, data2, data3]
+        existing_data = [d for d in all_data if d is not None]
         
         trial_data = None
         tampered = False
 
-        # Cross-validation logic
-        if data1 and data2:
-            if abs((data1['start_date'] - data2['start_date']).total_seconds()) > 60 or \
-               abs((data1['last_run_date'] - data2['last_run_date']).total_seconds()) > 60:
+        if len(existing_data) == 3:
+            # All locations exist, check for consistency
+            start_dates = [d['start_date'] for d in existing_data]
+            last_run_dates = [d['last_run_date'] for d in existing_data]
+            if (max(start_dates) - min(start_dates)).total_seconds() > 60 or \
+               (max(last_run_dates) - min(last_run_dates)).total_seconds() > 60:
                 tampered = True
-            trial_data = data1
-        elif data1 and not data2:
+            trial_data = existing_data[0] # Use primary as the source of truth
+        elif len(existing_data) > 0 and len(existing_data) < 3:
+            # Some but not all locations exist - tampering detected
             tampered = True
-            self._write_secondary_storage(data1)
-            trial_data = data1
-        elif not data1 and data2:
-            tampered = True
-            self._write_primary_storage(data2)
-            trial_data = data2
-        else: # Both missing, fresh install
+            # Use the most recent valid data and restore other locations
+            authoritative_data = max(existing_data, key=lambda d: d['last_run_date'])
+            self._write_primary_storage(authoritative_data)
+            self._write_secondary_storage(authoritative_data)
+            self._write_tertiary_storage(authoritative_data)
+            trial_data = authoritative_data
+        else: # No data found, fresh install
             now = datetime.now()
             trial_data = {'start_date': now, 'last_run_date': now}
             self._write_primary_storage(trial_data)
             self._write_secondary_storage(trial_data)
-        
+            self._write_tertiary_storage(trial_data)
+
         # Clock tampering detection
         now = datetime.now()
         # Allow a 5-minute grace period for small clock adjustments
@@ -192,16 +249,17 @@ class TrialManager:
         # Trial period calculation
         elapsed = now - trial_data['start_date']
         if (elapsed.total_seconds() / 60) >= self.TRIAL_MINUTES:
-            # Update last run date even if expired, to prevent rolling back time to bypass
             trial_data['last_run_date'] = now
             self._write_primary_storage(trial_data)
             self._write_secondary_storage(trial_data)
+            self._write_tertiary_storage(trial_data)
             return "EXPIRED"
         
         # Update last_run_date for next time
         trial_data['last_run_date'] = now
         self._write_primary_storage(trial_data)
         self._write_secondary_storage(trial_data)
+        self._write_tertiary_storage(trial_data)
 
         self.is_trial_active = True
         self.minutes_remaining = self.TRIAL_MINUTES - (elapsed.total_seconds() / 60)
@@ -225,16 +283,26 @@ class TrialManager:
 
     def show_trial_expired_dialog(self):
         dialog = ctk.CTkToplevel(self.parent_window)
-        dialog.title("Trial Expired")
-        dialog.geometry("400x250")
+        dialog.title("Trial Period Expired")
+        
+        dialog.update_idletasks()  # Update window geometry
+        screen_width = dialog.winfo_screenwidth()
+        screen_height = dialog.winfo_screenheight()
+        window_width = 780
+        window_height = 300
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        dialog.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        
         dialog.grab_set()
         dialog.resizable(False, False)
         main_frame = ctk.CTkFrame(dialog, corner_radius=15)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         ctk.CTkLabel(main_frame, text="Trial Period Expired", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=20)
-        ctk.CTkLabel(main_frame, text="The 7-day trial period has ended. Please upgrade your current version to the full version.\nContact the developer if you want the full version now.", justify="center").pack(pady=10)
+        ctk.CTkLabel(main_frame, text="The 7-day trial period has ended. Please upgrade your current version to the full version.\n\n\nNote: All your accounts are saved and will not be deleted, but you will not be able to access them until you obtain the full version.\n\nContact the developer if you want the full version now.", justify="center").pack(pady=10)
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
+        
         def on_contact():
             webbrowser.open("https://wa.me/212623422858")
 
