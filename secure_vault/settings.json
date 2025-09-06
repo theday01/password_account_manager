@@ -1,0 +1,21 @@
+{
+    "theme": "dark",
+    "font_size": 12,
+    "lockout_until": null,
+    "failed_attempts": 0,
+    "consecutive_lockouts": 0,
+    "last_modified": 1757198032.7821727,
+    "secure_storage_enabled": true,
+    "tfa_secret": null,
+    "tutorial_completed": true,
+    "language": "English",
+    "last_login_timestamp": 1757198031.469842,
+    "consecutive_logins": 1,
+    "trial_data": {
+        "start_date": "2025-09-06T23:33:34.528034",
+        "last_run_date": "2025-09-06T23:33:34.942730",
+        "failed_license_attempts": 0,
+        "consecutive_license_lockouts": 0,
+        "license_lockout_until": null
+    }
+}

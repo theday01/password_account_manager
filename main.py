@@ -948,7 +948,9 @@ class ModernPasswordManagerGUI:
             'secure_storage_enabled': True,
             'tfa_secret': None,
             'tutorial_completed': False,
-            'language': 'English'
+            'language': 'English',
+            'last_login_timestamp': 0.0,
+            'consecutive_logins': 0
         }
         if self.secure_file_manager:
             try:
@@ -1222,6 +1224,22 @@ class ModernPasswordManagerGUI:
                 self.failed_attempts = 0
                 self.consecutive_lockouts = 0
                 self.clear_lockout_state()
+
+                # Login tracking logic
+                now = datetime.now().timestamp()
+                last_login = self.settings.get('last_login_timestamp', 0.0)
+                consecutive_logins = self.settings.get('consecutive_logins', 0)
+
+                # Reset if last login was more than 1 hour ago (3600 seconds)
+                if (now - last_login) > 3600:
+                    consecutive_logins = 1
+                else:
+                    consecutive_logins += 1
+                
+                self.settings['last_login_timestamp'] = now
+                self.settings['consecutive_logins'] = consecutive_logins
+                self.save_settings_to_file()
+
                 if self.secure_file_manager:
                     self.security_monitor = SecurityMonitor(self.secure_file_manager)
                     self.security_monitor.set_alert_callback(self.handle_security_alert)
@@ -1461,6 +1479,66 @@ class ModernPasswordManagerGUI:
                 text_color=color
             )
 
+    def _generate_welcome_message(self):
+        user_name = "User"  # Default value
+        try:
+            details = self.database.get_master_account_details()
+            if details:
+                full_name, email = details
+                if full_name and full_name.strip():
+                    user_name = full_name  # Use the full name
+        except Exception as e:
+            logger.error(f"Could not fetch user name for welcome message: {e}")
+            # user_name is already "User", so we just log the error.
+
+        consecutive_logins = self.settings.get('consecutive_logins', 1)
+
+        welcome_back_messages = [
+            "We're happy to have you back, {name}.",
+            "Welcome back again, {name}!",
+            "Good to see you again, {name}."
+        ]
+        morning_greetings = [
+            "Good morning, {name}.",
+            "Have a great morning, {name}."
+        ]
+        afternoon_greetings = [
+            "Good afternoon, {name}.",
+            "Hope you're having a productive day, {name}."
+        ]
+        evening_greetings = [
+            "Good evening, {name}.",
+            "Hope you had a wonderful day, {name}."
+        ]
+        safety_tips = [
+            "Safety Tip: Use a unique password for every account.",
+            "Safety Tip: Enable Two-Factor Authentication (2FA) for critical accounts.",
+            "Safety Tip: Beware of phishing emails asking for your credentials.",
+            "Safety Tip: Regularly review your account security settings.",
+            "Safety Tip: A long password is a strong password.",
+            "Safety Tip: Never share your master password with anyone."
+        ]
+
+        greeting = ""
+        try:
+            if consecutive_logins >= 3:
+                greeting = secrets.choice(welcome_back_messages).format(name=user_name)
+            else:
+                current_hour = datetime.now().hour
+                if 5 <= current_hour < 12:
+                    greeting = secrets.choice(morning_greetings).format(name=user_name)
+                elif 12 <= current_hour < 18:
+                    greeting = secrets.choice(afternoon_greetings).format(name=user_name)
+                else:
+                    greeting = secrets.choice(evening_greetings).format(name=user_name)
+            
+            tip = secrets.choice(safety_tips)
+            return f"{greeting}\n{tip}"
+        except Exception as e:
+            logger.error(f"Failed to generate welcome message: {e}")
+            # Fallback message
+            return f"Welcome, {user_name}!\nRemember to stay secure online."
+
     def complete_setup(self, setup_window):
         master_password = self.setup_master_password.get()
         confirm_password = self.setup_confirm_password.get()
@@ -1535,11 +1613,23 @@ class ModernPasswordManagerGUI:
             )
             trial_label.pack(side="left", padx=20)
         
+        left_toolbar_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+        left_toolbar_frame.pack(side="left", fill="y", padx=25, pady=10)
+
         ctk.CTkLabel(
-            toolbar, 
-            text=self.lang_manager.get_string("main_toolbar_title"), 
+            left_toolbar_frame,
+            text=self.lang_manager.get_string("main_toolbar_title"),
             font=ctk.CTkFont(size=24, weight="bold")
-        ).pack(side="left", padx=25, pady=20)
+        ).pack(anchor="w")
+        
+        welcome_message = self._generate_welcome_message()
+        ctk.CTkLabel(
+            left_toolbar_frame,
+            text=welcome_message,
+            font=ctk.CTkFont(size=12),
+            justify="left",
+            anchor="w"
+        ).pack(anchor="w", pady=(5, 0))
         
         ctk.CTkButton(
             toolbar, 
