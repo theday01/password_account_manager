@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import secrets
 import hashlib
 import hmac
@@ -709,6 +710,28 @@ class SecureEntry(ctk.CTkEntry):
         if self.tooltip:
             self.tooltip.destroy()
             self.tooltip = None
+
+class NonArabicEntry(ctk.CTkEntry):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bind("<KeyRelease>", self._on_key_release)
+
+    def _on_key_release(self, event):
+        text = self.get()
+        cleaned_text = self._remove_arabic(text)
+
+        if text != cleaned_text:
+            cursor_pos = self.index("insert")
+            # Count removed characters before the cursor to adjust its position
+            removed_count = len(re.findall("[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]", text[:cursor_pos]))
+            
+            self.delete(0, "end")
+            self.insert(0, cleaned_text)
+            self.icursor(max(0, cursor_pos - removed_count))
+
+    def _remove_arabic(self, text):
+        arabic_pattern = re.compile("[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]+")
+        return arabic_pattern.sub("", text)
 
 class ModernPasswordManagerGUI:
     def __init__(self):
@@ -1425,14 +1448,14 @@ class ModernPasswordManagerGUI:
             font=ctk.CTkFont(size=18, weight="bold")
         ).pack(pady=20)
         
-        self.setup_full_name_entry = ctk.CTkEntry(
+        self.setup_full_name_entry = NonArabicEntry(
             main_frame, 
             placeholder_text="Full Name Ex. Hamza Saadi", 
             width=300, height=40
         )
         self.setup_full_name_entry.pack(pady=10)
 
-        self.setup_email_entry = ctk.CTkEntry(
+        self.setup_email_entry = NonArabicEntry(
             main_frame, 
             placeholder_text=self.lang_manager.get_string("email_placeholder"), 
             width=300, height=40
@@ -2666,7 +2689,7 @@ class ModernPasswordManagerGUI:
         search_frame = ctk.CTkFrame(self.main_panel)
         search_frame.pack(fill="x", padx=15, pady=10)
         
-        self.search_entry = ctk.CTkEntry(search_frame, placeholder_text=self.lang_manager.get_string("search_placeholder"),
+        self.search_entry = NonArabicEntry(search_frame, placeholder_text=self.lang_manager.get_string("search_placeholder"),
                                          width=400, height=45)
         self.search_entry.pack(side="left", padx=25, pady=15)
 
@@ -2961,7 +2984,7 @@ class ModernPasswordManagerGUI:
                     entry.insert("1.0", default_value)
                 entries[field_name] = entry
             else:
-                entry = ctk.CTkEntry(parent, width=450, height=40)
+                entry = NonArabicEntry(parent, width=450, height=40)
                 entry.pack(padx=25, pady=(0, 15))
                 if default_value:
                     entry.insert(0, default_value)
