@@ -19,10 +19,13 @@ except ImportError:
 class TrialManager:
     _machine_id = None  # Cache for machine ID
 
-    def __init__(self, parent_window, secure_file_manager, restart_callback=None):
-        self.TRIAL_MINUTES = 2  # Set trial duration to 2 minutes for testing
-        self.LICENSE_FILE = os.path.expanduser("~/.sv_license")
+    #def __init__(self, parent_window, secure_file_manager, restart_callback=None):
+    #    self.TRIAL_MINUTES = 2  # Set trial duration to 2 minutes for testing
+    #    self.LICENSE_FILE = os.path.expanduser("~/.sv_license")
 
+    def __init__(self, parent_window, secure_file_manager, restart_callback=None):
+        self.TRIAL_MINUTES = 7 * 24 * 60  # Set trial duration to 7 days (7 days * 24 hours * 60 minutes)
+        self.LICENSE_FILE = os.path.expanduser("~/.sv_license")
         # Primary storage
         self.REGISTRY_PATH = r"Software\SecureVaultPro"
         self.REGISTRY_KEY = "InstallInfo"
