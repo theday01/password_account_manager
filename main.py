@@ -304,6 +304,13 @@ class DatabaseManager:
                     details TEXT
                 )
             """)
+            metadata_conn.execute("""
+                CREATE TABLE IF NOT EXISTS security_questions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    question TEXT NOT NULL,
+                    answer_hash TEXT NOT NULL
+                )
+            """)
             metadata_conn.commit()
             metadata_conn.close()
             logger.info("Metadata database created")
@@ -687,6 +694,115 @@ class DatabaseManager:
         """, (datetime.now().isoformat(), action, entity_type, entity_id, details))
         metadata_conn.commit()
         metadata_conn.close()
+
+    def save_security_questions(self, questions: List[Tuple[str, str]]):
+        metadata_conn = sqlite3.connect(self.metadata_db)
+        try:
+            for question, answer_hash in questions:
+                metadata_conn.execute("""
+                    INSERT INTO security_questions (question, answer_hash)
+                    VALUES (?, ?)
+                """, (question, answer_hash))
+            metadata_conn.commit()
+            logger.info("Security questions saved successfully.")
+        except Exception as e:
+            logger.error(f"Failed to save security questions: {e}")
+            metadata_conn.rollback()
+            raise
+        finally:
+            metadata_conn.close()
+
+    def get_security_questions(self) -> List[Tuple[str, str]]:
+        metadata_conn = sqlite3.connect(self.metadata_db)
+        try:
+            cursor = metadata_conn.execute("SELECT question, answer_hash FROM security_questions")
+            questions = cursor.fetchall()
+            return questions
+        except Exception as e:
+            logger.error(f"Failed to get security questions: {e}")
+            return []
+        finally:
+            metadata_conn.close()
+
+class SecurityQuestionsDialog(ctk.CTkToplevel):
+    def __init__(self, parent, db_manager, crypto_manager, lang_manager):
+        super().__init__(parent)
+        self.db_manager = db_manager
+        self.crypto_manager = crypto_manager
+        self.lang_manager = lang_manager
+        self.result = False
+
+        self.title(self.lang_manager.get_string("security_questions_title"))
+        self.geometry("500x400")
+        self.grab_set()
+        self.resizable(False, False)
+
+        main_frame = ctk.CTkFrame(self)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        self.questions = self.db_manager.get_security_questions()
+        if not self.questions or len(self.questions) != 3:
+            self.destroy()
+            return
+        
+        self.answer_entries = []
+        for question, answer_hash in self.questions:
+            question_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+            question_frame.pack(fill="x", padx=20, pady=10)
+
+            ctk.CTkLabel(
+                question_frame,
+                text=question,
+                font=ctk.CTkFont(size=14, weight="bold")
+            ).pack(anchor="w")
+
+            answer_entry = SecureEntry(
+                question_frame,
+                placeholder_text=self.lang_manager.get_string("answer_placeholder"),
+                width=400,
+                height=30
+            )
+            answer_entry.pack(anchor="w")
+            self.answer_entries.append(answer_entry)
+
+        verify_btn = ctk.CTkButton(
+            main_frame,
+            text=self.lang_manager.get_string("verify_button"),
+            command=self.verify_answers,
+            height=45,
+            font=ctk.CTkFont(size=16)
+        )
+        verify_btn.pack(pady=20)
+
+    def verify_answers(self):
+        all_correct = True
+        for i, (question, answer_hash) in enumerate(self.questions):
+            answer = self.answer_entries[i].get().strip()
+            if not answer:
+                all_correct = False
+                break
+
+            try:
+                salt_and_hash = base64.b64decode(answer_hash)
+                salt = salt_and_hash[:32]
+                stored_hash = salt_and_hash[32:]
+                
+                new_answer_hash = self.crypto_manager.generate_key_from_password(answer, salt)
+                
+                if not hmac.compare_digest(new_answer_hash, stored_hash):
+                    all_correct = False
+                    break
+            except Exception as e:
+                logger.error(f"Error verifying security question: {e}")
+                all_correct = False
+                break
+        
+        self.result = all_correct
+        self.destroy()
+
+    def show(self):
+        self.wait_window()
+        return self.result
 class SecureEntry(ctk.CTkEntry):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1428,65 +1544,190 @@ class ModernPasswordManagerGUI:
             return
         
         self.update_login_button_states()
-        setup_window = ctk.CTkToplevel(self.root)
-        setup_window.title(self.lang_manager.get_string("setup_wizard_title"))
+        self.setup_window = ctk.CTkToplevel(self.root)
+        self.setup_window.title(self.lang_manager.get_string("setup_wizard_title"))
         
-        width, height = 600, 480
-        x = (setup_window.winfo_screenwidth() // 2) - (width // 2)
-        y = (setup_window.winfo_screenheight() // 2) - (height // 2)
-        setup_window.geometry(f"{width}x{height}+{x}+{y}")
+        width, height = 700, 500
+        x = (self.setup_window.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.setup_window.winfo_screenheight() // 2) - (height // 2)
+        self.setup_window.geometry(f"{width}x{height}+{x}+{y}")
 
-        setup_window.resizable(0, 0)
-        setup_window.grab_set()
+        self.setup_window.resizable(0, 0)
+        self.setup_window.grab_set()
 
-        main_frame = ctk.CTkFrame(setup_window)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        self.wizard_step = 0
+        self.wizard_frames = []
+
+        # Step 1: Master Password
+        step1_frame = ctk.CTkFrame(self.setup_window)
+        step1_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        self.wizard_frames.append(step1_frame)
         
         ctk.CTkLabel(
-            main_frame, 
+            step1_frame, 
             text=self.lang_manager.get_string("create_master_password_title"), 
             font=ctk.CTkFont(size=18, weight="bold")
         ).pack(pady=20)
         
         self.setup_full_name_entry = NonArabicEntry(
-            main_frame, 
+            step1_frame, 
             placeholder_text="Full Name Ex. Hamza Saadi", 
             width=300, height=40
         )
         self.setup_full_name_entry.pack(pady=10)
 
         self.setup_email_entry = NonArabicEntry(
-            main_frame, 
+            step1_frame, 
             placeholder_text=self.lang_manager.get_string("email_placeholder"), 
             width=300, height=40
         )
         self.setup_email_entry.pack(pady=10)
         
         self.setup_master_password = SecureEntry(
-            main_frame, 
+            step1_frame, 
             placeholder_text=self.lang_manager.get_string("master_password_placeholder"),
             show="*", width=300, height=40
         )
         self.setup_master_password.pack(pady=10)
 
         self.setup_confirm_password = SecureEntry(
-            main_frame, 
+            step1_frame, 
             placeholder_text=self.lang_manager.get_string("confirm_password_placeholder"),
             show="*", width=300, height=40
         )
         self.setup_confirm_password.pack(pady=10)
 
-        self.strength_label = ctk.CTkLabel(main_frame, text="")
+        self.strength_label = ctk.CTkLabel(step1_frame, text="")
         self.strength_label.pack(pady=10)
         self.setup_master_password.bind("<KeyRelease>", self.update_password_strength)
-        
-        finish_btn = ctk.CTkButton(
-            main_frame, 
-            text=self.lang_manager.get_string("complete_setup_button"), 
-            command=lambda: self.complete_setup(setup_window),
+
+        # Step 2: Security Questions
+        step2_frame = ctk.CTkFrame(self.setup_window)
+        # Don't pack it yet, it will be shown later
+        self.wizard_frames.append(step2_frame)
+
+        ctk.CTkLabel(
+            step2_frame,
+            text=self.lang_manager.get_string("security_questions_title"),
+            font=ctk.CTkFont(size=18, weight="bold")
+        ).pack(pady=20)
+
+        ctk.CTkLabel(
+            step2_frame,
+            text=self.lang_manager.get_string("security_questions_instruction"),
+            font=ctk.CTkFont(size=14)
+        ).pack(pady=10)
+
+        self.security_questions = []
+        self.security_questions_vars = []
+        self.security_questions_entries = []
+
+        questions = [
+            self.lang_manager.get_string("security_question_1"),
+            self.lang_manager.get_string("security_question_2"),
+            self.lang_manager.get_string("security_question_3"),
+            self.lang_manager.get_string("security_question_4"),
+            self.lang_manager.get_string("security_question_5"),
+        ]
+
+        for i, question_text in enumerate(questions):
+            var = tk.BooleanVar()
+            self.security_questions_vars.append(var)
+            
+            question_frame = ctk.CTkFrame(step2_frame, fg_color="transparent")
+            question_frame.pack(fill="x", padx=20, pady=5)
+
+            chk = ctk.CTkCheckBox(question_frame, text=question_text, variable=var)
+            chk.pack(side="left")
+
+            entry = SecureEntry(
+                question_frame,
+                placeholder_text=self.lang_manager.get_string("answer_placeholder"),
+                width=300,
+                height=30
+            )
+            entry.pack(side="right")
+            self.security_questions_entries.append(entry)
+            self.security_questions.append({"question": question_text, "var": var, "entry": entry})
+
+        # Navigation buttons
+        self.navigation_frame = ctk.CTkFrame(self.setup_window)
+        self.navigation_frame.pack(fill="x", padx=20, pady=20)
+
+        self.back_btn = ctk.CTkButton(
+            self.navigation_frame,
+            text="Back",
+            command=self.prev_step,
             height=45, font=ctk.CTkFont(size=16)
         )
-        finish_btn.pack(pady=20)
+        self.back_btn.pack(side="left", padx=10)
+
+        self.next_btn = ctk.CTkButton(
+            self.navigation_frame,
+            text="Next",
+            command=self.next_step,
+            height=45, font=ctk.CTkFont(size=16)
+        )
+        self.next_btn.pack(side="right", padx=10)
+
+        self.finish_btn = ctk.CTkButton(
+            self.navigation_frame,
+            text=self.lang_manager.get_string("complete_setup_button"),
+            command=lambda: self.complete_setup(self.setup_window),
+            height=45, font=ctk.CTkFont(size=16)
+        )
+        # Don't pack finish_btn yet
+
+        self.show_step()
+
+    def show_step(self):
+        for frame in self.wizard_frames:
+            frame.pack_forget()
+        
+        self.wizard_frames[self.wizard_step].pack(fill="both", expand=True, padx=20, pady=20)
+
+        if self.wizard_step == 0:
+            self.back_btn.pack_forget()
+            self.next_btn.pack(side="right", padx=10)
+            self.finish_btn.pack_forget()
+        elif self.wizard_step == len(self.wizard_frames) - 1:
+            self.back_btn.pack(side="left", padx=10)
+            self.next_btn.pack_forget()
+            self.finish_btn.pack(side="right", padx=10)
+        else:
+            self.back_btn.pack(side="left", padx=10)
+            self.next_btn.pack(side="right", padx=10)
+            self.finish_btn.pack_forget()
+
+    def next_step(self):
+        validation_passed = True
+        if self.wizard_step == 0:
+            master_password = self.setup_master_password.get()
+            confirm_password = self.setup_confirm_password.get()
+            full_name = self.setup_full_name_entry.get().strip()
+            email = self.setup_email_entry.get().strip()
+
+            if not full_name:
+                self.show_message("error", "Full name is required", msg_type="error")
+                validation_passed = False
+            elif not email:
+                self.show_message("error", "email_required_error", msg_type="error")
+                validation_passed = False
+            elif not master_password or master_password != confirm_password:
+                self.show_message("error", "passwords_dont_match", msg_type="error")
+                validation_passed = False
+            elif len(master_password) < 1:
+                self.show_message("error", "password_too_short", msg_type="error")
+                validation_passed = False
+
+        if validation_passed and self.wizard_step < len(self.wizard_frames) - 1:
+            self.wizard_step += 1
+            self.show_step()
+
+    def prev_step(self):
+        if self.wizard_step > 0:
+            self.wizard_step -= 1
+            self.show_step()
 
     def update_password_strength(self, event):
         password = self.setup_master_password.get()
@@ -1575,6 +1816,20 @@ class ModernPasswordManagerGUI:
         if len(master_password) < 1:
             self.show_message("error", "password_too_short", msg_type="error")
             return
+
+        selected_questions = []
+        for item in self.security_questions:
+            if item["var"].get():
+                answer = item["entry"].get().strip()
+                if not answer:
+                    self.show_message("security_questions_error_title", "security_questions_error_message", msg_type="error")
+                    return
+                selected_questions.append((item["question"], answer))
+
+        if len(selected_questions) != 3:
+            self.show_message("security_questions_error_title", "security_questions_error_message", msg_type="error")
+            return
+
         try:
             if self.secure_file_manager:
                 if not self.secure_file_manager.initialize_encryption(master_password):
@@ -1588,6 +1843,14 @@ class ModernPasswordManagerGUI:
             db_path = "manageyouraccount"
             self.database = DatabaseManager(db_path, self.crypto, self.secure_file_manager)
             self.database.initialize_database(master_password, email, full_name)
+
+            hashed_questions = []
+            for question, answer in selected_questions:
+                salt = self.crypto.generate_salt()
+                answer_hash = self.crypto.generate_key_from_password(answer, salt)
+                hashed_questions.append((question, base64.b64encode(salt + answer_hash).decode('utf-8')))
+            
+            self.database.save_security_questions(hashed_questions)
             
             if self.secure_file_manager:
                 self.secure_file_manager.sync_all_files()
@@ -2484,6 +2747,8 @@ class ModernPasswordManagerGUI:
         verify_button.pack(pady=20)
 
     def change_master_password_dialog(self):
+        if not self.verify_security_questions():
+            return
         dialog = ctk.CTkToplevel(self.root)
         dialog.title(self.lang_manager.get_string("change_master_password_dialog_title"))
         dialog.geometry("450x530")
@@ -2820,6 +3085,27 @@ class ModernPasswordManagerGUI:
         }
         return colors.get(strength, "#888888")
 
+    def verify_security_questions(self):
+        if self.enforce_lockout():
+            return False
+        dialog = SecurityQuestionsDialog(self.root, self.database, self.crypto, self.lang_manager)
+        is_correct = dialog.show()
+        if is_correct:
+            return True
+        else:
+            self.failed_attempts += 1
+            if self.failed_attempts >= 3:
+                self.consecutive_lockouts += 1
+                lockout_minutes = 3 * self.consecutive_lockouts
+                self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
+                self.save_lockout_state()
+                self.show_message("account_locked_error_title", "account_locked_error", msg_type="error", minutes=lockout_minutes)
+                self.failed_attempts = 0
+                self.lock_vault()
+            else:
+                self.show_message("error", "invalid_answer", msg_type="error")
+            return False
+
     def create_action_buttons(self, parent, account):
         button_frame = ctk.CTkFrame(parent, fg_color="transparent")
         button_frame.pack()
@@ -2838,6 +3124,8 @@ class ModernPasswordManagerGUI:
                           fg_color=color).pack(side="left", padx=5)
 
     def delete_account(self, account):
+        if not self.verify_security_questions():
+            return
         result = self.show_message("delete_confirm_title", "delete_confirm_message", ask="yesno", account_name=account['name'])
         if result:
             try:
@@ -2917,6 +3205,8 @@ class ModernPasswordManagerGUI:
             entry.configure(state="readonly")
 
     def copy_password_to_clipboard(self, account):
+        if not self.verify_security_questions():
+            return
         if not self.verify_master_password_dialog():
             return
         try:
@@ -3041,6 +3331,8 @@ class ModernPasswordManagerGUI:
                       width=150, height=45, font=ctk.CTkFont(size=16, weight="bold")).pack(side="right", padx=15)
 
     def save_account(self, dialog, entries, account=None):
+        if account and not self.verify_security_questions():
+            return
         try:
             name = entries["name"].get().strip()
             username = entries["username"].get().strip()
