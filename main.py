@@ -1480,16 +1480,13 @@ class ModernPasswordManagerGUI:
             )
 
     def _generate_welcome_message(self):
-        user_name = "User"  # Default value
+        full_name = "User"  # Default value
         try:
             details = self.database.get_master_account_details()
-            if details:
-                full_name, email = details
-                if full_name and full_name.strip():
-                    user_name = full_name  # Use the full name
+            if details and details[0] and details[0].strip():
+                full_name = details[0]
         except Exception as e:
             logger.error(f"Could not fetch user name for welcome message: {e}")
-            # user_name is already "User", so we just log the error.
 
         consecutive_logins = self.settings.get('consecutive_logins', 1)
 
@@ -1522,22 +1519,22 @@ class ModernPasswordManagerGUI:
         greeting = ""
         try:
             if consecutive_logins >= 3:
-                greeting = secrets.choice(welcome_back_messages).format(name=user_name)
+                greeting = secrets.choice(welcome_back_messages).format(name=full_name)
             else:
                 current_hour = datetime.now().hour
                 if 5 <= current_hour < 12:
-                    greeting = secrets.choice(morning_greetings).format(name=user_name)
+                    greeting = secrets.choice(morning_greetings).format(name=full_name)
                 elif 12 <= current_hour < 18:
-                    greeting = secrets.choice(afternoon_greetings).format(name=user_name)
+                    greeting = secrets.choice(afternoon_greetings).format(name=full_name)
                 else:
-                    greeting = secrets.choice(evening_greetings).format(name=user_name)
+                    greeting = secrets.choice(evening_greetings).format(name=full_name)
             
             tip = secrets.choice(safety_tips)
             return f"{greeting}\n{tip}"
         except Exception as e:
             logger.error(f"Failed to generate welcome message: {e}")
             # Fallback message
-            return f"Welcome, {user_name}!\nRemember to stay secure online."
+            return f"Welcome, {full_name}!\nRemember to stay secure online."
 
     def complete_setup(self, setup_window):
         master_password = self.setup_master_password.get()
