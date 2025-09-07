@@ -1480,61 +1480,59 @@ class ModernPasswordManagerGUI:
             )
 
     def _generate_welcome_message(self):
-        full_name = "User"  # Default value
-        try:
-            details = self.database.get_master_account_details()
-            if details and details[0] and details[0].strip():
-                full_name = details[0]
-        except Exception as e:
-            logger.error(f"Could not fetch user name for welcome message: {e}")
-
-        consecutive_logins = self.settings.get('consecutive_logins', 1)
-
-        welcome_back_messages = [
-            "We're happy to have you back, {name}.",
-            "Welcome back again, {name}!",
-            "Good to see you again, {name}."
-        ]
-        morning_greetings = [
-            "Good morning, {name}.",
-            "Have a great morning, {name}."
-        ]
-        afternoon_greetings = [
-            "Good afternoon, {name}.",
-            "Hope you're having a productive day, {name}."
-        ]
-        evening_greetings = [
-            "Good evening, {name}.",
-            "Hope you had a wonderful day, {name}."
-        ]
         safety_tips = [
             "Safety Tip: Use a unique password for every account.",
             "Safety Tip: Enable Two-Factor Authentication (2FA) for critical accounts.",
             "Safety Tip: Beware of phishing emails asking for your credentials.",
             "Safety Tip: Regularly review your account security settings.",
             "Safety Tip: A long password is a strong password.",
-            "Safety Tip: Never share your master password with anyone."
+            "Safety Tip: Never share your master password with anyone.",
+            "Safety Tip: Use a password manager to store your passwords securely.",
+            "Safety Tip: Be cautious of public Wi-Fi. Use a VPN to protect your connection.",
+            "Safety Tip: Regularly update your software and applications to patch security vulnerabilities.",
+            "Safety Tip: Think before you click. Hover over links to see the actual destination.",
+            "Safety Tip: Don't use personal information like your birthday or name in your passwords.",
+            "Safety Tip: Secure your home Wi-Fi network with a strong password and WPA3 encryption.",
+            "Safety Tip: Be wary of unsolicited emails, even if they seem to be from a known contact.",
+            "Safety Tip: Enable automatic updates for your operating system and antivirus software.",
+            "Safety Tip: Lock your computer and smartphone when you are not using them.",
+            "Safety Tip: Use different passwords for your different online accounts.",
+            "Safety Tip: Check website URLs for `https://` to ensure a secure connection.",
+            "Safety Tip: Be careful what you share on social media. It can be used for social engineering.",
+            "Safety Tip: Back up your important data regularly to an external drive or cloud service.",
+            "Safety Tip: Use a firewall to prevent unauthorized access to your network.",
+            "Safety Tip: If a deal looks too good to be true, it probably is. Be cautious of online scams.",
+            "Safety Tip: Cover your webcam when not in use to prevent unauthorized access.",
+            "Safety Tip: Review app permissions before installing them on your devices.",
+            "Safety Tip: Be skeptical of urgent requests for money or personal information, even from friends.",
+            "Safety Tip: Use a screen protector with a privacy filter to shield your screen from prying eyes.",
+            "Safety Tip: Shred physical documents containing sensitive information before discarding them.",
+            "Safety Tip: Check your bank and credit card statements regularly for any suspicious activity.",
+            "Safety Tip: Don't plug in unknown USB drives into your computer.",
+            "Safety Tip: Use passphrases instead of passwords. They are longer and easier to remember.",
+            "Safety Tip: Be aware of your digital footprint. Search for your name online to see what's public.",
+            "Safety Tip: Disable Bluetooth and location services when you are not using them.",
+            "Safety Tip: Log out of websites and applications when you are finished using them.",
+            "Safety Tip: Use a separate email address for online shopping and subscriptions.",
+            "Safety Tip: Be cautious when using QR codes. Verify their source before scanning.",
+            "Safety Tip: Educate your family, especially children and the elderly, about online safety.",
+            "Safety Tip: Avoid oversharing personal information on dating apps and websites.",
+            "Safety Tip: Secure your IoT (Internet of Things) devices with strong passwords and regular updates.",
+            "Safety Tip: If you receive a suspicious text message, don't reply. Block the number and delete it.",
+            "Safety Tip: Use a credit card for online purchases instead of a debit card for better fraud protection.",
+            "Safety Tip: Before disposing of an old device, make sure to wipe all your personal data from it.",
+            "Safety Tip: Be careful with what you post in online forums and comment sections.",
+            "Safety Tip: Check for skimmers on ATMs and gas pumps before using your card.",
+            "Safety Tip: Don't fall for tech support scams. Legitimate companies won't call you out of the blue.",
+            "Safety Tip: Use a virtual credit card number for online trials and subscriptions.",
+            "Safety Tip: Be mindful of what's in the background when you are on a video call.",
+            "Safety Tip: Trust your instincts. If something feels off, it probably is."
         ]
-
-        greeting = ""
         try:
-            if consecutive_logins >= 3:
-                greeting = secrets.choice(welcome_back_messages).format(name=full_name)
-            else:
-                current_hour = datetime.now().hour
-                if 5 <= current_hour < 12:
-                    greeting = secrets.choice(morning_greetings).format(name=full_name)
-                elif 12 <= current_hour < 18:
-                    greeting = secrets.choice(afternoon_greetings).format(name=full_name)
-                else:
-                    greeting = secrets.choice(evening_greetings).format(name=full_name)
-            
             tip = secrets.choice(safety_tips)
-            return f"{greeting}\n{tip}"
+            return tip
         except Exception as e:
             logger.error(f"Failed to generate welcome message: {e}")
-            # Fallback message
-            return f"Welcome, {full_name}!\nRemember to stay secure online."
 
     def complete_setup(self, setup_window):
         master_password = self.setup_master_password.get()
