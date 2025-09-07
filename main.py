@@ -1623,9 +1623,17 @@ class ModernPasswordManagerGUI:
         
         if self.trial_manager and self.trial_manager.is_trial_active:
             remaining_minutes = int(self.trial_manager.minutes_remaining)
+            
+            # if remaining_minutes is more than a day, show days, otherwise show minutes
+            if remaining_minutes > 24 * 60:
+                remaining_days = remaining_minutes // (24 * 60)
+                trial_text = f"Trial Version: {remaining_days} days remaining."
+            else:
+                trial_text = f"Trial Version: {remaining_minutes} minutes remaining."
+
             trial_label = ctk.CTkLabel(
                 toolbar,
-                text=f"Trial Version: {remaining_minutes} minutes remaining.\nOnce the trial ends, you must activate the full version to continue.",
+                text=f"{trial_text}\nOnce the trial ends, you must activate the full version to continue.",
                 font=ctk.CTkFont(size=14),
                 text_color="red"
             )
