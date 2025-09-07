@@ -30,6 +30,7 @@ from localization import LanguageManager
 import threading
 from notification_manager import start_notification_loop
 from trial_manager import TrialManager
+from icon_manager import set_icon, ThemedToplevel
 
 logger = logging.getLogger(__name__)
 
@@ -724,7 +725,7 @@ class DatabaseManager:
         finally:
             metadata_conn.close()
 
-class SecurityQuestionsDialog(ctk.CTkToplevel):
+class SecurityQuestionsDialog(ThemedToplevel):
     def __init__(self, parent, db_manager, crypto_manager, lang_manager):
         super().__init__(parent)
         self.db_manager = db_manager
@@ -864,12 +865,7 @@ class ModernPasswordManagerGUI:
         self.root.withdraw()
         self.root.title(self.lang_manager.get_string("app_title"))
         self.root.geometry("1200x800")
-        try:
-            icon_path = os.path.join("icons", "main.ico")
-            if os.path.exists(icon_path):
-                self.root.iconbitmap(default=icon_path)
-        except Exception as e:
-            logger.warning(f"Could not set application icon: {e}")
+        set_icon(self.root)
         
         self.show_loading_screen()
 
@@ -907,7 +903,7 @@ class ModernPasswordManagerGUI:
         self.start_lockout_validation_timer()
 
     def show_welcome_dialog(self):
-        welcome_window = ctk.CTkToplevel(self.root)
+        welcome_window = ThemedToplevel(self.root)
         welcome_window.title("Welcome")
         welcome_window.geometry("500x350")
         welcome_window.resizable(False, False)
@@ -961,7 +957,7 @@ class ModernPasswordManagerGUI:
         subtext_color = "#4a5568" # softer gray
         
         width, height = 550, 220   # wider for side-by-side layout
-        loading_window = ctk.CTkToplevel(self.root, fg_color=bg_color)
+        loading_window = ThemedToplevel(self.root, fg_color=bg_color)
         loading_window.title(self.lang_manager.get_string("loading"))
         loading_window.geometry(f"{width}x{height}")
         loading_window.resizable(False, False)
@@ -1480,7 +1476,7 @@ class ModernPasswordManagerGUI:
     def verify_master_password_dialog(self):
         if self.enforce_lockout():
             return False
-        dialog = ctk.CTkToplevel(self.root)
+        dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("verify_master_password_title"))
         dialog.geometry("400x230")
         dialog.grab_set()
@@ -1544,7 +1540,7 @@ class ModernPasswordManagerGUI:
             return
         
         self.update_login_button_states()
-        self.setup_window = ctk.CTkToplevel(self.root)
+        self.setup_window = ThemedToplevel(self.root)
         self.setup_window.title(self.lang_manager.get_string("setup_wizard_title"))
         
         width, height = 700, 500
@@ -2007,6 +2003,7 @@ class ModernPasswordManagerGUI:
         backups = sorted(glob.glob(os.path.join(backup_folder, "*.svbk")), reverse=True)
 
         win = tk.Toplevel(self.root)
+        set_icon(win)
         win.title(self.lang_manager.get_string("restore_dialog_title"))
         win.geometry("820x480")
         win.resizable(True, True)
@@ -2248,7 +2245,7 @@ class ModernPasswordManagerGUI:
             self.show_message("error", "database_not_available_error", msg_type="error")
             return
 
-        dialog = ctk.CTkToplevel(self.root)
+        dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("backup_dialog_title"))
         dialog.geometry("630x730")
         dialog.grab_set()
@@ -2526,7 +2523,7 @@ class ModernPasswordManagerGUI:
             return False
 
     def show_settings(self):
-        settings_window = ctk.CTkToplevel(self.root)
+        settings_window = ThemedToplevel(self.root)
         settings_window.title(self.lang_manager.get_string("settings"))
         settings_window.geometry("500x600")
         settings_window.grab_set()
@@ -2592,7 +2589,7 @@ class ModernPasswordManagerGUI:
         lang_options.pack(side="right", padx=10)
 
     def show_about_dialog(self):
-        about_dialog = ctk.CTkToplevel(self.root)
+        about_dialog = ThemedToplevel(self.root)
         about_dialog.title(self.lang_manager.get_string("about_dialog_title"))
         about_dialog.geometry("1000x600")
         about_dialog.resizable(False, False)
@@ -2622,7 +2619,7 @@ class ModernPasswordManagerGUI:
             self.enable_tfa_dialog()
 
     def enable_tfa_dialog(self):
-        dialog = ctk.CTkToplevel(self.root)
+        dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("enable_tfa_dialog_title"))
         dialog.geometry("380x550")
         dialog.resizable(False, False)
@@ -2669,7 +2666,7 @@ class ModernPasswordManagerGUI:
         verify_button.pack(pady=20)
 
     def disable_tfa_dialog(self):
-        dialog = ctk.CTkToplevel(self.root)
+        dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("disable_tfa_dialog_title"))
         dialog.geometry("400x250")
         dialog.grab_set()
@@ -2700,7 +2697,7 @@ class ModernPasswordManagerGUI:
         verify_button.pack(pady=20)
 
     def prompt_for_tfa(self):
-        dialog = ctk.CTkToplevel(self.root)
+        dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("tfa_dialog_title"))
         dialog.geometry("400x250")
         dialog.grab_set()
@@ -2749,7 +2746,7 @@ class ModernPasswordManagerGUI:
     def change_master_password_dialog(self):
         if not self.verify_security_questions():
             return
-        dialog = ctk.CTkToplevel(self.root)
+        dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("change_master_password_dialog_title"))
         dialog.geometry("450x530")
         dialog.resizable(False, False)
@@ -3139,7 +3136,7 @@ class ModernPasswordManagerGUI:
         if not self.verify_master_password_dialog():
             return
         username, password = self.database.get_account_credentials(account["id"])
-        dialog = ctk.CTkToplevel(self.root)
+        dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("account_details_title", account_name=account['name']))
         dialog.geometry("500x770")
         dialog.resizable(0,0)
@@ -3239,7 +3236,7 @@ class ModernPasswordManagerGUI:
     def show_account_dialog(self, account=None):
         is_edit = account is not None
         title = self.lang_manager.get_string("edit_account_title", account_name=account['name']) if is_edit else self.lang_manager.get_string("add_account_title")
-        dialog = ctk.CTkToplevel(self.root)
+        dialog = ThemedToplevel(self.root)
         dialog.title(title)
         dialog.geometry("550x800")
         dialog.resizable(0,0)
@@ -3735,7 +3732,7 @@ class ModernPasswordManagerGUI:
             return f"❌ Error during diagnosis: {e}"
 
     def show_secure_storage_error_dialog(self, error_msg):
-        dialog = ctk.CTkToplevel(self.root)
+        dialog = ThemedToplevel(self.root)
         dialog.title("Secure Storage Error")
         dialog.geometry("600x400")
         dialog.grab_set()
