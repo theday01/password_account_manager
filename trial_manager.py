@@ -20,7 +20,7 @@ class TrialManager:
     _machine_id = None  # Cache for machine ID
 
     def __init__(self, parent_window, secure_file_manager, restart_callback=None):
-        self.TRIAL_MINUTES = 7 * 24 * 60  # Set trial duration to 7 days (7 days * 24 hours * 60 minutes)
+        self.TRIAL_PERIOD = timedelta(days=7)
         self.LICENSE_FILE = os.path.expanduser("~/.sv_license")
         # Primary storage
         self.REGISTRY_PATH = r"Software\SecureVaultPro"
@@ -244,7 +244,7 @@ class TrialManager:
 
         # Trial period calculation
         elapsed = now - trial_data['start_date']
-        if (elapsed.total_seconds() / 60) >= self.TRIAL_MINUTES:
+        if elapsed >= self.TRIAL_PERIOD:
             trial_data['last_run_date'] = now
             self._write_primary_storage(trial_data)
             self._write_secondary_storage(trial_data)
@@ -258,7 +258,7 @@ class TrialManager:
         self._write_tertiary_storage(trial_data)
 
         self.is_trial_active = True
-        self.minutes_remaining = self.TRIAL_MINUTES - (elapsed.total_seconds() / 60)
+        self.minutes_remaining = (self.TRIAL_PERIOD - elapsed).total_seconds() / 60
         return "TRIAL"
 
     def activate_full_version(self):
