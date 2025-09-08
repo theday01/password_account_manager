@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from PIL import Image
 import os
+from icon_manager import ThemedToplevel
 
 class TutorialManager:
     def __init__(self, parent, lang_manager):
@@ -92,7 +93,7 @@ class TutorialManager:
 
     def show_tutorial_window(self):
         # Create window with increased width to avoid clipping titles
-        self.tutorial_window = ctk.CTkToplevel(self.parent)
+        self.tutorial_window = ThemedToplevel(self.parent)
         self.tutorial_window.title(self.lang_manager.get_string("tutorial_title"))
         width, height = self.win_width, self.win_height
         self.tutorial_window.overrideredirect(False)

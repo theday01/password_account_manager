@@ -10,6 +10,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 import hashlib
 from machine_id_utils import generate_machine_id
+from icon_manager import ThemedToplevel
 
 try:
     import winreg
@@ -278,7 +279,7 @@ class TrialManager:
             return False
 
     def show_trial_expired_dialog(self):
-        dialog = ctk.CTkToplevel(self.parent_window)
+        dialog = ThemedToplevel(self.parent_window)
         dialog.title("Trial Period Expired")
         
         dialog.update_idletasks()  # Update window geometry
