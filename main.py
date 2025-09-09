@@ -604,6 +604,14 @@ class DatabaseManager:
         sensitive_conn.close()
         self.log_action("UPDATE", "ACCOUNT", account_id, f"Updated account: {name}")
         self.secure_file_manager.rotate_integrity_signature()
+
+    def update_master_account_email(self, email: str):
+        metadata_conn = sqlite3.connect(self.metadata_db)
+        metadata_conn.execute("UPDATE accounts SET email = ? WHERE id = 'master_account'", (email,))
+        metadata_conn.commit()
+        metadata_conn.close()
+        self.log_action("UPDATE", "ACCOUNT", "master_account", f"Updated master account email to {email}")
+        self.secure_file_manager.rotate_integrity_signature()
     
     def delete_account(self, account_id: str):
         metadata_conn = sqlite3.connect(self.metadata_db)
@@ -2619,6 +2627,32 @@ class ModernPasswordManagerGUI:
             self.enable_tfa_dialog()
 
     def enable_tfa_dialog(self):
+        full_name, email = self.database.get_master_account_details()
+
+        if not email:
+            if not self.verify_master_password_dialog():
+                self.show_message("error", "tfa_setup_aborted_error", msg_type="error")
+                return
+
+            email_dialog = ctk.CTkInputDialog(
+                text="Please enter your email address to set up 2FA:",
+                title="Email Required for 2FA"
+            )
+            new_email = email_dialog.get_input()
+
+            if new_email:
+                if "@" in new_email and "." in new_email.split('@')[1]:
+                    try:
+                        self.database.update_master_account_email(new_email)
+                        self.show_message("success", "email_updated_success_message")
+                        # Restart the 2FA setup process
+                        self.enable_tfa_dialog()
+                    except Exception as e:
+                        self.show_message("error", "email_update_failed_error", msg_type="error", error=str(e))
+                else:
+                    self.show_message("error", "invalid_email_format_error", msg_type="error")
+            return
+
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("enable_tfa_dialog_title"))
         dialog.geometry("380x550")
@@ -2632,10 +2666,6 @@ class ModernPasswordManagerGUI:
                      font=ctk.CTkFont(size=16, weight="bold")).pack(pady=10)
 
         secret = self.tfa_manager.generate_secret()
-        full_name, email = self.database.get_master_account_details()
-        if not email:
-            self.show_message("error", "tfa_details_error", msg_type="error")
-            return
         uri = self.tfa_manager.get_provisioning_uri(secret, email, full_name)
         qr_image_data = self.tfa_manager.generate_qr_code(uri)
         qr_image = Image.open(qr_image_data)
@@ -2695,6 +2725,61 @@ class ModernPasswordManagerGUI:
 
         verify_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("verify_and_disable_button"), command=verify_and_disable)
         verify_button.pack(pady=20)
+
+    def verify_tfa_dialog(self):
+        if not self.settings.get('tfa_secret'):
+            return True
+
+        dialog = ThemedToplevel(self.root)
+        dialog.title(self.lang_manager.get_string("tfa_dialog_title"))
+        dialog.geometry("400x250")
+        dialog.grab_set()
+        
+        result = {"verified": False}
+
+        main_frame = ctk.CTkFrame(dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("enter_2fa_code_label"),
+                     font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
+        
+        code_entry = SecureEntry(main_frame, width=200)
+        code_entry.pack(pady=10)
+        code_entry.focus()
+
+        def verify_tfa():
+            code = code_entry.get().strip()
+            encrypted_secret_b64 = self.settings.get('tfa_secret')
+            encrypted_secret = base64.b64decode(encrypted_secret_b64)
+            secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
+            if self.tfa_manager.verify_code(secret, code):
+                result["verified"] = True
+                dialog.destroy()
+            else:
+                self.show_message("error", "invalid_2fa_code", msg_type="error")
+                self.failed_attempts += 1
+                if self.failed_attempts >= 3:
+                    self.consecutive_lockouts += 1
+                    lockout_minutes = 3 * self.consecutive_lockouts
+                    self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
+                    self.save_lockout_state()
+                    self.show_message("account_locked_error_title", "account_locked_error", msg_type="error", minutes=lockout_minutes)
+                    self.failed_attempts = 0
+                    dialog.destroy()
+                    self.lock_vault()
+        
+        def on_cancel():
+            dialog.destroy()
+
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(pady=20)
+        
+        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), command=on_cancel, width=100).pack(side="left", padx=10)
+        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("verify_button"), command=verify_tfa, width=100).pack(side="right", padx=10)
+
+        dialog.wait_window()
+        
+        return result["verified"]
 
     def prompt_for_tfa(self):
         dialog = ThemedToplevel(self.root)
@@ -3121,8 +3206,12 @@ class ModernPasswordManagerGUI:
                           fg_color=color).pack(side="left", padx=5)
 
     def delete_account(self, account):
-        if not self.verify_security_questions():
-            return
+        if self.settings.get('tfa_secret'):
+            if not self.verify_tfa_dialog():
+                return
+        else:
+            if not self.verify_security_questions():
+                return
         result = self.show_message("delete_confirm_title", "delete_confirm_message", ask="yesno", account_name=account['name'])
         if result:
             try:
@@ -3133,8 +3222,13 @@ class ModernPasswordManagerGUI:
                 self.show_message("error", "delete_failed_message", msg_type="error", error=str(e))
 
     def view_account_details(self, account):
-        if not self.verify_master_password_dialog():
-            return
+        if self.settings.get('tfa_secret'):
+            if not self.verify_tfa_dialog():
+                return
+        else:
+            if not self.verify_master_password_dialog():
+                return
+
         username, password = self.database.get_account_credentials(account["id"])
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("account_details_title", account_name=account['name']))
@@ -3328,8 +3422,13 @@ class ModernPasswordManagerGUI:
                       width=150, height=45, font=ctk.CTkFont(size=16, weight="bold")).pack(side="right", padx=15)
 
     def save_account(self, dialog, entries, account=None):
-        if account and not self.verify_security_questions():
-            return
+        if account:
+            if self.settings.get('tfa_secret'):
+                if not self.verify_tfa_dialog():
+                    return
+            else:
+                if not self.verify_security_questions():
+                    return
         try:
             name = entries["name"].get().strip()
             username = entries["username"].get().strip()
