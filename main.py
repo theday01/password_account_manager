@@ -442,15 +442,24 @@ class DatabaseManager:
                     try:
                         test_username = self.crypto.decrypt_data(test_row[0], self.encryption_key)
                         test_password = self.crypto.decrypt_data(test_row[1], self.encryption_key)
-                        logger.info("Test decryption successful")
+                        if test_username == "master" and test_password == master_password:
+                            logger.info("Test decryption and password verification successful")
+                        else:
+                            logger.error("Master password verification failed. Decrypted password does not match provided password.")
+                            return False
+                    except InvalidTag:
+                        logger.error("Test decryption failed: Invalid authentication tag. This almost certainly means the password is wrong.")
+                        return False
                     except Exception as decrypt_error:
-                        logger.error(f"Test decryption failed: {decrypt_error}")
+                        logger.error(f"An unexpected error occurred during test decryption: {decrypt_error}")
                         return False
                 else:
-                    logger.warning("No master account found for test decryption")
+                    logger.error("No master account found for test decryption. Authentication cannot proceed.")
+                    return False
             except Exception as test_error:
                 logger.error(f"Database test failed: {test_error}")
                 return False
+            
             logger.info("Authentication successful!")
             return True
         except FileNotFoundError as e:
@@ -644,9 +653,16 @@ class DatabaseManager:
         for account_id, enc_username, enc_password in credentials:
             try:
                 username = self.crypto.decrypt_data(enc_username, self.encryption_key)
-                password = self.crypto.decrypt_data(enc_password, self.encryption_key)
                 new_enc_username = self.crypto.encrypt_data(username, new_encryption_key)
-                new_enc_password = self.crypto.encrypt_data(password, new_encryption_key)
+
+                if account_id == 'master_account':
+                    # For the master account, encrypt the new password
+                    new_enc_password = self.crypto.encrypt_data(new_password, new_encryption_key)
+                else:
+                    # For all other accounts, re-encrypt their existing password
+                    password = self.crypto.decrypt_data(enc_password, self.encryption_key)
+                    new_enc_password = self.crypto.encrypt_data(password, new_encryption_key)
+
                 sensitive_conn.execute("""
                     UPDATE credentials 
                     SET encrypted_username=?, encrypted_password=?
