@@ -1894,7 +1894,6 @@ class ModernPasswordManagerGUI:
                 if not self.secure_file_manager.initialize_vault_files():
                     self.show_message("error", "create_vault_files_error", msg_type="error")
                     return
-                self.secure_file_manager.load_files_to_temp()
             
             db_path = "manageyouraccount"
             self.database = DatabaseManager(db_path, self.crypto, self.secure_file_manager)
