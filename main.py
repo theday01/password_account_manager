@@ -901,7 +901,6 @@ class ModernPasswordManagerGUI:
         self.tfa_manager = TwoFactorAuthManager()
         self.database = None
         self.secure_file_manager = None
-        self.security_monitor = None
         self.trial_manager = None
         ctk.set_appearance_mode("dark")  
         self.root = ctk.CTk()
@@ -1096,8 +1095,8 @@ class ModernPasswordManagerGUI:
             # Initialize SFM early for trial manager
             self._setup_secure_file_manager()
             
-            self.trial_manager = TrialManager(self.root, self.secure_file_manager, restart_callback=self.restart_program)
-            if self.trial_manager.status == "EXPIRED":
+            self.trial_manager = TrialManager(self.root, restart_callback=self.restart_program)
+            if self.trial_manager.status in ["EXPIRED", "TAMPERED"]:
                 if not self.trial_manager.show_trial_expired_dialog():
                     self.root.quit()
                     return
@@ -1435,11 +1434,6 @@ class ModernPasswordManagerGUI:
                 self.settings['consecutive_logins'] = consecutive_logins
                 self.save_settings_to_file()
 
-                if self.secure_file_manager:
-                    self.security_monitor = SecurityMonitor(self.secure_file_manager)
-                    self.security_monitor.set_alert_callback(self.handle_security_alert)
-                    self._start_security_monitoring()
-                
                 notification_thread = threading.Thread(target=start_notification_loop, daemon=True)
                 notification_thread.start()
                 
@@ -1471,27 +1465,6 @@ class ModernPasswordManagerGUI:
             else:
                 self.save_lockout_state()
                 self.show_message("error", "invalid_master_password_error", msg_type="error", attempts=3 - self.failed_attempts)
-
-    def _start_security_monitoring(self):
-        if self.security_monitor:
-            self.security_monitor.start()
-
-    def handle_security_alert(self, alert):
-        severity = alert.get("severity", "UNKNOWN")
-        message = alert.get("message", "An unspecified security alert was triggered.")
-        details = alert.get("detail", {})
-        
-        title = f"Security Alert: {severity}"
-        full_message = f"{message}\n\nDetails: {details}"
-        
-        if severity == "CRITICAL":
-            self.show_message(title, full_message, msg_type="error")
-            # Consider more drastic action for critical alerts, like locking the vault
-            self.lock_vault()
-        elif severity == "HIGH":
-            self.show_message(title, full_message, msg_type="warning")
-        else:
-            self.show_message(title, full_message, msg_type="info")
 
     def disable_login_button_with_countdown(self, lockout_minutes):
         if hasattr(self, 'login_btn'):
@@ -2478,7 +2451,6 @@ class ModernPasswordManagerGUI:
                 logger.info("Temporary files cleaned up")
             self.authenticated = False
             self.database = None
-            self.security_monitor = None
             self.show_login_screen()
             
             logger.info("Vault locked successfully")

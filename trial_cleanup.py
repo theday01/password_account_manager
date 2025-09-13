@@ -1,174 +1,139 @@
 import os
 import sys
+import argparse
 import platform
-import json
-import shutil
 
-try:
-    import winreg
-except ImportError:
-    winreg = None
+# It is safe to import these as this script is not part of the main application
+# and is only intended for development/testing.
+from guardian_anchor import GuardianAnchor
+from guardian_observer import GuardianObserver
+from trial_manager import TrialManager
 
-# --- Configuration: Must match trial_manager.py and secure_file_manager.py ---
-LICENSE_FILE = os.path.expanduser("~/.sv_license")
-DOTFILE_PATH = os.path.expanduser("~/.sv_meta")
-REGISTRY_PATH = r"Software\SecureVaultPro"
-SECURE_VAULT_DIR = "secure_vault"
-SETTINGS_FILE = os.path.join(SECURE_VAULT_DIR, "settings.json")
-# ---
+# THIS IS A SECRET PASSWORD. A real application might use a more secure method
+# for developer authentication, but for this context, a hardcoded secret is sufficient.
+DEV_PASSWORD = "a_very_secret_dev_password_for_testing_only"
 
-def _get_tertiary_path():
-    system = platform.system()
-    if system == 'Windows':
-        path = os.path.join(os.environ.get("ProgramData", "C:\\ProgramData"), "SystemLogs")
-        return os.path.join(path, "updater.log")
-    elif system == 'Linux':
-        path = os.path.expanduser("~/.config/systemd")
-        return os.path.join(path, "user.log")
-    elif system == 'Darwin':
-        path = os.path.expanduser("~/Library/Application Support")
-        return os.path.join(path, ".system_events.log")
-    return None
-
-TERTIARY_PATH = _get_tertiary_path()
-
-def check_registry():
-    """Checks for the existence of the registry key."""
-    if platform.system() != 'Windows' or not winreg:
-        return None # Not applicable
-    try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REGISTRY_PATH, 0, winreg.KEY_READ):
-            return True
-    except FileNotFoundError:
-        return False
-
-def check_settings_file():
-    """Checks if the 'trial_data' key exists in the settings JSON."""
-    if not os.path.exists(SETTINGS_FILE):
-        return False
-    try:
-        with open(SETTINGS_FILE, 'r') as f:
-            data = json.load(f)
-        return 'trial_data' in data
-    except (json.JSONDecodeError, IOError):
-        return False
-
-def report_status():
-    """Checks for all trial artifacts and prints a status report."""
-    print("--- Trial System Status Report ---")
+def find_and_delete_files(prefixes_and_dirs):
+    """
+    Scans directories for files with specific prefixes and deletes them.
+    """
+    deleted_count = 0
+    failed_count = 0
     
-    # 1. Check OS-specific primary storage
-    if platform.system() == 'Windows':
-        if check_registry():
-            print(f"[+] Found Registry Key: HKEY_CURRENT_USER\\{REGISTRY_PATH}")
-        else:
-            print(f"[-] Registry Key Not Found.")
-    else: # Linux/macOS
-        if os.path.exists(DOTFILE_PATH):
-            print(f"[+] Found Dotfile: {DOTFILE_PATH}")
-        else:
-            print(f"[-] Dotfile Not Found: {DOTFILE_PATH}")
-
-    # 2. Check license file
-    if os.path.exists(LICENSE_FILE):
-        print(f"[+] Found License File: {LICENSE_FILE}")
-    else:
-        print(f"[-] License File Not Found: {LICENSE_FILE}")
+    for name, data in prefixes_and_dirs.items():
+        prefix = data["prefix"]
+        directory = data["dir"]
         
-    # 3. Check for trial data in settings file
-    if check_settings_file():
-        print(f"[+] Found 'trial_data' key in: {SETTINGS_FILE}")
-    else:
-        print(f"[-] 'trial_data' key not found in: {SETTINGS_FILE}")
+        if not os.path.isdir(directory):
+            print(f"[INFO] Directory for {name} not found: {directory}. Skipping.")
+            continue
 
-    # 4. Check for tertiary file
-    if TERTIARY_PATH and os.path.exists(TERTIARY_PATH):
-        print(f"[+] Found Tertiary File: {TERTIARY_PATH}")
-    else:
-        print(f"[-] Tertiary File Not Found: {TERTIARY_PATH}")
-
-def clean_artifacts(force=False):
-    """Deletes all trial-related artifacts. Asks for confirmation unless force=True."""
-    report_status()
-    print("\nThis script will attempt to delete the artifacts listed above, including the entire secure_vault directory.")
-    
-    if not force:
-        try:
-            confirm = input("Are you sure you want to proceed? (y/n): ").lower()
-        except KeyboardInterrupt:
-            print("\nCleanup cancelled.")
-            return
+        found_files = False
+        for filename in os.listdir(directory):
+            if filename.startswith(prefix):
+                found_files = True
+                path_to_delete = os.path.join(directory, filename)
+                try:
+                    os.remove(path_to_delete)
+                    print(f"[SUCCESS] Deleted {name}: {path_to_delete}")
+                    deleted_count += 1
+                except OSError as e:
+                    print(f"[ERROR] FAILED to delete {name}: {path_to_delete}")
+                    print(f"         Reason: {e}")
+                    print(f"         RECOMMENDATION: Manually delete the file above and re-run this script with elevated (admin/sudo) privileges.")
+                    failed_count += 1
+        
+        if not found_files:
+            print(f"[INFO] No files with prefix '{prefix}' found in {directory}.")
             
-        if confirm != 'y':
-            print("Cleanup cancelled.")
-            return
+    return deleted_count, failed_count
 
-    print("\n--- Starting Cleanup ---")
 
-    # 1. Delete OS-specific primary storage
-    if platform.system() == 'Windows':
-        if check_registry():
-            try:
-                winreg.DeleteKey(winreg.HKEY_CURRENT_USER, REGISTRY_PATH)
-                print(f"[+] Deleted Registry Key: HKEY_CURRENT_USER\\{REGISTRY_PATH}")
-            except OSError as e:
-                print(f"[!] Error deleting registry key: {e}")
-    else: # Linux/macOS
-        if os.path.exists(DOTFILE_PATH):
-            try:
-                os.remove(DOTFILE_PATH)
-                print(f"[+] Deleted Dotfile: {DOTFILE_PATH}")
-            except OSError as e:
-                print(f"[!] Error deleting dotfile: {e}")
+def clean_all_artifacts():
+    """
+    Finds and deletes all known artifacts from the new guardian-based trial system
+    by scanning for discoverable filename prefixes.
+    """
+    print("--- Developer Cleanup Tool ---")
+    print("Scanning for all trial-related artifacts...")
 
-    # 2. Delete license file
-    if os.path.exists(LICENSE_FILE):
-        try:
-            os.remove(LICENSE_FILE)
-            print(f"[+] Deleted License File: {LICENSE_FILE}")
-        except OSError as e:
-            print(f"[!] Error deleting license file: {e}")
+    try:
+        # Instantiate guardians to get their file paths, which contain the base directories.
+        anchor = GuardianAnchor()
+        observer = GuardianObserver(anchor)
+        # We need a dummy TrialManager just to get the license path.
+        trial_manager = TrialManager(parent_window=None, restart_callback=None)
 
-    # 3. To be safe and clean everything, we just remove the entire secure_vault directory
-    if os.path.isdir(SECURE_VAULT_DIR):
-        try:
-            shutil.rmtree(SECURE_VAULT_DIR)
-            print(f"[+] Deleted Secure Vault Directory: {SECURE_VAULT_DIR}")
-        except OSError as e:
-            print(f"[!] Error deleting secure vault directory: {e}")
-    
-    # 4. Delete tertiary file
-    if TERTIARY_PATH and os.path.exists(TERTIARY_PATH):
-        try:
-            os.remove(TERTIARY_PATH)
-            print(f"[+] Deleted Tertiary File: {TERTIARY_PATH}")
-        except OSError as e:
-            print(f"[!] Error deleting tertiary file: {e}")
-            
-    print("\n--- Cleanup Complete ---")
+        # Define the prefixes and the base directories to scan.
+        # We get the directory from the full path generated by the classes.
+        search_locations = {
+            "Anchor File(s)": {
+                "prefix": "sv-anchor-",
+                "dir": os.path.dirname(anchor.anchor_path)
+            },
+            "Observer File(s)": {
+                "prefix": "sv-observer-",
+                "dir": os.path.dirname(observer.observer_path)
+            },
+            "License File(s)": {
+                "prefix": "sv-license-" if platform.system() == "Windows" else ".sv-license-",
+                "dir": os.path.dirname(trial_manager.LICENSE_FILE)
+            }
+        }
+        
+        deleted, failed = find_and_delete_files(search_locations)
 
+        print("\n--- Cleanup Summary ---")
+        if failed > 0:
+            print(f"🔴 FAILED to delete {failed} artifact(s). Please review the errors above and take manual action.")
+        else:
+            print(f"🟢 Successfully deleted {deleted} artifact(s).")
+        print("The system should now be in a clean state.")
+
+    except Exception as e:
+        print(f"\nAn unexpected error occurred during cleanup: {e}")
+        print("Please ensure all application modules are available and paths are correct.")
 
 def main():
     """
     Main function to run the cleanup script.
-    Parses command-line arguments to either report or clean.
+    Parses command-line arguments to verify the developer password.
     """
-    print("*"*60)
-    print("WARNING: This script is for development and testing purposes only.")
-    print("It is designed to completely remove all trial-related data.")
-    print("DO NOT distribute this script with the final application.")
-    print("*"*60)
+    parser = argparse.ArgumentParser(
+        description="""
+        *** SecureVault Pro Developer Cleanup Tool ***
+        This script completely removes all trial-related data, including hidden guardian files.
+        It is for development and testing purposes ONLY.
+        WARNING: This provides a clean slate and will reset the trial period entirely.
+        """,
+        formatter_class=argparse.RawTextHelpFormatter
+    )
     
-    args = [arg.lower() for arg in sys.argv[1:]]
+    parser.add_argument(
+        '--password',
+        required=True,
+        help='The secret developer password required to run the cleanup.'
+    )
     
-    if '--clean' in args:
-        force_clean = '--force' in args
-        clean_artifacts(force=force_clean)
-    else:
-        report_status()
-        print("\nTo remove these artifacts, run with the --clean flag.")
-        print(f"Example: python {sys.argv[0]} --clean")
-        print("Add --force to bypass confirmation prompt.")
+    print("*"*60)
+    print("WARNING: This is a developer-only tool.")
+    print("Running this will permanently delete all trial data.")
+    print("*"*60)
+
+    try:
+        args = parser.parse_args()
+        if args.password.strip() == DEV_PASSWORD:
+            print("\nDeveloper password accepted.")
+            clean_all_artifacts()
+        else:
+            print("\n[ACCESS DENIED] Incorrect developer password.")
+            sys.exit(1)
+    except SystemExit as e:
+        if e.code != 0:
+             print("\nTo use this script, you must provide the correct password.")
+             print(f"Example: python {sys.argv[0]} --password={DEV_PASSWORD}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     main()
