@@ -1,9 +1,0 @@
-{
-    "trial_data": {
-        "start_date": "2025-09-13T21:13:35.184960",
-        "last_run_date": "2025-09-13T21:13:35.626957",
-        "failed_license_attempts": 0,
-        "consecutive_license_lockouts": 0,
-        "license_lockout_until": null
-    }
-}
