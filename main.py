@@ -15,6 +15,7 @@ from enum import Enum
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.backends import default_backend
 import tkinter as tk
 from tkinter import messagebox, filedialog
@@ -441,9 +442,6 @@ class DatabaseManager:
                     try:
                         test_username = self.crypto.decrypt_data(test_row[0], self.encryption_key)
                         test_password = self.crypto.decrypt_data(test_row[1], self.encryption_key)
-                        if test_password != master_password:
-                            logger.error("Master password mismatch after decryption.")
-                            return False
                         logger.info("Test decryption successful")
                     except Exception as decrypt_error:
                         logger.error(f"Test decryption failed: {decrypt_error}")
@@ -826,6 +824,7 @@ class SecureEntry(ctk.CTkEntry):
         self.tooltip = None
         self.bind("<Enter>", self.show_tooltip)
         self.bind("<Leave>", self.hide_tooltip)
+        self.bind("<KeyRelease>", self._on_key_release)
 
     def show_tooltip(self, event):
         self.tooltip = tk.Toplevel(self)
@@ -838,6 +837,23 @@ class SecureEntry(ctk.CTkEntry):
         if self.tooltip:
             self.tooltip.destroy()
             self.tooltip = None
+
+    def _on_key_release(self, event):
+        text = self.get()
+        cleaned_text = self._remove_arabic(text)
+
+        if text != cleaned_text:
+            cursor_pos = self.index("insert")
+            # Count removed characters before the cursor to adjust its position
+            removed_count = len(re.findall("[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]", text[:cursor_pos]))
+            
+            self.delete(0, "end")
+            self.insert(0, cleaned_text)
+            self.icursor(max(0, cursor_pos - removed_count))
+
+    def _remove_arabic(self, text):
+        arabic_pattern = re.compile("[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]+")
+        return arabic_pattern.sub("", text)
 
 class NonArabicEntry(ctk.CTkEntry):
     def __init__(self, *args, **kwargs):
@@ -1295,15 +1311,32 @@ class ModernPasswordManagerGUI:
             text_color="#888888"
         )
         subtitle.pack(pady=(0, 30), padx=40)
+        password_frame = ctk.CTkFrame(login_card, fg_color="transparent")
+        password_frame.pack(pady=15, padx=40)
         self.master_password_entry = SecureEntry(
-            login_card,
+            password_frame,
             placeholder_text=self.lang_manager.get_string("enter_master_password"),
             show="*",
-            width=350,
+            width=300,
             height=45,
             font=ctk.CTkFont(size=16)
         )
-        self.master_password_entry.pack(pady=15, padx=40)
+        self.master_password_entry.pack(side="left", padx=(0, 5))
+        def toggle_password_visibility():
+            if self.master_password_entry.cget("show") == "*":
+                self.master_password_entry.configure(show="")
+                toggle_btn.configure(text="🙈")
+            else:
+                self.master_password_entry.configure(show="*")
+                toggle_btn.configure(text="👁️")
+        toggle_btn = ctk.CTkButton(
+            password_frame,
+            text="👁️",
+            width=45,
+            height=45,
+            command=toggle_password_visibility
+        )
+        toggle_btn.pack(side="left")
         button_frame = ctk.CTkFrame(login_card, fg_color="transparent")
         button_frame.pack(pady=30, padx=40)
         self.login_btn = ctk.CTkButton(
@@ -1894,10 +1927,12 @@ class ModernPasswordManagerGUI:
         if self.trial_manager and self.trial_manager.is_trial_active:
             remaining_minutes = int(self.trial_manager.minutes_remaining)
             
-            # if remaining_minutes is more than a day, show days, otherwise show minutes
             if remaining_minutes > 24 * 60:
                 remaining_days = remaining_minutes // (24 * 60)
                 trial_text = f"Trial Version: {remaining_days} days remaining."
+            elif remaining_minutes > 60:
+                remaining_hours = remaining_minutes // 60
+                trial_text = f"Trial Version: {remaining_hours} hours remaining."
             else:
                 trial_text = f"Trial Version: {remaining_minutes} minutes remaining."
 
@@ -2630,38 +2665,21 @@ class ModernPasswordManagerGUI:
             self.enable_tfa_dialog()
 
     def enable_tfa_dialog(self):
+        if not self.verify_master_password_dialog():
+            self.show_message("error", "tfa_setup_aborted_error", msg_type="error")
+            return
+
         full_name, email = self.database.get_master_account_details()
 
-        if not email:
-            if not self.verify_master_password_dialog():
-                self.show_message("error", "tfa_setup_aborted_error", msg_type="error")
-                return
-
-            email_dialog = ctk.CTkInputDialog(
-                text="Please enter your email address to set up 2FA:",
-                title="Email Required for 2FA"
-            )
-            new_email = email_dialog.get_input()
-
-            if new_email:
-                if "@" in new_email and "." in new_email.split('@')[1]:
-                    try:
-                        self.database.update_master_account_email(new_email)
-                        self.show_message("success", "email_updated_success_message")
-                        # Restart the 2FA setup process
-                        self.enable_tfa_dialog()
-                    except Exception as e:
-                        self.show_message("error", "email_update_failed_error", msg_type="error", error=str(e))
-                else:
-                    self.show_message("error", "invalid_email_format_error", msg_type="error")
-            return
+        # If email is not available, use the full name for the provisioning URI
+        account_name = email if email else (full_name if full_name else "SecureVault User")
 
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("enable_tfa_dialog_title"))
         dialog.geometry("380x550")
         dialog.resizable(False, False)
         dialog.grab_set()
-        
+
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
@@ -2669,18 +2687,18 @@ class ModernPasswordManagerGUI:
                      font=ctk.CTkFont(size=16, weight="bold")).pack(pady=10)
 
         secret = self.tfa_manager.generate_secret()
-        uri = self.tfa_manager.get_provisioning_uri(secret, email, full_name)
+        uri = self.tfa_manager.get_provisioning_uri(secret, account_name, full_name)
         qr_image_data = self.tfa_manager.generate_qr_code(uri)
         qr_image = Image.open(qr_image_data)
         qr_photo = ImageTk.PhotoImage(qr_image)
-        
+
         qr_label = ctk.CTkLabel(main_frame, image=qr_photo, text="")
         qr_label.image = qr_photo
         qr_label.pack(pady=10)
 
         ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("enter_6_digit_code_verify_label"),
                      font=ctk.CTkFont(size=14)).pack(pady=10)
-        
+
         code_entry = SecureEntry(main_frame, width=200)
         code_entry.pack(pady=5)
 
@@ -2800,33 +2818,41 @@ class ModernPasswordManagerGUI:
         code_entry.pack(pady=10)
 
         def verify_tfa():
-            code = code_entry.get().strip()
-            encrypted_secret_b64 = self.settings.get('tfa_secret')
-            encrypted_secret = base64.b64decode(encrypted_secret_b64)
-            secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
-            if self.tfa_manager.verify_code(secret, code):
-                self.authenticated = True
-                self.failed_attempts = 0
-                self.consecutive_lockouts = 0
-                self.clear_lockout_state()
-                if self.secure_file_manager:
-                    self.security_monitor = SecurityMonitor(self.secure_file_manager)
-                    self.security_monitor.set_alert_callback(self.handle_security_alert)
-                    self._start_security_monitoring()
-                dialog.destroy()
-                self.show_main_interface()
-            else:
-                self.show_message("error", "invalid_2fa_code", msg_type="error")
-                self.failed_attempts += 1
-                if self.failed_attempts >= 3:
-                    self.consecutive_lockouts += 1
-                    lockout_minutes = 3 * self.consecutive_lockouts
-                    self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
-                    self.save_lockout_state()
-                    self.show_message("account_locked_error_title", "account_locked_error", msg_type="error", minutes=lockout_minutes)
+            try:
+                code = code_entry.get().strip()
+                encrypted_secret_b64 = self.settings.get('tfa_secret')
+                encrypted_secret = base64.b64decode(encrypted_secret_b64)
+                secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
+                if self.tfa_manager.verify_code(secret, code):
+                    self.authenticated = True
                     self.failed_attempts = 0
+                    self.consecutive_lockouts = 0
+                    self.clear_lockout_state()
+                    if self.secure_file_manager:
+                        self.security_monitor = SecurityMonitor(self.secure_file_manager)
+                        self.security_monitor.set_alert_callback(self.handle_security_alert)
+                        self._start_security_monitoring()
                     dialog.destroy()
-                    self.lock_vault()
+                    self.show_main_interface()
+                else:
+                    self.show_message("error", "invalid_2fa_code", msg_type="error")
+                    self.failed_attempts += 1
+                    if self.failed_attempts >= 3:
+                        self.consecutive_lockouts += 1
+                        lockout_minutes = 3 * self.consecutive_lockouts
+                        self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
+                        self.save_lockout_state()
+                        self.show_message("account_locked_error_title", "account_locked_error", msg_type="error", minutes=lockout_minutes)
+                        self.failed_attempts = 0
+                        dialog.destroy()
+                        self.lock_vault()
+            except InvalidTag:
+                messagebox.showerror(
+                    "2FA Verification Error",
+                    "2FA verification failed, this is most likely due to an incorrect ''master password'', Please try logging in again."
+                )
+                dialog.destroy()
+                self.lock_vault()
 
         verify_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("verify_button"), command=verify_tfa)
         verify_button.pack(pady=20)

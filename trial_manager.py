@@ -198,30 +198,28 @@ class TrialManager:
         data2 = self._read_secondary_storage()
         data3 = self._read_tertiary_storage()
         
-        all_data = [data1, data2, data3]
-        existing_data = [d for d in all_data if d is not None]
-        
+        existing_data = [d for d in [data1, data2, data3] if d]
+
         trial_data = None
         tampered = False
 
-        if len(existing_data) == 3:
-            # All locations exist, check for consistency
-            start_dates = [d['start_date'] for d in existing_data]
-            last_run_dates = [d['last_run_date'] for d in existing_data]
-            if (max(start_dates) - min(start_dates)).total_seconds() > 60 or \
-               (max(last_run_dates) - min(last_run_dates)).total_seconds() > 60:
-                tampered = True
-            trial_data = existing_data[0] # Use primary as the source of truth
-        elif len(existing_data) > 0 and len(existing_data) < 3:
-            # Some but not all locations exist - tampering detected
-            tampered = True
-            # Use the most recent valid data and restore other locations
-            authoritative_data = max(existing_data, key=lambda d: d['last_run_date'])
-            self._write_primary_storage(authoritative_data)
-            self._write_secondary_storage(authoritative_data)
-            self._write_tertiary_storage(authoritative_data)
+        if existing_data:
+            # Data found, use the most recent one as the source of truth
+            authoritative_data = max(existing_data, key=lambda d: d.get('last_run_date', datetime.min))
             trial_data = authoritative_data
-        else: # No data found, fresh install
+            
+            # Check for data consistency if multiple sources exist
+            if len(existing_data) > 1:
+                start_dates = [d['start_date'] for d in existing_data]
+                if (max(start_dates) - min(start_dates)).total_seconds() > 60:
+                    tampered = True
+
+            # Restore to all locations to ensure consistency
+            self._write_primary_storage(trial_data)
+            self._write_secondary_storage(trial_data)
+            self._write_tertiary_storage(trial_data)
+        else:
+            # No data found, this is a fresh install
             now = datetime.now()
             trial_data = {'start_date': now, 'last_run_date': now}
             self._write_primary_storage(trial_data)

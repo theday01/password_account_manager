@@ -378,6 +378,10 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "security_question_5": "What was the name of the company where you had your first job?",
         "answer_placeholder": "Your answer here",
         "invalid_answer": "The answer is incorrect. Please try again.",
+        "security_alert": "Security Alert",
+        "suspicious_activity_detected": "Suspicious activity detected. The application will now close.",
+        "app_locked_title": "Application Locked",
+        "app_locked_message": "The application is locked due to suspicious activity. Please wait {time} before trying again.",
     },
     "Arabic": {
         "loading": "جارٍ التحميل...",
@@ -741,6 +745,10 @@ SecureVault Pro هو مدير كلمات مرور لسطح المكتب يركز
         "security_question_5": "ما هو اسم الشركة التي عملت بها لأول مرة؟",
         "answer_placeholder": "إجابتك هنا",
         "invalid_answer": "الإجابة غير صحيحة. الرجاء المحاولة مرة أخرى.",
+        "security_alert": "تنبيه أمني",
+        "suspicious_activity_detected": "تم الكشف عن نشاط مشبوه. سيتم إغلاق التطبيق الآن.",
+        "app_locked_title": "التطبيق مقفل",
+        "app_locked_message": "التطبيق مقفل بسبب نشاط مشبوه. الرجاء الانتظار {time} قبل المحاولة مرة أخرى.",
     }
 }
 
