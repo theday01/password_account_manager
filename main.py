@@ -1469,6 +1469,7 @@ class ModernPasswordManagerGUI:
                 self.failed_attempts = 0
                 self.disable_login_button_with_countdown(lockout_minutes)
             else:
+                self.save_lockout_state()
                 self.show_message("error", "invalid_master_password_error", msg_type="error", attempts=3 - self.failed_attempts)
 
     def _start_security_monitoring(self):
@@ -1588,6 +1589,7 @@ class ModernPasswordManagerGUI:
                     self.show_message("account_locked_error_title", "account_locked_error", msg_type="error", minutes=lockout_minutes)
                     self.failed_attempts = 0
                 else:
+                    self.save_lockout_state()
                     self.show_message("error", "invalid_master_password", msg_type="error")
                 return False
         except Exception:
@@ -2803,6 +2805,8 @@ class ModernPasswordManagerGUI:
                     self.failed_attempts = 0
                     dialog.destroy()
                     self.lock_vault()
+                else:
+                    self.save_lockout_state()
         
         def on_cancel():
             dialog.destroy()
@@ -2861,6 +2865,8 @@ class ModernPasswordManagerGUI:
                         self.failed_attempts = 0
                         dialog.destroy()
                         self.lock_vault()
+                    else:
+                        self.save_lockout_state()
             except InvalidTag:
                 messagebox.showerror(
                     "2FA Verification Error",
@@ -3229,6 +3235,7 @@ class ModernPasswordManagerGUI:
                 self.failed_attempts = 0
                 self.lock_vault()
             else:
+                self.save_lockout_state()
                 self.show_message("error", "invalid_answer", msg_type="error")
             return False
 
