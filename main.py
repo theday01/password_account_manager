@@ -441,6 +441,9 @@ class DatabaseManager:
                     try:
                         test_username = self.crypto.decrypt_data(test_row[0], self.encryption_key)
                         test_password = self.crypto.decrypt_data(test_row[1], self.encryption_key)
+                        if test_password != master_password:
+                            logger.error("Master password mismatch after decryption.")
+                            return False
                         logger.info("Test decryption successful")
                     except Exception as decrypt_error:
                         logger.error(f"Test decryption failed: {decrypt_error}")
