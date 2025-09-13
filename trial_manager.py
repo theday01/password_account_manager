@@ -11,6 +11,50 @@ from icon_manager import ThemedToplevel
 from guardian_anchor import GuardianAnchor
 from guardian_observer import GuardianObserver
 
+class HoldButton(ctk.CTkButton):
+    """A button that requires being held down to activate."""
+    def __init__(self, master, hold_time_ms=3000, hold_callback=None, **kwargs):
+        # The 'command' is replaced by 'hold_callback'
+        self.hold_callback = hold_callback
+        if 'command' in kwargs:
+            del kwargs['command']
+
+        super().__init__(master, **kwargs)
+        
+        self.hold_time_ms = hold_time_ms
+        self.timer = None
+        self.start_time = None
+        self.original_text = self.cget("text")
+
+        self.bind("<ButtonPress-1>", self._on_press)
+        self.bind("<ButtonRelease-1>", self._on_release)
+
+    def _on_press(self, event):
+        self.start_time = datetime.now()
+        self._update_hold_text()
+
+    def _on_release(self, event):
+        if self.timer:
+            self.after_cancel(self.timer)
+            self.timer = None
+        self.configure(text=self.original_text)
+
+    def _update_hold_text(self):
+        if not self.start_time:
+            return
+
+        elapsed_ms = (datetime.now() - self.start_time).total_seconds() * 1000
+        remaining_sec = (self.hold_time_ms - elapsed_ms) / 1000
+
+        if remaining_sec <= 0:
+            if self.hold_callback:
+                self.hold_callback()
+            self.configure(text=self.original_text)
+            self.start_time = None
+        else:
+            self.configure(text=f"Hold for {remaining_sec:.1f}s")
+            self.timer = self.after(100, self._update_hold_text)
+
 class TrialManager:
     """
     The Enforcer. This class determines the application's trial status by
@@ -180,11 +224,12 @@ class TrialManager:
 
         ctk.CTkButton(button_frame, text="Contact Developer", command=on_contact, width=180, height=40).pack(side="left", padx=10)
         
-        activate_button = ctk.CTkButton(button_frame, text="Activate", command=on_activate, width=120, height=40,fg_color="#4CAF50", hover_color="#45a049")
-        activate_button.pack(side="left", padx=10)
-        
         if is_tampered:
-            activate_button.configure(state="disabled", text="Activation Disabled")
+            activate_button = HoldButton(button_frame, text="Enable Activation", hold_callback=on_activate, width=150, height=40, fg_color="#4CAF50", hover_color="#45a049")
+            activate_button.pack(side="left", padx=10)
+        else:
+            activate_button = ctk.CTkButton(button_frame, text="Activate", command=on_activate, width=120, height=40,fg_color="#4CAF50", hover_color="#45a049")
+            activate_button.pack(side="left", padx=10)
 
         ctk.CTkButton(button_frame, text="Exit", command=on_exit, width=100, height=40, fg_color="#D32F2F", hover_color="#D10E00").pack(side="right", padx=10)
             
