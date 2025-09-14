@@ -63,27 +63,24 @@ class TrialManager:
     """
     _machine_id = None  # Cache for machine ID
 
-    # def __init__(self, parent_window, restart_callback=None):
-    #     self.TRIAL_PERIOD = timedelta(days=7)
-    #     self.LICENSE_FILE = self._get_obfuscated_license_path()
-
-    #     self.parent_window = parent_window
-    #     self.restart_callback = restart_callback
-
-    #     # Instantiate the guardians
-    #     self.anchor = GuardianAnchor()
-    #     self.observer = GuardianObserver(self.anchor)
-
-    #     self.is_trial_active = False
-    #     self.minutes_remaining = 0
-    #     self.status = self.check_trial_status()
-
-    def __init__(self, parent_window, restart_callback=None):
+    def __init__(self, parent_window, settings_manager, restart_callback=None):
         self.TRIAL_PERIOD = timedelta(minutes=1)  # Changed from days=7 to minutes=1
         self.LICENSE_FILE = self._get_obfuscated_license_path()
 
         self.parent_window = parent_window
         self.restart_callback = restart_callback
+        self._settings_manager = settings_manager
+        
+        if self._settings_manager:
+            self._settings = self._settings_manager.read_settings() or {}
+        else:
+            self._settings = {}
+        
+        # Load state from settings or initialize to defaults
+        self.failed_activation_attempts = self._settings.get('activation_failed_attempts', 0)
+        
+        lockout_end_iso = self._settings.get('activation_lockout_end_time')
+        self.activation_lockout_end_time = datetime.fromisoformat(lockout_end_iso) if lockout_end_iso else None
 
         # Instantiate the guardians
         self.anchor = GuardianAnchor()
@@ -92,6 +89,7 @@ class TrialManager:
         self.is_trial_active = False
         self.minutes_remaining = 0
         self.status = self.check_trial_status()
+        self._validate_activation_state()
 
     def _get_machine_id(self):
         if TrialManager._machine_id is None:
@@ -107,6 +105,44 @@ class TrialManager:
         if platform.system() != "Windows":
             filename = f".{filename}"
         return os.path.expanduser(f"~/{filename}")
+
+    def _validate_activation_state(self):
+        """Sanity check and cleanup of the activation lockout state."""
+        if self.is_activation_locked_out():
+            if datetime.now() >= self.activation_lockout_end_time:
+                self.failed_activation_attempts = 0
+                self.activation_lockout_end_time = None
+                self._save_activation_state()
+
+    def _save_activation_state(self):
+        """Saves the current activation lockout state to the settings file."""
+        self._settings['activation_failed_attempts'] = self.failed_activation_attempts
+        self._settings['activation_lockout_end_time'] = self.activation_lockout_end_time.isoformat() if self.activation_lockout_end_time else None
+        
+        if self._settings_manager:
+            self._settings_manager.write_settings(self._settings)
+
+    def is_activation_locked_out(self) -> bool:
+        """Checks if the activation is currently in a hard lockout state."""
+        if not self.activation_lockout_end_time:
+            return False
+        
+        if datetime.now() < self.activation_lockout_end_time:
+            return True
+        else:
+            # Lockout has just expired, so reset and report not locked.
+            self.failed_activation_attempts = 0
+            self.activation_lockout_end_time = None
+            self._save_activation_state()
+            return False
+
+    def get_remaining_activation_lockout_time(self) -> int:
+        """Gets the remaining activation lockout time in seconds."""
+        if not self.is_activation_locked_out():
+            return 0
+        
+        remaining = self.activation_lockout_end_time - datetime.now()
+        return max(0, int(remaining.total_seconds()))
 
     def check_trial_status(self):
         """
@@ -166,14 +202,22 @@ class TrialManager:
         """
         dialog = ThemedToplevel(self.parent_window)
         is_tampered = self.status == "TAMPERED"
-        is_locked = lockout_time_remaining is not None
+        is_login_locked = lockout_time_remaining is not None
+        is_activation_locked = self.is_activation_locked_out()
 
-        if is_locked:
+        lockout_time = 0
+        if is_login_locked:
             title = "Account Locked"
+            lockout_time = lockout_time_remaining
+        elif is_activation_locked:
+            title = "Activation Locked"
+            lockout_time = self.get_remaining_activation_lockout_time()
         elif is_tampered:
             title = "Application Corrupted"
         else:
             title = "Trial Period Expired"
+        
+        is_locked = is_login_locked or is_activation_locked
         
         dialog.title(title)
         
@@ -191,36 +235,45 @@ class TrialManager:
         main_frame = ctk.CTkFrame(dialog, corner_radius=15)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-        ctk.CTkLabel(main_frame, text=title, font=ctk.CTkFont(size=20, weight="bold")).pack(pady=20)
+        title_label = ctk.CTkLabel(main_frame, text=title, font=ctk.CTkFont(size=20, weight="bold"))
+        title_label.pack(pady=20)
         
-        if is_locked:
-            message = "Too many incorrect login attempts. For your security, access has been temporarily blocked."
-            ctk.CTkLabel(main_frame, text=message, justify="center", text_color="orange").pack(pady=10)
-            
-            countdown_label = ctk.CTkLabel(main_frame, text="", font=ctk.CTkFont(size=16, weight="bold"))
-            countdown_label.pack(pady=10)
+        message_label = ctk.CTkLabel(main_frame, text="", justify="center")
+        countdown_label = ctk.CTkLabel(main_frame, text="", font=ctk.CTkFont(size=16, weight="bold"))
 
-            def update_countdown(seconds_left):
-                if seconds_left > 0:
-                    minutes, seconds = divmod(seconds_left, 60)
-                    hours, minutes = divmod(minutes, 60)
-                    if hours > 0:
-                        time_str = f"{hours}h {minutes:02d}m {seconds:02d}s"
-                    else:
-                        time_str = f"{minutes:02d}m {seconds:02d}s"
-                    countdown_label.configure(text=f"Time remaining: {time_str}")
-                    dialog.after(1000, update_countdown, seconds_left - 1)
+        def update_countdown(seconds_left):
+            if seconds_left > 0:
+                minutes, seconds = divmod(seconds_left, 60)
+                hours, minutes = divmod(minutes, 60)
+                if hours > 0:
+                    time_str = f"{hours}h {minutes:02d}m {seconds:02d}s"
                 else:
-                    countdown_label.configure(text="You can now restart the application.")
-            
-            update_countdown(lockout_time_remaining)
+                    time_str = f"{minutes:02d}m {seconds:02d}s"
+                countdown_label.configure(text=f"Time remaining: {time_str}")
+                dialog.after(1000, update_countdown, seconds_left - 1)
+            else:
+                dialog.title("Trial Period Expired")
+                message_label.configure(text="The 7-day trial period has ended. Please upgrade to the full version.\n\nAll your data is safe but cannot be accessed until you activate.", text_color="white")
+                countdown_label.pack_forget()
+
+
+        if is_locked:
+            message = "Too many incorrect attempts. For your security, access has been temporarily blocked."
+            if is_activation_locked:
+                message = "Too many incorrect activation attempts. For your security, access has been temporarily blocked."
+            message_label.configure(text=message, text_color="orange")
+            message_label.pack(pady=10)
+            countdown_label.pack(pady=10)
+            update_countdown(lockout_time)
 
         elif is_tampered:
             message = "Critical security components have been modified or corrupted, or tampering has been detected.\nThe application cannot continue.\n\nPlease contact support and provide your Machine ID to resolve this issue."
-            ctk.CTkLabel(main_frame, text=message, justify="center", text_color="red").pack(pady=10)
+            message_label.configure(text=message, text_color="red")
+            message_label.pack(pady=10)
         else: # EXPIRED
             message = "The 7-day trial period has ended. Please upgrade to the full version.\n\nAll your data is safe but cannot be accessed until you activate."
-            ctk.CTkLabel(main_frame, text=message, justify="center").pack(pady=10)
+            message_label.configure(text=message)
+            message_label.pack(pady=10)
 
         machine_id_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         machine_id_frame.pack(pady=10)
@@ -247,6 +300,9 @@ class TrialManager:
             self.parent_window.destroy()
 
         def on_activate():
+            if self.is_activation_locked_out():
+                return
+
             input_dialog = ctk.CTkInputDialog(text="Please enter your license key:", title="Activate Full Version")
             license_key = input_dialog.get_input()
             if not license_key: return
@@ -256,35 +312,59 @@ class TrialManager:
             expected_key = hashlib.sha256((machine_id + SECRET_SALT).encode()).hexdigest()
 
             if license_key.strip() == expected_key:
+                self.failed_activation_attempts = 0
+                self.activation_lockout_end_time = None
+                self._save_activation_state()
                 if self.activate_full_version():
                     dialog.destroy()
                     if self.restart_callback:
                         self.restart_callback()
             else:
-                messagebox.showerror("Activation Failed", "The license key is incorrect. Please verify the key and try again.")
+                self.failed_activation_attempts += 1
+                if self.failed_activation_attempts >= 3:
+                    # Initial lockout is 15 minutes; each subsequent lockout extends by 30 minutes
+                    if self.activation_lockout_end_time and self.activation_lockout_end_time > datetime.now():
+                        self.activation_lockout_end_time += timedelta(minutes=30)
+                    else:
+                        self.activation_lockout_end_time = datetime.now() + timedelta(minutes=15)
+                    
+                    self._save_activation_state()
+                    
+                    # Update UI without recursion
+                    new_lockout_time = self.get_remaining_activation_lockout_time()
+                    dialog.title("Activation Locked")
+                    message_label.configure(text="Too many incorrect activation attempts. For your security, access has been temporarily blocked.", text_color="orange")
+                    if not countdown_label.winfo_ismapped():
+                        countdown_label.pack(pady=10)
+                    update_countdown(new_lockout_time)
+                else:
+                    attempts_left = 3 - self.failed_activation_attempts
+                    if attempts_left == 1:
+                        message = "The license key is incorrect. You have 1 attempt remaining."
+                    else:
+                        message = f"The license key is incorrect. You have {attempts_left} attempts remaining."
+                    messagebox.showerror("Activation Failed", message)
+                    self._save_activation_state()
 
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
 
-        if not is_locked:
-            ctk.CTkButton(button_frame, text="Contact Developer", command=on_contact, width=180, height=40).pack(side="left", padx=10)
-        
-            if is_tampered:
-                # In a real scenario, we might have a different call to action here,
-                # but for now, we just show the contact button.
-                activate_button = HoldButton(
-                    button_frame, 
-                    text="Activate", 
-                    hold_callback=on_activate, 
-                    width=120, 
-                    height=40,
-                    fg_color="#4CAF50", 
-                    hover_color="#45a049"
-                )
-                activate_button.pack(side="left", padx=10)
-            else:
-                activate_button = ctk.CTkButton(button_frame, text="Activate", command=on_activate, width=120, height=40,fg_color="#4CAF50", hover_color="#45a049")
-                activate_button.pack(side="left", padx=10)
+        ctk.CTkButton(button_frame, text="Contact Developer", command=on_contact, width=180, height=40).pack(side="left", padx=10)
+    
+        if is_tampered:
+            activate_button = HoldButton(
+                button_frame, 
+                text="Activate", 
+                hold_callback=on_activate, 
+                width=120, 
+                height=40,
+                fg_color="#4CAF50", 
+                hover_color="#45a049"
+            )
+            activate_button.pack(side="left", padx=10)
+        else:
+            activate_button = ctk.CTkButton(button_frame, text="Activate", command=on_activate, width=120, height=40,fg_color="#4CAF50", hover_color="#45a049")
+            activate_button.pack(side="left", padx=10)
 
         ctk.CTkButton(button_frame, text="Exit", command=on_exit, width=100, height=40, fg_color="#D32F2F", hover_color="#D10E00").pack(side="right", padx=10)
             

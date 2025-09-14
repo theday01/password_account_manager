@@ -1094,7 +1094,7 @@ class ModernPasswordManagerGUI:
             # Initialize SFM early for trial manager
             self._setup_secure_file_manager()
             
-            self.trial_manager = TrialManager(self.root, restart_callback=self.restart_program)
+            self.trial_manager = TrialManager(self.root, self.secure_file_manager, restart_callback=self.restart_program)
             if self.trial_manager.status in ["EXPIRED", "TAMPERED"]:
                 if not self.trial_manager.show_trial_expired_dialog():
                     self.root.quit()
