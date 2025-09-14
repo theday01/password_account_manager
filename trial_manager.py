@@ -13,7 +13,7 @@ from guardian_observer import GuardianObserver
 
 class HoldButton(ctk.CTkButton):
     """A button that requires being held down to activate."""
-    def __init__(self, master, hold_time_ms=3000, hold_callback=None, **kwargs):
+    def __init__(self, master, hold_time_ms=5000, hold_callback=None, **kwargs):
         # The 'command' is replaced by 'hold_callback'
         self.hold_callback = hold_callback
         if 'command' in kwargs:
@@ -240,9 +240,6 @@ class TrialManager:
         copy_button = ctk.CTkButton(machine_id_frame, text="📋", width=30, height=30, command=copy_machine_id, font=ctk.CTkFont(size=14))
         copy_button.pack(side="left", padx=(5, 0))
 
-        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        button_frame.pack(pady=20)
-        
         def on_contact():
             webbrowser.open("https://wa.me/212623422858")
 
@@ -266,13 +263,25 @@ class TrialManager:
             else:
                 messagebox.showerror("Activation Failed", "The license key is incorrect. Please verify the key and try again.")
 
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(pady=20)
+
         if not is_locked:
             ctk.CTkButton(button_frame, text="Contact Developer", command=on_contact, width=180, height=40).pack(side="left", padx=10)
         
             if is_tampered:
                 # In a real scenario, we might have a different call to action here,
                 # but for now, we just show the contact button.
-                pass
+                activate_button = HoldButton(
+                    button_frame, 
+                    text="Activate", 
+                    hold_callback=on_activate, 
+                    width=120, 
+                    height=40,
+                    fg_color="#4CAF50", 
+                    hover_color="#45a049"
+                )
+                activate_button.pack(side="left", padx=10)
             else:
                 activate_button = ctk.CTkButton(button_frame, text="Activate", command=on_activate, width=120, height=40,fg_color="#4CAF50", hover_color="#45a049")
                 activate_button.pack(side="left", padx=10)
