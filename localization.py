@@ -50,6 +50,7 @@ LANGUAGES = {
         "your_accounts": "Your Accounts",
         "password_generator": "Password Generator",
         "security_report": "Security Report",
+        "check_update_online": "online update",
         "your_accounts_title": "🔑 Your Accounts",
         "add_new_account": "➕ Add New Account",
         "search_placeholder": "🔍 Search by name, email, or URL...",

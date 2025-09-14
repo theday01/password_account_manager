@@ -65,10 +65,15 @@ def get_system_uuid():
 
 def generate_machine_id():
     """
-    Generates a composite machine ID from UUID and MAC address.
+    Generates a stable machine ID primarily from the system's UUID.
+    This is more stable than including the MAC address, which can change.
     """
-    uuid = get_system_uuid() or "default_uuid_on_error"
-    mac_address = get_mac_address() or "default_mac_on_error"
+    uuid = get_system_uuid()
     
-    combined_id = f"{uuid}-{mac_address}"
-    return hashlib.sha256(combined_id.encode()).hexdigest()
+    # If UUID is not available, fall back to a combination of system info.
+    # This is less ideal but provides a fallback.
+    if not uuid:
+        system_info = f"{platform.system()}-{platform.node()}-{platform.architecture()}"
+        return hashlib.sha256(system_info.encode()).hexdigest()
+        
+    return hashlib.sha256(uuid.encode()).hexdigest()

@@ -160,21 +160,28 @@ class TrialManager:
             messagebox.showerror("Error", f"Activation failed. Please contact support. Error: {e}")
             return False
 
-    def show_trial_expired_dialog(self):
+    def show_trial_expired_dialog(self, lockout_time_remaining=None):
         """
-        Shows a dialog for expired or tampered states. The logic here is for UI only.
+        Shows a dialog for expired, tampered, or locked-out states.
         """
         dialog = ThemedToplevel(self.parent_window)
         is_tampered = self.status == "TAMPERED"
+        is_locked = lockout_time_remaining is not None
+
+        if is_locked:
+            title = "Account Locked"
+        elif is_tampered:
+            title = "Application Corrupted"
+        else:
+            title = "Trial Period Expired"
         
-        title = "Application Corrupted" if is_tampered else "Trial Period Expired"
         dialog.title(title)
         
         dialog.update_idletasks()
         screen_width = dialog.winfo_screenwidth()
         screen_height = dialog.winfo_screenheight()
         window_width = 780
-        window_height = 380
+        window_height = 420  # Increased height for the countdown
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
         dialog.geometry(f"{window_width}x{window_height}+{x}+{y}")
@@ -186,10 +193,32 @@ class TrialManager:
 
         ctk.CTkLabel(main_frame, text=title, font=ctk.CTkFont(size=20, weight="bold")).pack(pady=20)
         
-        if is_tampered:
+        if is_locked:
+            message = "Too many incorrect login attempts. For your security, access has been temporarily blocked."
+            ctk.CTkLabel(main_frame, text=message, justify="center", text_color="orange").pack(pady=10)
+            
+            countdown_label = ctk.CTkLabel(main_frame, text="", font=ctk.CTkFont(size=16, weight="bold"))
+            countdown_label.pack(pady=10)
+
+            def update_countdown(seconds_left):
+                if seconds_left > 0:
+                    minutes, seconds = divmod(seconds_left, 60)
+                    hours, minutes = divmod(minutes, 60)
+                    if hours > 0:
+                        time_str = f"{hours}h {minutes:02d}m {seconds:02d}s"
+                    else:
+                        time_str = f"{minutes:02d}m {seconds:02d}s"
+                    countdown_label.configure(text=f"Time remaining: {time_str}")
+                    dialog.after(1000, update_countdown, seconds_left - 1)
+                else:
+                    countdown_label.configure(text="You can now restart the application.")
+            
+            update_countdown(lockout_time_remaining)
+
+        elif is_tampered:
             message = "Critical security components have been modified or corrupted, or tampering has been detected.\nThe application cannot continue.\n\nPlease contact support and provide your Machine ID to resolve this issue."
             ctk.CTkLabel(main_frame, text=message, justify="center", text_color="red").pack(pady=10)
-        else:
+        else: # EXPIRED
             message = "The 7-day trial period has ended. Please upgrade to the full version.\n\nAll your data is safe but cannot be accessed until you activate."
             ctk.CTkLabel(main_frame, text=message, justify="center").pack(pady=10)
 
@@ -237,16 +266,25 @@ class TrialManager:
             else:
                 messagebox.showerror("Activation Failed", "The license key is incorrect. Please verify the key and try again.")
 
-        ctk.CTkButton(button_frame, text="Contact Developer", command=on_contact, width=180, height=40).pack(side="left", padx=10)
+        if not is_locked:
+            ctk.CTkButton(button_frame, text="Contact Developer", command=on_contact, width=180, height=40).pack(side="left", padx=10)
         
-        if is_tampered:
-            activate_button = HoldButton(button_frame, text="Enable Activation", hold_callback=on_activate, width=150, height=40, fg_color="#4CAF50", hover_color="#45a049")
-            activate_button.pack(side="left", padx=10)
-        else:
-            activate_button = ctk.CTkButton(button_frame, text="Activate", command=on_activate, width=120, height=40,fg_color="#4CAF50", hover_color="#45a049")
-            activate_button.pack(side="left", padx=10)
+            if is_tampered:
+                # In a real scenario, we might have a different call to action here,
+                # but for now, we just show the contact button.
+                pass
+            else:
+                activate_button = ctk.CTkButton(button_frame, text="Activate", command=on_activate, width=120, height=40,fg_color="#4CAF50", hover_color="#45a049")
+                activate_button.pack(side="left", padx=10)
 
         ctk.CTkButton(button_frame, text="Exit", command=on_exit, width=100, height=40, fg_color="#D32F2F", hover_color="#D10E00").pack(side="right", padx=10)
             
         dialog.wait_window()
         return self.status == "FULL"
+
+    def show_lockout_dialog(self, remaining_seconds):
+        """
+        A specific method to show the lockout dialog.
+        This is a wrapper around the enhanced show_trial_expired_dialog.
+        """
+        self.show_trial_expired_dialog(lockout_time_remaining=remaining_seconds)

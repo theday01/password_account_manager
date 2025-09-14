@@ -124,6 +124,20 @@ class GuardianAnchor:
             # Decrypt and verify fingerprint
             decrypted_data = self._decrypt(encrypted_data)
             if decrypted_data.get('machine_fp') != self.machine_fp:
+                # This could be a legitimate upgrade from a version with an unstable fingerprint.
+                # Attempt to "heal" the anchor file by updating the fingerprint
+                # while preserving the original installation timestamp.
+                original_install_ts = decrypted_data.get('install_ts')
+                if original_install_ts:
+                    healed_data = {
+                        'install_ts': original_install_ts,
+                        'machine_fp': self.machine_fp
+                    }
+                    if self._write_anchor(healed_data):
+                        # Successfully healed the anchor file.
+                        return "OK_HEALED", healed_data
+                
+                # If healing is not possible or fails, then it's considered tampering.
                 return "TAMPERED_FINGERPRINT", None
             
             return "OK_EXISTS", decrypted_data

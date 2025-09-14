@@ -9,9 +9,9 @@ class AuthGuardian:
     Manages authentication security, including brute-force protection and lockouts.
     """
     # Constants for the protection mechanism
-    FREE_ATTEMPTS = 3
-    MAX_ATTEMPTS_BEFORE_LOCKOUT = 10
-    BASE_LOCKOUT_MINUTES = 15
+    MAX_ATTEMPTS_BEFORE_LOCKOUT = 3
+    INITIAL_LOCKOUT_MINUTES = 60
+    SUBSEQUENT_LOCKOUT_INCREMENT_MINUTES = 30
 
     def __init__(self, settings_manager):
         """
@@ -58,24 +58,6 @@ class AuthGuardian:
         except Exception as e:
             logger.error(f"Failed to save guardian state: {e}")
 
-    def get_login_delay(self) -> int:
-        """
-        Calculates the delay in seconds required before the next login attempt.
-        This implements an exponential backoff strategy.
-        
-        Returns:
-            int: The number of seconds to wait.
-        """
-        if self.failed_attempts < self.FREE_ATTEMPTS:
-            return 0
-        
-        # Exponential backoff after free attempts
-        delay = 2 ** (self.failed_attempts - self.FREE_ATTEMPTS)
-        
-        # Cap the delay to a reasonable maximum (e.g., 1 minute)
-        # before a full lockout occurs.
-        return min(delay, 60)
-
     def record_login_attempt(self, success: bool):
         """
         Records the result of a login attempt and updates the security state.
@@ -86,17 +68,23 @@ class AuthGuardian:
         if success:
             logger.info("Successful login attempt recorded. Resetting guardian state.")
             self.failed_attempts = 0
-            # We keep `consecutive_lockouts` so that repeated patterns of
-            # failures and successes are still penalized over time, but we can
-            # reset it if desired. For now, we'll only reset it on a clean exit
-            # or after a long period of no activity.
+            # On successful login, we can reset consecutive_lockouts,
+            # or keep it to penalize users who repeatedly fail and succeed.
+            # For this implementation, we'll reset it to be more forgiving.
+            self.consecutive_lockouts = 0
         else:
             self.failed_attempts += 1
             logger.warning(f"Failed login attempt #{self.failed_attempts} recorded.")
             
             if self.failed_attempts >= self.MAX_ATTEMPTS_BEFORE_LOCKOUT:
                 self.consecutive_lockouts += 1
-                lockout_minutes = self.BASE_LOCKOUT_MINUTES * self.consecutive_lockouts
+                
+                if self.consecutive_lockouts == 1:
+                    lockout_minutes = self.INITIAL_LOCKOUT_MINUTES
+                else:
+                    # Subsequent lockouts add 30 minutes to the initial 60-minute lockout
+                    lockout_minutes = self.INITIAL_LOCKOUT_MINUTES + (self.consecutive_lockouts - 1) * self.SUBSEQUENT_LOCKOUT_INCREMENT_MINUTES
+                
                 self.lockout_end_time = datetime.now() + timedelta(minutes=lockout_minutes)
                 logger.warning(f"Maximum login attempts reached. Account locked for {lockout_minutes} minutes.")
 

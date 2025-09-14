@@ -903,6 +903,7 @@ class ModernPasswordManagerGUI:
         self.database = None
         self.secure_file_manager = None
         self.trial_manager = None
+        self.authenticated = False  # Initialize here to prevent cleanup error
         ctk.set_appearance_mode("dark")  
         self.root = ctk.CTk()
         self.root.withdraw()
@@ -1274,12 +1275,6 @@ class ModernPasswordManagerGUI:
             self.show_message("error", "enter_master_password_error", msg_type="error")
             return
 
-        delay = self.auth_guardian.get_login_delay()
-        if delay > 0:
-            self.show_message("info", "delay_before_login", msg_type="info", seconds=delay)
-            self.root.update_idletasks()
-            time.sleep(delay)
-
         if not self.is_vault_initialized():
             self.show_message("error", "vault_not_initialized_error", msg_type="error")
             return
@@ -1342,10 +1337,14 @@ class ModernPasswordManagerGUI:
                 return
 
             if self.auth_guardian.is_locked_out():
-                self.show_lockout_screen()
+                self.trial_manager.show_lockout_dialog(self.auth_guardian.get_remaining_lockout_time())
+                self.root.quit()
             else:
                 remaining_attempts = self.auth_guardian.MAX_ATTEMPTS_BEFORE_LOCKOUT - self.auth_guardian.failed_attempts
                 self.show_message("error", "invalid_master_password_error", msg_type="error", attempts=remaining_attempts)
+                if self.auth_guardian.is_locked_out(): # Re-check after message
+                    self.trial_manager.show_lockout_dialog(self.auth_guardian.get_remaining_lockout_time())
+                    self.root.quit()
 
     def disable_login_button_with_countdown(self):
         if hasattr(self, 'login_btn'):
@@ -3635,7 +3634,8 @@ class ModernPasswordManagerGUI:
             remaining_time = self.get_remaining_lockout_time()
             minutes, seconds = divmod(remaining_time, 60)
             logger.info(f"User is locked out on startup - {minutes:02d}:{seconds:02d} remaining")
-            self.show_lockout_screen()
+            self.trial_manager.show_lockout_dialog(remaining_time)
+            self.root.quit()
             return True
         return False
 
