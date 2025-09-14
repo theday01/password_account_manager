@@ -63,8 +63,23 @@ class TrialManager:
     """
     _machine_id = None  # Cache for machine ID
 
+    # def __init__(self, parent_window, restart_callback=None):
+    #     self.TRIAL_PERIOD = timedelta(days=7)
+    #     self.LICENSE_FILE = self._get_obfuscated_license_path()
+
+    #     self.parent_window = parent_window
+    #     self.restart_callback = restart_callback
+
+    #     # Instantiate the guardians
+    #     self.anchor = GuardianAnchor()
+    #     self.observer = GuardianObserver(self.anchor)
+
+    #     self.is_trial_active = False
+    #     self.minutes_remaining = 0
+    #     self.status = self.check_trial_status()
+
     def __init__(self, parent_window, restart_callback=None):
-        self.TRIAL_PERIOD = timedelta(days=7)
+        self.TRIAL_PERIOD = timedelta(minutes=1)  # Changed from days=7 to minutes=1
         self.LICENSE_FILE = self._get_obfuscated_license_path()
 
         self.parent_window = parent_window

@@ -32,6 +32,7 @@ import threading
 from notification_manager import start_notification_loop
 from trial_manager import TrialManager
 from icon_manager import set_icon, ThemedToplevel
+from auth_guardian import AuthGuardian
 
 logger = logging.getLogger(__name__)
 
@@ -933,14 +934,11 @@ class ModernPasswordManagerGUI:
     def _initialize_app(self):
         self.authenticated = False
         self.accounts = []
-        self.failed_attempts = 0
-        self.lockout_until = None
-        self.settings = {}
-        self.consecutive_lockouts = 0
+        self.auth_guardian = AuthGuardian(self.secure_file_manager)
+        self.settings = self.auth_guardian._settings
         self.inactivity_timer = None
         self.INACTIVITY_TIMEOUT = 2 * 60 * 1000  # 2 minutes in milliseconds
         self.load_settings()
-        self.validate_lockout_integrity()
         self.setup_ui()
         self.start_lockout_validation_timer()
 
@@ -1115,13 +1113,11 @@ class ModernPasswordManagerGUI:
             self.secure_file_manager = None
 
     def load_settings(self):
+        # Most settings are now managed by AuthGuardian via SecureFileManager.
+        # This method is for settings not related to auth state.
         default_settings = {
             'theme': 'dark',
             'font_size': 12,
-            'lockout_until': None,
-            'failed_attempts': 0,
-            'consecutive_lockouts': 0,
-            'last_modified': None,
             'secure_storage_enabled': True,
             'tfa_secret': None,
             'tutorial_completed': False,
@@ -1129,154 +1125,41 @@ class ModernPasswordManagerGUI:
             'last_login_timestamp': 0.0,
             'consecutive_logins': 0
         }
-        if self.secure_file_manager:
-            try:
-                loaded_settings = self.secure_file_manager.read_settings()
-                if loaded_settings:
-                    self.settings = {**default_settings, **loaded_settings}
-                    if 'language' in self.settings:
-                        self.lang_manager.set_language(self.settings['language'])
-                    self.restore_lockout_state()
-                    return
-            except Exception as e:
-                logger.error(f"Failed to load secure settings: {e}")
-        settings_file = "vault_settings.json"
-        try:
-            if os.path.exists(settings_file):
-                current_file_time = os.path.getmtime(settings_file)
-                with open(settings_file, 'r') as f:
-                    loaded_settings = json.load(f)
-                    if 'last_modified' in loaded_settings and loaded_settings['last_modified']:
-                        try:
-                            stored_time = float(loaded_settings['last_modified'])
-                            if abs(current_file_time - stored_time) > 1:
-                                logger.warning("Settings file modification time mismatch detected")
-                                loaded_settings['lockout_until'] = None
-                                loaded_settings['failed_attempts'] = 0
-                                loaded_settings['consecutive_lockouts'] = 0
-                        except (ValueError, TypeError):
-                            logger.warning("Invalid modification time in settings")
-                            loaded_settings['lockout_until'] = None
-                            loaded_settings['failed_attempts'] = 0
-                            loaded_settings['consecutive_lockouts'] = 0
-                    self.settings = {**default_settings, **loaded_settings}
-                    if 'language' in self.settings:
-                        self.lang_manager.set_language(self.settings['language'])
-                    self.restore_lockout_state()
-            else:
-                self.settings = default_settings
-                self.save_settings_to_file()
-        except Exception as e:
-            logger.error(f"Error loading settings: {e}")
-            self.settings = default_settings
-
-    def restore_lockout_state(self):
-        if 'lockout_until' in self.settings and self.settings['lockout_until']:
-            try:
-                lockout_time = datetime.fromisoformat(self.settings['lockout_until'])
-                current_time = datetime.now()
-                if current_time < lockout_time:
-                    self.lockout_until = lockout_time
-                    self.failed_attempts = self.settings.get('failed_attempts', 0)
-                    self.consecutive_lockouts = self.settings.get('consecutive_lockouts', 0)
-                    remaining_seconds = int((lockout_time - current_time).total_seconds())
-                    lockout_minutes = remaining_seconds // 60
-                    logger.info(f"Lockout state restored - {lockout_minutes} minutes remaining")
-                else:
-                    self.clear_lockout_state()
-                    logger.info("Lockout period expired, state cleared")
-            except Exception as e:
-                logger.error(f"Error parsing lockout time: {e}")
-                self.clear_lockout_state()
-        else:
-            self.failed_attempts = self.settings.get('failed_attempts', 0)
-            self.consecutive_lockouts = self.settings.get('consecutive_lockouts', 0)
-
-    def clear_lockout_state(self):
-        logger.info("Clearing lockout state")
-        self.lockout_until = None
-        self.failed_attempts = 0
-        self.consecutive_lockouts = 0
-        self.settings['lockout_until'] = None
-        self.settings['failed_attempts'] = 0
-        self.settings['consecutive_lockouts'] = 0
-        self.save_settings_to_file()
-
-    def save_lockout_state(self):
-        if self.lockout_until:
-            self.settings['lockout_until'] = self.lockout_until.isoformat()
-            remaining_time = self.get_remaining_lockout_time()
-            minutes = remaining_time // 60
-            seconds = remaining_time % 60
-            logger.info(f"Saving lockout state - {minutes:02d}:{seconds:02d} remaining")
-        else:
-            self.settings['lockout_until'] = None
-        self.settings['failed_attempts'] = self.failed_attempts
-        self.settings['consecutive_lockouts'] = self.consecutive_lockouts
-        self.save_settings_to_file()
+        
+        # The AuthGuardian already loaded the settings. We just ensure defaults.
+        self.settings = {**default_settings, **self.settings}
+        
+        if 'language' in self.settings:
+            self.lang_manager.set_language(self.settings['language'])
 
     def save_settings_to_file(self):
-        self.settings['last_modified'] = time.time()
-        if self.secure_file_manager and self.secure_file_manager.temp_dir:
-            try:
-                temp_settings_path = os.path.join(self.secure_file_manager.temp_dir, "settings.json")
-                with open(temp_settings_path, 'w') as f:
-                    json.dump(self.settings, f, indent=4)
-            except Exception as e:
-                logger.warning(f"Could not save settings to temp dir: {e}")
+        # This method now just saves the current state of self.settings.
+        # AuthGuardian is responsible for saving its own state.
         if self.secure_file_manager:
             try:
-                if self.secure_file_manager.write_settings(self.settings):
-                    return
+                self.secure_file_manager.write_settings(self.settings)
             except Exception as e:
-                logger.error(f"Failed to save secure settings: {e}")
-        try:
-            settings_file = "vault_settings.json"
-            with open(settings_file, 'w') as f:
-                json.dump(self.settings, f, indent=4)
-        except Exception as e:
-            logger.error(f"Error saving settings: {e}")
-
-    def validate_lockout_integrity(self):
-        logger.info("Validating lockout state integrity...")
-        if self.lockout_until:
-            current_time = datetime.now()
-            if current_time >= self.lockout_until:
-                logger.info("Lockout period has expired, clearing state")
-                self.clear_lockout_state()
-            else:
-                if self.failed_attempts < 0:
-                    self.failed_attempts = 0
-                if self.consecutive_lockouts < 0:
-                    self.consecutive_lockouts = 0
-                max_lockout_duration = timedelta(hours=24)
-                if self.lockout_until - current_time > max_lockout_duration:
-                    logger.warning("Lockout time exceeds maximum duration, resetting")
-                    self.clear_lockout_state()
-                    return
+                logger.error(f"Error saving settings: {e}")
         else:
-            if self.failed_attempts < 0:
-                self.failed_attempts = 0
-            if self.consecutive_lockouts < 0:
-                self.consecutive_lockouts = 0
+            # Fallback for when secure manager isn't available
+            try:
+                with open("vault_settings.json", 'w') as f:
+                    json.dump(self.settings, f, indent=4)
+            except Exception as e:
+                logger.error(f"Error saving settings to fallback file: {e}")
 
     def log_security_event(self, event_type: str, details: str):
         logger.info(f"SECURITY EVENT: {event_type} - {details}")
 
     def start_lockout_validation_timer(self):
         def validate_periodically():
-            if self.lockout_until:
-                current_time = datetime.now()
-                if current_time >= self.lockout_until:
-                    logger.info("Periodic check - lockout period expired")
-                    self.clear_lockout_state()
-                    if hasattr(self, 'lockout_countdown_label'):
-                        self.root.after(0, self.show_login_screen)
-                else:
-                    self.root.after(30000, validate_periodically)
+            if self.auth_guardian.is_locked_out():
+                # The UI update is handled by update_lockout_countdown
+                self.root.after(1000, validate_periodically)
             else:
-                self.root.after(60000, validate_periodically)
-        self.root.after(30000, validate_periodically)
+                # Check less frequently when not locked out
+                self.root.after(30000, validate_periodically)
+        self.root.after(1000, validate_periodically)
 
     def is_vault_initialized(self):
         legacy_exists = os.path.exists("manageyouraccount_salt")
@@ -1378,18 +1261,29 @@ class ModernPasswordManagerGUI:
             state="disabled" if self.is_vault_initialized() else "normal"
         )
         self.setup_btn.pack(pady=8)
-        if self.lockout_until and datetime.now() < self.lockout_until:
+        if self.auth_guardian.is_locked_out():
             self.update_lockout_countdown()
         self.update_login_button_states()
 
     def authenticate_user(self):
+        if self.enforce_lockout(show_error=True):
+            return
+
         master_password = self.master_password_entry.get().strip()
         if not master_password:
             self.show_message("error", "enter_master_password_error", msg_type="error")
             return
+
+        delay = self.auth_guardian.get_login_delay()
+        if delay > 0:
+            self.show_message("info", "delay_before_login", msg_type="info", seconds=delay)
+            self.root.update_idletasks()
+            time.sleep(delay)
+
         if not self.is_vault_initialized():
             self.show_message("error", "vault_not_initialized_error", msg_type="error")
             return
+        
         if self.secure_file_manager:
             legacy_setup = SecureVaultSetup(self.secure_file_manager)
             if legacy_setup.has_legacy_files():
@@ -1397,6 +1291,7 @@ class ModernPasswordManagerGUI:
                 if not legacy_setup.migrate_legacy_files(master_password):
                     self.show_message("migration_error_title", "migration_error_body", msg_type="error")
                     return
+        
         if self.secure_file_manager:
             if not self.secure_file_manager.initialize_encryption(master_password):
                 self.show_message("error", "secure_storage_init_error", msg_type="error")
@@ -1408,108 +1303,83 @@ class ModernPasswordManagerGUI:
                 error_msg += self.lang_manager.get_string("diagnostic_report") + "\n" + diagnostic_report
                 self.show_secure_storage_error_dialog(error_msg)
                 return
+
         db_path = "manageyouraccount"
         self.database = DatabaseManager(db_path, self.crypto, self.secure_file_manager)
-        if self.database.authenticate(master_password):
+        auth_success = self.database.authenticate(master_password)
+        self.auth_guardian.record_login_attempt(success=auth_success)
+
+        if auth_success:
             if self.settings.get('tfa_secret'):
                 self.prompt_for_tfa()
             else:
                 self.authenticated = True
-                self.failed_attempts = 0
-                self.consecutive_lockouts = 0
-                self.clear_lockout_state()
-
-                # Login tracking logic
                 now = datetime.now().timestamp()
                 last_login = self.settings.get('last_login_timestamp', 0.0)
                 consecutive_logins = self.settings.get('consecutive_logins', 0)
-
-                # Reset if last login was more than 1 hour ago (3600 seconds)
                 if (now - last_login) > 3600:
                     consecutive_logins = 1
                 else:
                     consecutive_logins += 1
-                
                 self.settings['last_login_timestamp'] = now
                 self.settings['consecutive_logins'] = consecutive_logins
                 self.save_settings_to_file()
-
                 notification_thread = threading.Thread(target=start_notification_loop, daemon=True)
                 notification_thread.start()
-                
                 self.show_main_interface()
         else:
             if hasattr(self.database, 'last_integrity_error') and self.database.last_integrity_error:
                 result = self.show_message("integrity_error_title", "integrity_error_body", ask="yesno")
-                
                 if result:
                     try:
                         if self.database.force_integrity_reset():
                             self.show_message("success", "integrity_fix_success")
                             self.database.last_integrity_error = False
-                            return
                         else:
                             self.show_message("error", "integrity_fix_fail", msg_type="error")
                     except Exception as e:
                         self.show_message("error", "integrity_fix_error", msg_type="error", error=str(e))
-            
-            self.failed_attempts += 1
-            if self.failed_attempts >= 3:
-                self.consecutive_lockouts += 1
-                lockout_minutes = 3 * self.consecutive_lockouts
-                self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
-                self.save_lockout_state()
-                self.show_message("account_locked_error_title", "account_locked_error", msg_type="error", minutes=lockout_minutes)
-                self.failed_attempts = 0
-                self.disable_login_button_with_countdown(lockout_minutes)
-            else:
-                self.save_lockout_state()
-                self.show_message("error", "invalid_master_password_error", msg_type="error", attempts=3 - self.failed_attempts)
+                return
 
-    def disable_login_button_with_countdown(self, lockout_minutes):
+            if self.auth_guardian.is_locked_out():
+                self.show_lockout_screen()
+            else:
+                remaining_attempts = self.auth_guardian.MAX_ATTEMPTS_BEFORE_LOCKOUT - self.auth_guardian.failed_attempts
+                self.show_message("error", "invalid_master_password_error", msg_type="error", attempts=remaining_attempts)
+
+    def disable_login_button_with_countdown(self):
         if hasattr(self, 'login_btn'):
             self.login_btn.configure(state="disabled")
             self.update_lockout_countdown()
 
     def update_lockout_countdown(self):
-        if self.lockout_until and datetime.now() < self.lockout_until:
-            remaining_time = int((self.lockout_until - datetime.now()).total_seconds())
-            minutes = remaining_time // 60
-            seconds = remaining_time % 60
+        if self.auth_guardian.is_locked_out():
+            remaining_time = self.auth_guardian.get_remaining_lockout_time()
+            minutes, seconds = divmod(remaining_time, 60)
             
+            lockout_text = f"🔒 Locked ({minutes:02d}:{seconds:02d})"
             if hasattr(self, 'login_btn'):
-                self.login_btn.configure(
-                    text=f"🔒 Locked ({minutes:02d}:{seconds:02d})",
-                    state="disabled"
-                )
+                self.login_btn.configure(text=lockout_text, state="disabled")
             if hasattr(self, 'lockout_countdown_label'):
-                self.lockout_countdown_label.configure(
-                    text=f"Time remaining: {minutes:02d}:{seconds:02d}"
-                )
+                self.lockout_countdown_label.configure(text=f"Time remaining: {minutes:02d}:{seconds:02d}")
+            
             self.root.after(1000, self.update_lockout_countdown)
         else:
-            if hasattr(self, 'login_btn'):
-                self.login_btn.configure(
-                    text="🔓 Login",
-                    state="normal"
-                )
-            self.lockout_until = None
-            self.clear_lockout_state()
-            if hasattr(self, 'lockout_countdown_label'):
+            if hasattr(self, 'lockout_countdown_label'): # If we were on the lockout screen
                 self.show_login_screen()
+            elif hasattr(self, 'login_btn'):
+                self.login_btn.configure(text="🔓 Login", state="normal")
 
     def update_login_button_states(self):
         if hasattr(self, 'login_btn') and hasattr(self, 'setup_btn'):
-            if self.is_vault_initialized():
-                self.login_btn.configure(state="normal")
-                self.setup_btn.configure(state="disabled")
-            else:
-                self.login_btn.configure(state="disabled")
-                self.setup_btn.configure(state="normal")
+            is_init = self.is_vault_initialized()
+            self.login_btn.configure(state="normal" if is_init else "disabled")
+            self.setup_btn.configure(state="disabled" if is_init else "normal")
 
     def verify_master_password_dialog(self):
-        if self.enforce_lockout():
+        if self.enforce_lockout(show_error=True):
             return False
+
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("verify_master_password_title"))
         dialog.geometry("400x230")
@@ -1536,7 +1406,6 @@ class ModernPasswordManagerGUI:
             result["confirmed"] = False
             dialog.destroy()
         
-        
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=10)
         
@@ -1550,20 +1419,14 @@ class ModernPasswordManagerGUI:
         
         try:
             temp_db = DatabaseManager(self.database.db_path, self.crypto, self.secure_file_manager)
-            if temp_db.authenticate(result["password"]):
+            auth_success = temp_db.authenticate(result["password"])
+            self.auth_guardian.record_login_attempt(auth_success)
+            if auth_success:
                 return True
             else:
-                self.failed_attempts += 1
-                if self.failed_attempts >= 3:
-                    self.consecutive_lockouts += 1
-                    lockout_minutes = 3 * self.consecutive_lockouts
-                    self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
-                    self.save_lockout_state()
-                    self.show_message("account_locked_error_title", "account_locked_error", msg_type="error", minutes=lockout_minutes)
-                    self.failed_attempts = 0
-                else:
-                    self.save_lockout_state()
-                    self.show_message("error", "invalid_master_password", msg_type="error")
+                self.show_message("error", "invalid_master_password", msg_type="error")
+                if self.auth_guardian.is_locked_out():
+                    self.lock_vault() # Force lock and show screen
                 return False
         except Exception:
             self.show_message("error", "auth_failed", msg_type="error")
@@ -1916,23 +1779,47 @@ class ModernPasswordManagerGUI:
         
         if self.trial_manager and self.trial_manager.is_trial_active:
             remaining_minutes = int(self.trial_manager.minutes_remaining)
-            
-            if remaining_minutes > 24 * 60:
-                remaining_days = remaining_minutes // (24 * 60)
-                trial_text = f"Trial Version: {remaining_days} days remaining."
-            elif remaining_minutes > 60:
-                remaining_hours = remaining_minutes // 60
-                trial_text = f"Trial Version: {remaining_hours} hours remaining."
-            else:
-                trial_text = f"Trial Version: {remaining_minutes} minutes remaining."
 
-            trial_label = ctk.CTkLabel(
-                toolbar,
-                text=f"{trial_text}\nOnce the trial ends, you must activate the full version to continue.",
-                font=ctk.CTkFont(size=14),
-                text_color="red"
+            def _english_time(n, unit):
+                if unit == "day":
+                    return f"{n} day" if n == 1 else f"{n} days"
+                if unit == "hour":
+                    return f"{n} hour" if n == 1 else f"{n} hours"
+                # minutes
+                return f"{n} minute" if n == 1 else f"{n} minutes"
+
+            if remaining_minutes >= 24 * 60:
+                remaining_days = remaining_minutes // (24 * 60)
+                time_text = _english_time(remaining_days, "day")
+            elif remaining_minutes >= 60:
+                remaining_hours = remaining_minutes // 60
+                time_text = _english_time(remaining_hours, "hour")
+            else:
+                time_text = _english_time(remaining_minutes, "minute")
+
+            # UI: bold primary line + subdued secondary line
+            trial_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+            trial_frame.pack(side="left", padx=20, pady=8)
+
+            primary_label = ctk.CTkLabel(
+                trial_frame,
+                text=f"⏳ Trial — {time_text} remaining",
+                font=ctk.CTkFont(size=14, weight="bold"),
+                text_color="#FF7A18",  # warm orange to attract attention
+                anchor="w",
+                justify="left"
             )
-            trial_label.pack(side="left", padx=20)
+            primary_label.pack(anchor="w")
+
+            secondary_label = ctk.CTkLabel(
+                trial_frame,
+                text="When the trial ends, you'll need to activate the full version to continue.",
+                font=ctk.CTkFont(size=11),
+                text_color="#6B7280",  # soft gray for secondary info
+                anchor="w",
+                justify="left"
+            )
+            secondary_label.pack(anchor="w", pady=(4, 0))
         
         left_toolbar_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
         left_toolbar_frame.pack(side="left", fill="y", padx=25, pady=10)
@@ -2739,6 +2626,8 @@ class ModernPasswordManagerGUI:
     def verify_tfa_dialog(self):
         if not self.settings.get('tfa_secret'):
             return True
+        if self.enforce_lockout(show_error=True):
+            return False
 
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("tfa_dialog_title"))
@@ -2746,13 +2635,10 @@ class ModernPasswordManagerGUI:
         dialog.grab_set()
         
         result = {"verified": False}
-
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-
         ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("enter_2fa_code_label"),
                      font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
-        
         code_entry = SecureEntry(main_frame, width=200)
         code_entry.pack(pady=10)
         code_entry.focus()
@@ -2762,35 +2648,28 @@ class ModernPasswordManagerGUI:
             encrypted_secret_b64 = self.settings.get('tfa_secret')
             encrypted_secret = base64.b64decode(encrypted_secret_b64)
             secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
-            if self.tfa_manager.verify_code(secret, code):
+            
+            is_valid = self.tfa_manager.verify_code(secret, code)
+            self.auth_guardian.record_login_attempt(is_valid)
+
+            if is_valid:
                 result["verified"] = True
                 dialog.destroy()
             else:
                 self.show_message("error", "invalid_2fa_code", msg_type="error")
-                self.failed_attempts += 1
-                if self.failed_attempts >= 3:
-                    self.consecutive_lockouts += 1
-                    lockout_minutes = 3 * self.consecutive_lockouts
-                    self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
-                    self.save_lockout_state()
-                    self.show_message("account_locked_error_title", "account_locked_error", msg_type="error", minutes=lockout_minutes)
-                    self.failed_attempts = 0
+                if self.auth_guardian.is_locked_out():
                     dialog.destroy()
                     self.lock_vault()
-                else:
-                    self.save_lockout_state()
         
         def on_cancel():
             dialog.destroy()
 
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
-        
         ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), command=on_cancel, width=100).pack(side="left", padx=10)
         ctk.CTkButton(button_frame, text=self.lang_manager.get_string("verify_button"), command=verify_tfa, width=100).pack(side="right", padx=10)
 
         dialog.wait_window()
-        
         return result["verified"]
 
     def prompt_for_tfa(self):
@@ -2814,11 +2693,13 @@ class ModernPasswordManagerGUI:
                 encrypted_secret_b64 = self.settings.get('tfa_secret')
                 encrypted_secret = base64.b64decode(encrypted_secret_b64)
                 secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
-                if self.tfa_manager.verify_code(secret, code):
+                
+                is_valid = self.tfa_manager.verify_code(secret, code)
+                # A failed TFA attempt should also count towards lockout
+                self.auth_guardian.record_login_attempt(is_valid)
+
+                if is_valid:
                     self.authenticated = True
-                    self.failed_attempts = 0
-                    self.consecutive_lockouts = 0
-                    self.clear_lockout_state()
                     if self.secure_file_manager:
                         self.security_monitor = SecurityMonitor(self.secure_file_manager)
                         self.security_monitor.set_alert_callback(self.handle_security_alert)
@@ -2827,22 +2708,14 @@ class ModernPasswordManagerGUI:
                     self.show_main_interface()
                 else:
                     self.show_message("error", "invalid_2fa_code", msg_type="error")
-                    self.failed_attempts += 1
-                    if self.failed_attempts >= 3:
-                        self.consecutive_lockouts += 1
-                        lockout_minutes = 3 * self.consecutive_lockouts
-                        self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
-                        self.save_lockout_state()
-                        self.show_message("account_locked_error_title", "account_locked_error", msg_type="error", minutes=lockout_minutes)
-                        self.failed_attempts = 0
+                    if self.auth_guardian.is_locked_out():
                         dialog.destroy()
                         self.lock_vault()
-                    else:
-                        self.save_lockout_state()
+
             except InvalidTag:
                 messagebox.showerror(
                     "2FA Verification Error",
-                    "2FA verification failed, this is most likely due to an incorrect ''master password'', Please try logging in again."
+                    "2FA verification failed, this is most likely due to an incorrect 'master password'. Please try logging in again."
                 )
                 dialog.destroy()
                 self.lock_vault()
@@ -3190,25 +3063,20 @@ class ModernPasswordManagerGUI:
         return colors.get(strength, "#888888")
 
     def verify_security_questions(self):
-        if self.enforce_lockout():
+        if self.enforce_lockout(show_error=True):
             return False
         dialog = SecurityQuestionsDialog(self.root, self.database, self.crypto, self.lang_manager)
         is_correct = dialog.show()
+        
+        # We treat a security question failure like a password failure for lockout purposes.
+        self.auth_guardian.record_login_attempt(is_correct)
+        
         if is_correct:
             return True
         else:
-            self.failed_attempts += 1
-            if self.failed_attempts >= 3:
-                self.consecutive_lockouts += 1
-                lockout_minutes = 3 * self.consecutive_lockouts
-                self.lockout_until = datetime.now() + timedelta(minutes=lockout_minutes)
-                self.save_lockout_state()
-                self.show_message("account_locked_error_title", "account_locked_error", msg_type="error", minutes=lockout_minutes)
-                self.failed_attempts = 0
+            self.show_message("error", "invalid_answer", msg_type="error")
+            if self.auth_guardian.is_locked_out():
                 self.lock_vault()
-            else:
-                self.save_lockout_state()
-                self.show_message("error", "invalid_answer", msg_type="error")
             return False
 
     def create_action_buttons(self, parent, account):
@@ -3747,30 +3615,25 @@ class ModernPasswordManagerGUI:
                          text_color="#FF4444").pack(pady=20)
 
     def get_remaining_lockout_time(self) -> int:
-        if self.lockout_until and datetime.now() < self.lockout_until:
-            return int((self.lockout_until - datetime.now()).total_seconds())
-        return 0
+        return self.auth_guardian.get_remaining_lockout_time()
 
-    def enforce_lockout(self):
+    def enforce_lockout(self, show_error=False) -> bool:
         if self.is_currently_locked_out():
-            remaining_time = self.get_remaining_lockout_time()
-            minutes = remaining_time // 60
-            seconds = remaining_time % 60
-            self.show_message("Account Locked", f"Account is locked for {minutes:02d}:{seconds:02d} due to failed attempts.", msg_type="error")
-            self.log_security_event("LOCKOUT_ENFORCED", "Login attempt blocked - user locked out")
+            if show_error:
+                remaining_time = self.get_remaining_lockout_time()
+                minutes, seconds = divmod(remaining_time, 60)
+                self.show_message("Account Locked", f"Account is locked for {minutes:02d}:{seconds:02d} due to failed attempts.", msg_type="error")
+            self.log_security_event("LOCKOUT_ENFORCED", "Attempt blocked - user locked out")
             return True
         return False
 
     def is_currently_locked_out(self) -> bool:
-        if self.lockout_until and datetime.now() < self.lockout_until:
-            return True
-        return False
+        return self.auth_guardian.is_locked_out()
 
     def check_startup_lockout(self):
         if self.is_currently_locked_out():
             remaining_time = self.get_remaining_lockout_time()
-            minutes = remaining_time // 60
-            seconds = remaining_time % 60
+            minutes, seconds = divmod(remaining_time, 60)
             logger.info(f"User is locked out on startup - {minutes:02d}:{seconds:02d} remaining")
             self.show_lockout_screen()
             return True
