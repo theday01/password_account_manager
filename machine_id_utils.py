@@ -63,17 +63,53 @@ def get_system_uuid():
         return None
     return None
 
+def get_ram_info():
+    """
+    Retrieves RAM serial numbers.
+    """
+    try:
+        system = platform.system()
+        if system == 'Windows':
+            command = "wmic memorychip get SerialNumber"
+            output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
+            serial_numbers = [line.strip() for line in output.split('\n') if line.strip() and "SerialNumber" not in line]
+            return "".join(sorted(serial_numbers))
+        elif system == 'Linux':
+            try:
+                command = "dmidecode -t memory | grep 'Serial Number:'"
+                output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
+                serial_numbers = [line.split(':')[1].strip() for line in output.split('\n') if "Serial Number:" in line]
+                # Filter out "Not Specified" or similar placeholders
+                serial_numbers = [sn for sn in serial_numbers if sn and "Not Specified" not in sn and "Unknown" not in sn]
+                return "".join(sorted(serial_numbers))
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                # Fallback if dmidecode is not available or fails
+                return None
+        elif system == 'Darwin': # macOS
+            command = "system_profiler SPMemoryDataType | grep 'Serial Number'"
+            output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
+            serial_numbers = [line.split(':')[1].strip() for line in output.split('\n') if "Serial Number:" in line]
+            return "".join(sorted(serial_numbers))
+    except Exception:
+        return None
+    return None
+
 def generate_machine_id():
     """
-    Generates a stable machine ID primarily from the system's UUID.
-    This is more stable than including the MAC address, which can change.
+    Generates a stable machine ID from a combination of hardware identifiers.
+    This is more stable and secure than relying on a single identifier.
     """
-    uuid = get_system_uuid()
-    
-    # If UUID is not available, fall back to a combination of system info.
-    # This is less ideal but provides a fallback.
-    if not uuid:
+    # Use placeholders for unavailable information to ensure a consistent format
+    mac_address = get_mac_address() or "no_mac"
+    ram_info = get_ram_info() or "no_ram"
+    uuid = get_system_uuid() or "no_uuid"
+
+    # Combine all the info, using a separator to prevent collisions
+    machine_info = f"{mac_address}|{ram_info}|{uuid}"
+
+    # Fallback for cases where no hardware identifiers can be retrieved
+    if machine_info == "no_mac|no_ram|no_uuid":
         system_info = f"{platform.system()}-{platform.node()}-{platform.architecture()}"
         return hashlib.sha256(system_info.encode()).hexdigest()
-        
-    return hashlib.sha256(uuid.encode()).hexdigest()
+
+    return hashlib.sha256(machine_info.encode()).hexdigest()
