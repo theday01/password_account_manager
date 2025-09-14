@@ -181,7 +181,7 @@ class TrialManager:
         screen_width = dialog.winfo_screenwidth()
         screen_height = dialog.winfo_screenheight()
         window_width = 780
-        window_height = 420  # Increased height for the countdown
+        window_height = 350  # Increased height for the countdown
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
         dialog.geometry(f"{window_width}x{window_height}+{x}+{y}")
