@@ -202,7 +202,7 @@ LANGUAGES = {
         "new_password_must_be_different_error": "❌ New password must be different from current",
         "password_changed_success_status": "✅ Password changed successfully!",
         "password_changed_success_title": "Password Changed Successfully",
-        "password_changed_success_message": "Master password changed successfully!\\n\\n🔄 The program will now restart to ensure all changes take effect.\\n\\nPlease wait while the application restarts...",
+        "password_changed_success_message": "Master password changed successfully! \n\n🔄 The program will now restart to ensure all changes take effect. \n\nPlease wait while the application restarts...",
         "current_password_incorrect_error": "Current password is incorrect",
         "password_change_failed_error": "Password change failed: {error}",
         "password_change_failed_status": "❌ Password change failed",

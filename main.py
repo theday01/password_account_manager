@@ -33,6 +33,8 @@ from notification_manager import start_notification_loop
 from trial_manager import TrialManager
 from icon_manager import set_icon, ThemedToplevel
 from auth_guardian import AuthGuardian
+from typing import List
+import secrets
 
 logger = logging.getLogger(__name__)
 
@@ -1636,61 +1638,125 @@ class ModernPasswordManagerGUI:
                 text_color=color
             )
 
-    def _generate_welcome_message(self):
-        safety_tips = [
-            "Safety Tip: Use a unique password for every account.",
-            "Safety Tip: Enable Two-Factor Authentication (2FA) for critical accounts.",
-            "Safety Tip: Beware of phishing emails asking for your credentials.",
-            "Safety Tip: Regularly review your account security settings.",
-            "Safety Tip: A long password is a strong password.",
-            "Safety Tip: Never share your master password with anyone.",
-            "Safety Tip: Use a password manager to store your passwords securely.",
-            "Safety Tip: Be cautious of public Wi-Fi. Use a VPN to protect your connection.",
-            "Safety Tip: Regularly update your software and applications to patch security vulnerabilities.",
-            "Safety Tip: Think before you click. Hover over links to see the actual destination.",
-            "Safety Tip: Don't use personal information like your birthday or name in your passwords.",
-            "Safety Tip: Secure your home Wi-Fi network with a strong password and WPA3 encryption.",
-            "Safety Tip: Be wary of unsolicited emails, even if they seem to be from a known contact.",
-            "Safety Tip: Enable automatic updates for your operating system and antivirus software.",
-            "Safety Tip: Lock your computer and smartphone when you are not using them.",
-            "Safety Tip: Use different passwords for your different online accounts.",
-            "Safety Tip: Check website URLs for `https://` to ensure a secure connection.",
-            "Safety Tip: Be careful what you share on social media. It can be used for social engineering.",
-            "Safety Tip: Back up your important data regularly to an external drive or cloud service.",
-            "Safety Tip: Use a firewall to prevent unauthorized access to your network.",
-            "Safety Tip: If a deal looks too good to be true, it probably is. Be cautious of online scams.",
-            "Safety Tip: Cover your webcam when not in use to prevent unauthorized access.",
-            "Safety Tip: Review app permissions before installing them on your devices.",
-            "Safety Tip: Be skeptical of urgent requests for money or personal information, even from friends.",
-            "Safety Tip: Use a screen protector with a privacy filter to shield your screen from prying eyes.",
-            "Safety Tip: Shred physical documents containing sensitive information before discarding them.",
-            "Safety Tip: Check your bank and credit card statements regularly for any suspicious activity.",
-            "Safety Tip: Don't plug in unknown USB drives into your computer.",
-            "Safety Tip: Use passphrases instead of passwords. They are longer and easier to remember.",
-            "Safety Tip: Be aware of your digital footprint. Search for your name online to see what's public.",
-            "Safety Tip: Disable Bluetooth and location services when you are not using them.",
-            "Safety Tip: Log out of websites and applications when you are finished using them.",
-            "Safety Tip: Use a separate email address for online shopping and subscriptions.",
-            "Safety Tip: Be cautious when using QR codes. Verify their source before scanning.",
-            "Safety Tip: Educate your family, especially children and the elderly, about online safety.",
-            "Safety Tip: Avoid oversharing personal information on dating apps and websites.",
-            "Safety Tip: Secure your IoT (Internet of Things) devices with strong passwords and regular updates.",
-            "Safety Tip: If you receive a suspicious text message, don't reply. Block the number and delete it.",
-            "Safety Tip: Use a credit card for online purchases instead of a debit card for better fraud protection.",
-            "Safety Tip: Before disposing of an old device, make sure to wipe all your personal data from it.",
-            "Safety Tip: Be careful with what you post in online forums and comment sections.",
-            "Safety Tip: Check for skimmers on ATMs and gas pumps before using your card.",
-            "Safety Tip: Don't fall for tech support scams. Legitimate companies won't call you out of the blue.",
-            "Safety Tip: Use a virtual credit card number for online trials and subscriptions.",
-            "Safety Tip: Be mindful of what's in the background when you are on a video call.",
-            "Safety Tip: Trust your instincts. If something feels off, it probably is."
+    def _generate_welcome_message(self, count: int = 1) -> str:
+        """
+        Return `count` unique security tips (default 1). Tips are full sentences and
+        prefixed with 'Security Tip:' for consistent UI display.
+        """
+        safety_tips: List[str] = [
+            "Security Tip: Use a unique, strong password for every account and avoid reusing passwords.",
+            "Security Tip: Enable two-factor authentication (2FA) or multi-factor authentication (MFA) on all critical accounts.",
+            "Security Tip: Beware of phishing emails asking for credentials; verify the sender and never enter credentials from a link.",
+            "Security Tip: Regularly review and tighten your account security and privacy settings.",
+            "Security Tip: Prefer long passphrases made of multiple unrelated words rather than short, complex passwords.",
+            "Security Tip: Never share your primary or master password with anyone or store it in plain text.",
+            "Security Tip: Use a reputable password manager to generate and securely store passwords and secrets.",
+            "Security Tip: Avoid using public Wi-Fi for sensitive transactions; if you must, use a trusted VPN.",
+            "Security Tip: Keep your operating system, applications, and firmware updated to patch known vulnerabilities.",
+            "Security Tip: Hover over links to inspect their real destination before clicking and verify expected domains.",
+            "Security Tip: Do not use easily guessed personal information (birthdays, names) in passwords.",
+            "Security Tip: Secure your home Wi-Fi with a strong password and the strongest available encryption (WPA3 where supported).",
+            "Security Tip: Be cautious of unexpected or unsolicited messages, even from known contacts — accounts can be compromised.",
+            "Security Tip: Enable automatic updates for your OS and security software where feasible.",
+            "Security Tip: Lock devices when not in use and require a PIN, password, biometric, or smart lock to resume.",
+            "Security Tip: Use different passwords for personal, work, and financial accounts to limit cross-account compromise.",
+            "Security Tip: Verify presence of HTTPS and a valid certificate before entering sensitive information on websites.",
+            "Security Tip: Limit what you share on social media; information there can be used for social engineering attacks.",
+            "Security Tip: Back up important data regularly to multiple locations (offline and cloud) and test restore procedures.",
+            "Security Tip: Use a firewall to block unwanted incoming traffic and monitor for suspicious connections.",
+            "Security Tip: Be skeptical of offers that seem too good to be true — they are often scams or phishing attempts.",
+            "Security Tip: Cover your webcam when not in use and disable or manage camera access for apps.",
+            "Security Tip: Review app permissions before installation and only grant permissions that are necessary.",
+            "Security Tip: Treat urgent money or information requests skeptically — verify by calling the person through a known-good number.",
+            "Security Tip: Use a privacy screen on laptops in public places to reduce shoulder-surfing risk.",
+            "Security Tip: Shred physical documents that contain sensitive information before disposal.",
+            "Security Tip: Monitor bank and credit card statements frequently and enable alerts for suspicious activity.",
+            "Security Tip: Never insert unknown USB drives into your computer — they can carry malware or exfiltrate data.",
+            "Security Tip: Use passphrases (4+ random words) which are easier to remember and harder to brute-force than short passwords.",
+            "Security Tip: Periodically search for your personal data online to understand and reduce your digital footprint.",
+            "Security Tip: Disable Bluetooth and location services when they are not needed to limit tracking and attack surface.",
+            "Security Tip: Sign out from websites and shared devices when finished to prevent unauthorized access.",
+            "Security Tip: Keep a separate email address for shopping and subscriptions to reduce spam to your primary inbox.",
+            "Security Tip: Verify the source before scanning QR codes and avoid scanning codes from unknown or suspicious sources.",
+            "Security Tip: Teach family members, especially children and elderly relatives, about basic online safety and scams.",
+            "Security Tip: Avoid oversharing on dating apps and verify identities before meeting in person.",
+            "Security Tip: Change default credentials on IoT devices and keep their firmware up to date.",
+            "Security Tip: Block and delete suspicious text messages instead of replying, and report phishing SMS to your carrier.",
+            "Security Tip: Prefer credit cards over debit cards for online purchases because of stronger consumer protections.",
+            "Security Tip: Wipe devices securely (factory reset + crypto erase) before disposal or resale to remove personal data.",
+            "Security Tip: Be mindful of what you post in public forums and remember that anything public can be scraped.",
+            "Security Tip: Inspect ATMs and gas pumps for card skimmers and avoid using compromised-looking machines.",
+            "Security Tip: Never trust unsolicited tech support calls; contact vendors using official channels if you suspect an issue.",
+            "Security Tip: Use virtual or single-use credit card numbers for trials and untrusted merchants when available.",
+            "Security Tip: Check your video-call background and be careful sharing sensitive information during remote meetings.",
+            "Security Tip: Trust your instincts — if something feels off, pause and validate before proceeding.",
+            # Additional, more advanced / operational tips:
+            "Security Tip: Use hardware security keys (FIDO2/WebAuthn) where supported for stronger phishing-resistant MFA.",
+            "Security Tip: Use app-specific or service-specific passwords for applications that do not support modern MFA.",
+            "Security Tip: Monitor breach notification services and consider dark-web monitoring to know if credentials leak.",
+            "Security Tip: Use DNS filtering or secure DNS (DoH/DoT) to reduce exposure to malicious domains.",
+            "Security Tip: Configure account recovery options (alternate email, phone) and store them securely.",
+            "Security Tip: Limit the number of people with administrative privileges and follow the principle of least privilege.",
+            "Security Tip: Segment your network (guest vs. trusted) to reduce lateral movement from compromised devices.",
+            "Security Tip: Disable unused services and close unnecessary ports on networked devices to reduce attack surface.",
+            "Security Tip: Use full-disk encryption (e.g., BitLocker, FileVault) to protect data at rest on lost or stolen devices.",
+            "Security Tip: Securely store MFA backup codes or recovery keys offline (paper or secure hardware) in a safe place.",
+            "Security Tip: Regularly audit third-party app access to your accounts and revoke access that is no longer required.",
+            "Security Tip: Be cautious installing browser extensions — only install trusted extensions and review their permissions.",
+            "Security Tip: Maintain a separate non-admin account for daily work and reserve an admin account for elevated tasks.",
+            "Security Tip: Keep device firmware (router, NAS, IoT) current and change default management ports and credentials.",
+            "Security Tip: Verify downloads by checking cryptographic checksums or digital signatures when available.",
+            "Security Tip: Use DMARC, DKIM, and SPF on your email domain to reduce email spoofing and phishing impact.",
+            "Security Tip: Implement immutable or offline backups to protect against ransomware and ensure recoverability.",
+            "Security Tip: Use passkeys (platform-backed credentials) where supported to simplify authentication and reduce phishing.",
+            "Security Tip: Rotate API keys, secrets, and certificates periodically and remove unused credentials.",
+            "Security Tip: Store highly sensitive data encrypted using strong, vetted encryption libraries and manage keys securely.",
+            "Security Tip: Use secure coding practices and regularly run static and dynamic analysis on production code.",
+            "Security Tip: Avoid clicking on shortened URLs without previewing them and use URL expanders when unsure.",
+            "Security Tip: Use content/ad blockers or safe-browsing extensions to reduce risk from malvertising.",
+            "Security Tip: Use SIM/PIN protection on mobile devices and enable carrier-level protections where offered.",
+            "Security Tip: Be wary of public/unknown charging stations (risk of juice jacking); use your own cable or a power-only adapter.",
+            "Security Tip: Keep an incident response plan and contacts ready so you can act quickly when a breach is suspected.",
+            "Security Tip: Maintain and review logs for suspicious activity and keep them stored securely off the main system.",
+            "Security Tip: Use network segmentation and VLANs for critical infrastructure to limit potential wide-spread compromise.",
+            "Security Tip: Use hardware-backed secure enclaves (TPM/SE) and enable Secure Boot where available.",
+            "Security Tip: Use certificate pinning or strict TLS validation in apps that handle sensitive data.",
+            "Security Tip: Test your backups regularly by performing full restores to ensure integrity and process accuracy.",
+            "Security Tip: Avoid mixing personal devices with corporate systems for privileged or sensitive tasks.",
+            "Security Tip: Consider endpoint detection and response (EDR) for business-critical systems to improve detection.",
+            "Security Tip: Establish a change control process to review and approve configuration changes to infrastructure.",
+            "Security Tip: Limit use of browser autofill for sensitive fields and require re-authentication for high-risk actions.",
+            "Security Tip: Remove default or sample content from web applications and harden frameworks before deployment.",
+            "Security Tip: Use tokenization or vaulting for payment data and sensitive PII to reduce compliance scope.",
+            "Security Tip: Maintain a minimal public exposure profile — limit exposed services, APIs, and ports to what is necessary."
         ]
-        try:
-            tip = secrets.choice(safety_tips)
-            return tip
-        except Exception as e:
-            logger.error(f"Failed to generate welcome message: {e}")
 
+        # Safeguard count
+        try:
+            total = len(safety_tips)
+            if count < 1:
+                count = 1
+            if count > total:
+                count = total
+
+            if count == 1:
+                # choose a single random tip
+                tip = secrets.choice(safety_tips)
+                return tip
+            else:
+                # return `count` unique tips
+                chosen = secrets.SystemRandom().sample(safety_tips, count)
+                # format as numbered list for clarity in UI
+                lines = [f"{idx}. {t}" for idx, t in enumerate(chosen, start=1)]
+                return "\n".join(lines)
+        except Exception as e:
+            # graceful fallback — keep a simple message so UI doesn't break
+            try:
+                logger.error(f"Failed to generate welcome message: {e}")
+            except Exception:
+                pass
+            return "Security Tip: Keep your software updated and use strong, unique passwords for each account."
+    
     def complete_setup(self, setup_window):
         master_password = self.setup_master_password.get()
         confirm_password = self.setup_confirm_password.get()

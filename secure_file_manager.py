@@ -20,6 +20,10 @@ try:
 except Exception:
     WATCHDOG_AVAILABLE = False
 
+import base64
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
 # cryptography imports
 try:
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -310,15 +314,47 @@ class SecureFileManager:
         The order of files is deterministic.
         """
         hasher = hashlib.sha256()
-        files = [self.metadata_db, self.sensitive_db]
+        files = [self.metadata_db, self.sensitive_db, self.settings_path]
+        magic_header = b"ENC_V1:"
+
         for p in files:
-            if os.path.exists(p):
-                # include file path and size & content to make collisions unlikely
-                hasher.update(p.encode("utf-8"))
-                hasher.update(str(os.path.getsize(p)).encode("utf-8"))
+            if not os.path.exists(p):
+                continue
+
+            hasher.update(p.encode("utf-8"))
+            hasher.update(str(os.path.getsize(p)).encode("utf-8"))
+
+            if p == self.settings_path and self.encryption_key:
+                # For settings, we must hash the plaintext content, not the ciphertext,
+                # because the ciphertext changes on every write due to the random IV.
+                try:
+                    with open(p, "rb") as fh:
+                        raw_data = fh.read()
+                    
+                    if raw_data.startswith(magic_header):
+                        encoded_data = raw_data[len(magic_header):]
+                        decoded_data = base64.b64decode(encoded_data)
+                        iv, tag, ciphertext = decoded_data[:16], decoded_data[16:32], decoded_data[32:]
+                        
+                        cipher = Cipher(algorithms.AES(self.encryption_key), modes.GCM(iv, tag), backend=default_backend())
+                        decryptor = cipher.decryptor()
+                        plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+                        hasher.update(plaintext)
+                    else:
+                        # It's a plaintext settings file, hash its content directly
+                        hasher.update(raw_data)
+                except Exception:
+                    # If decryption fails during integrity check, something is very wrong.
+                    # Hashing the raw (undecryptable) content is a safe fallback
+                    # as it will cause a mismatch if the file was tampered with.
+                    with open(p, "rb") as fh:
+                        hasher.update(fh.read())
+            else:
+                # For all other files (or settings without an encryption key), hash the raw content
                 with open(p, "rb") as fh:
                     for chunk in iter(lambda: fh.read(8192), b""):
                         hasher.update(chunk)
+                        
         return hasher.digest()
 
     def rotate_integrity_signature(self) -> bool:
@@ -524,24 +560,89 @@ class SecureFileManager:
         return out
 
     def read_settings(self) -> Optional[Dict]:
-        """Read and parse settings from the secure settings file."""
+        """Read, decrypt, and parse settings from the secure settings file."""
         if not os.path.exists(self.settings_path):
             return None
+
         try:
-            with open(self.settings_path, 'r') as f:
-                return json.load(f)
-        except (IOError, json.JSONDecodeError):
-            LOG.exception("Failed to read or parse secure settings file.")
+            with open(self.settings_path, 'rb') as f:
+                raw_data = f.read()
+        except IOError:
+            LOG.exception("Failed to read secure settings file.")
             return None
 
+        # Check for magic header to determine if the file is encrypted
+        magic_header = b"ENC_V1:"
+        if raw_data.startswith(magic_header):
+            if not self.encryption_key:
+                LOG.error("Settings file is encrypted, but no encryption key is available.")
+                return None
+            
+            try:
+                # Strip header and decode from base64
+                encoded_data = raw_data[len(magic_header):]
+                decoded_data = base64.b64decode(encoded_data)
+                
+                # Extract IV, tag, and ciphertext
+                iv = decoded_data[:16]
+                tag = decoded_data[16:32]
+                ciphertext = decoded_data[32:]
+                
+                # Decrypt
+                cipher = Cipher(algorithms.AES(self.encryption_key), modes.GCM(iv, tag), backend=default_backend())
+                decryptor = cipher.decryptor()
+                decrypted_json = decryptor.update(ciphertext) + decryptor.finalize()
+                
+                return json.loads(decrypted_json.decode('utf-8'))
+            
+            except (InvalidTag, ValueError, IndexError) as e:
+                LOG.exception(f"Failed to decrypt settings file. It may be corrupt or the key is wrong: {e}")
+                return None # Hard fail if decryption fails on an encrypted file
+            except Exception:
+                LOG.exception("An unexpected error occurred during settings decryption.")
+                return None
+
+        else:
+            # No header, assume legacy plaintext file
+            try:
+                return json.loads(raw_data.decode('utf-8'))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                LOG.exception("Failed to parse settings file as JSON.")
+                return None
+
     def write_settings(self, settings: Dict) -> bool:
-        """Write settings to the secure settings file."""
+        """Encrypt and write settings to the secure settings file if a key is available, otherwise write plaintext."""
+        # If no encryption key is set, we write the settings as plaintext JSON.
+        # This is for scenarios like initial setup before a master password exists.
+        if not self.encryption_key:
+            LOG.warning("Writing settings in plaintext because no encryption key is available.")
+            try:
+                settings_json = json.dumps(settings, indent=4).encode('utf-8')
+                _atomic_write(self.settings_path, settings_json)
+                return True
+            except Exception:
+                LOG.exception("Failed to write plaintext settings.")
+                return False
+
+        # If an encryption key is available, encrypt the settings.
         try:
-            with open(self.settings_path, 'w') as f:
-                json.dump(settings, f, indent=4)
+            settings_json = json.dumps(settings, indent=4).encode('utf-8')
+            
+            iv = os.urandom(16)
+            cipher = Cipher(algorithms.AES(self.encryption_key), modes.GCM(iv), backend=default_backend())
+            encryptor = cipher.encryptor()
+            ciphertext = encryptor.update(settings_json) + encryptor.finalize()
+            
+            # Combine IV, tag, and ciphertext, then encode
+            encoded_bundle = base64.b64encode(iv + encryptor.tag + ciphertext)
+            
+            # Prepend the magic header
+            final_data = b"ENC_V1:" + encoded_bundle
+            
+            _atomic_write(self.settings_path, final_data)
             return True
-        except IOError:
-            LOG.exception("Failed to write to secure settings file.")
+        except Exception:
+            LOG.exception("Failed to encrypt and write settings.")
             return False
 
 
