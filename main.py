@@ -682,6 +682,8 @@ class DatabaseManager:
         logger.info("All credentials re-encrypted successfully")
         self.encryption_key = new_encryption_key
         self.integrity_key = new_integrity_key
+        if self.secure_file_manager:
+            self.secure_file_manager.encryption_key = new_encryption_key
         try:
             with open(self.salt_path, "wb") as f:
                 f.write(new_salt)
@@ -697,6 +699,7 @@ class DatabaseManager:
             raise ValueError(f"Failed to update integrity signature: {e}")
         self.log_action("UPDATE", "SYSTEM", "master_password", "Master password changed successfully")
         if self.secure_file_manager:
+            self.secure_file_manager.cleanup_temp_files()
             try:
                 self.secure_file_manager.sync_all_files()
                 logger.info("Changes synced to secure storage")
