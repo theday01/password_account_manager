@@ -54,9 +54,10 @@ class AuthGuardian:
         self._settings['guardian_lockout_end_time'] = self.lockout_end_time.isoformat() if self.lockout_end_time else None
         
         try:
-            self._settings_manager.write_settings(self._settings)
+            if not self._settings_manager.write_settings(self._settings):
+                logger.warning("Failed to save guardian state, most likely because the vault is locked.")
         except Exception as e:
-            logger.error(f"Failed to save guardian state: {e}")
+            logger.error(f"An unexpected error occurred while saving guardian state: {e}")
 
     def record_login_attempt(self, success: bool):
         """

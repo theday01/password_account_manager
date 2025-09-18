@@ -579,7 +579,7 @@ class SecureFileManager:
         magic_header = b"ENC_V1:"
         if raw_data.startswith(magic_header):
             if not self.encryption_key:
-                LOG.error("Settings file is encrypted, but no encryption key is available.")
+                LOG.warning("Settings file is encrypted, but no encryption key is available (this is expected on startup).")
                 return None
             
             try:
@@ -626,11 +626,10 @@ class SecureFileManager:
         # but only if the caller explicitly allows it.
         if not self.encryption_key:
             if not allow_plaintext:
-                msg = "No encryption key available. Writing settings in plaintext is disallowed by default."
-                LOG.error(msg)
-                raise EncryptionWarning(msg)
+                LOG.warning("No encryption key available. Writing settings in plaintext is disallowed by default.")
+                return False
             
-            LOG.warning("Writing settings in plaintext because no encryption key is available.")
+            LOG.info("Writing settings in plaintext because no encryption key is available (and allow_plaintext=True).")
             try:
                 settings_json = json.dumps(settings, indent=4).encode('utf-8')
                 _atomic_write(self.settings_path, settings_json)
