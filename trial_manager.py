@@ -120,7 +120,7 @@ class TrialManager:
         self._settings['activation_lockout_end_time'] = self.activation_lockout_end_time.isoformat() if self.activation_lockout_end_time else None
         
         if self._settings_manager:
-            self._settings_manager.write_settings(self._settings)
+            self._settings_manager.write_settings(self._settings, allow_plaintext=True)
 
     def is_activation_locked_out(self) -> bool:
         """Checks if the activation is currently in a hard lockout state."""

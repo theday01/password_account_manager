@@ -36,6 +36,10 @@ except Exception:
 LOG = logging.getLogger(__name__)
 
 
+class EncryptionWarning(UserWarning):
+    """Warning issued when encryption is expected but not available."""
+
+
 # ------------------------ Utilities ------------------------
 
 def _atomic_write(path: str, data: bytes) -> None:
@@ -343,10 +347,10 @@ class SecureFileManager:
                     else:
                         # It's a plaintext settings file, hash its content directly
                         hasher.update(raw_data)
-                except Exception:
-                    # If decryption fails during integrity check, something is very wrong.
-                    # Hashing the raw (undecryptable) content is a safe fallback
-                    # as it will cause a mismatch if the file was tampered with.
+                except (EncryptionWarning, InvalidTag):
+                    # If decryption is not possible (no key) or fails (bad key/tampering),
+                    # hashing the raw (undecryptable) content is a safe fallback.
+                    # This will correctly cause a signature mismatch if the file was tampered with.
                     with open(p, "rb") as fh:
                         hasher.update(fh.read())
             else:
@@ -595,7 +599,11 @@ class SecureFileManager:
                 
                 return json.loads(decrypted_json.decode('utf-8'))
             
-            except (InvalidTag, ValueError, IndexError) as e:
+            except (EncryptionWarning, InvalidTag):
+                # This is not an error, but a state where the settings are not available.
+                # The caller should handle this case.
+                return None
+            except (ValueError, IndexError) as e:
                 LOG.exception(f"Failed to decrypt settings file. It may be corrupt or the key is wrong: {e}")
                 return None # Hard fail if decryption fails on an encrypted file
             except Exception:
@@ -610,11 +618,18 @@ class SecureFileManager:
                 LOG.exception("Failed to parse settings file as JSON.")
                 return None
 
-    def write_settings(self, settings: Dict) -> bool:
-        """Encrypt and write settings to the secure settings file if a key is available, otherwise write plaintext."""
-        # If no encryption key is set, we write the settings as plaintext JSON.
-        # This is for scenarios like initial setup before a master password exists.
+    def write_settings(self, settings: Dict, *, allow_plaintext: bool = False) -> bool:
+        """Encrypt and write settings. If a key is available, data is encrypted.
+        If no key is available, data is written in plaintext only if allow_plaintext is True.
+        """
+        # If no encryption key is set, we can write the settings as plaintext JSON,
+        # but only if the caller explicitly allows it.
         if not self.encryption_key:
+            if not allow_plaintext:
+                msg = "No encryption key available. Writing settings in plaintext is disallowed by default."
+                LOG.error(msg)
+                raise EncryptionWarning(msg)
+            
             LOG.warning("Writing settings in plaintext because no encryption key is available.")
             try:
                 settings_json = json.dumps(settings, indent=4).encode('utf-8')
