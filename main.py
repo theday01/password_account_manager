@@ -1835,6 +1835,15 @@ class ModernPasswordManagerGUI:
         self.root.bind("<Motion>", self.reset_inactivity_timer)
         self.root.bind("<Button-1>", self.reset_inactivity_timer)
 
+        def on_closing():
+            self.show_message(
+                "action_not_allowed_title",
+                "action_not_allowed_body",
+                msg_type="info"
+            )
+        
+        self.root.protocol("WM_DELETE_WINDOW", on_closing)
+
         if not self.settings.get('tutorial_completed', False):
             tutorial = TutorialManager(self.root, self.lang_manager)
             tutorial.show_tutorial_window()
@@ -2406,6 +2415,7 @@ class ModernPasswordManagerGUI:
                 logger.info("Temporary files cleaned up")
             self.authenticated = False
             self.database = None
+            self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)  # Re-enable closing
             self.show_login_screen()
             
             logger.info("Vault locked successfully")

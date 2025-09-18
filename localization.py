@@ -383,6 +383,8 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "suspicious_activity_detected": "Suspicious activity detected. The application will now close.",
         "app_locked_title": "Application Locked",
         "app_locked_message": "The application is locked due to suspicious activity. Please wait {time} before trying again.",
+        "action_not_allowed_title": "Action Not Allowed",
+        "action_not_allowed_body": "Closing the application is not allowed from this screen. Please log out first to ensure your data is saved securely.",
     },
     "Arabic": {
         "loading": "جارٍ التحميل...",
@@ -750,6 +752,8 @@ SecureVault Pro هو مدير كلمات مرور لسطح المكتب يركز
         "suspicious_activity_detected": "تم الكشف عن نشاط مشبوه. سيتم إغلاق التطبيق الآن.",
         "app_locked_title": "التطبيق مقفل",
         "app_locked_message": "التطبيق مقفل بسبب نشاط مشبوه. الرجاء الانتظار {time} قبل المحاولة مرة أخرى.",
+        "action_not_allowed_title": "الإجراء غير مسموح به",
+        "action_not_allowed_body": "إغلاق التطبيق غير مسموح به من هذه الشاشة. يرجى تسجيل الخروج أولاً لضمان حفظ بياناتك بشكل آمن.",
     }
 }
 
