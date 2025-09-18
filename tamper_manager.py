@@ -69,8 +69,13 @@ class TamperManager:
             encrypted_data = self._encrypt_data(data_dict)
             signature = self._sign_data(encrypted_data)
             payload = json.dumps({'data': encrypted_data, 'sig': signature})
-            with open(self.watermark_path, 'w') as f:
+            
+            temp_path = self.watermark_path + ".tmp"
+            with open(temp_path, 'w') as f:
                 f.write(payload)
+            
+            os.replace(temp_path, self.watermark_path)
+            
             if platform.system() == 'Windows':
                 os.system(f"attrib +h +s {self.watermark_path}")
             return True

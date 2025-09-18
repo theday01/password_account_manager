@@ -1,5 +1,13 @@
 في التعديل ععلا الحساب السابق قم بالمطالبة بكلمة المرور الرئيسية
 
+اذا انطفء الويندوز بشكل مفاجء قد تتم المطالبة بتفعيل البرنامج خطءا 
+
+
+
+
+
+
+
 
 trial :
     def __init__(self, parent_window, secure_file_manager, restart_callback=None):
