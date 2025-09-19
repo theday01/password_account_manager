@@ -992,105 +992,123 @@ class ModernPasswordManagerGUI:
             height=50
         )
         close_button.pack(pady=20)
-
-        # Wait for the window to be closed before returning
         welcome_window.wait_window()
 
-    def show_loading_screen(self): 
-        bg_color = "#f5f5f5"      # light gray background
-        accent_color = "#2b6cb0"  # deep blue
-        slogan_color = "#1a202c"  # dark gray/black
-        subtext_color = "#4a5568" # softer gray
+    def show_loading_screen(self):
+        bg_color = "#f5f5f5"      
+        accent_color = "#2b6cb0" 
+        text_color = "#1a202c"     
+        slogan_color = "#4a5568" 
         
-        width, height = 550, 220   # wider for side-by-side layout
+        width, height = 480, 320   # more compact and centered
         loading_window = ThemedToplevel(self.root, fg_color=bg_color)
         loading_window.title(self.lang_manager.get_string("loading"))
         loading_window.geometry(f"{width}x{height}")
         loading_window.resizable(False, False)
         loading_window.overrideredirect(True)
         loading_window.grab_set()
+        
         self.root.update_idletasks()
         x = (self.root.winfo_screenwidth() // 2) - (width // 2)
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         loading_window.geometry(f"{width}x{height}+{x}+{y}")
 
-        main_frame = ctk.CTkFrame(loading_window, fg_color=bg_color, corner_radius=0)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-        main_frame.columnconfigure(0, weight=1)  # image column
-        main_frame.columnconfigure(1, weight=2)  # text column
+        main_frame = ctk.CTkFrame(loading_window, fg_color=bg_color, corner_radius=10)
+        main_frame.pack(fill="both", expand=True, padx=2, pady=2)
 
         try:
             load_icon_path = os.path.join("icons", "load.png")
             if os.path.exists(load_icon_path):
                 load_image = Image.open(load_icon_path)
-                load_icon = ctk.CTkImage(light_image=load_image, size=(200, 150))  
-                icon_label = ctk.CTkLabel(main_frame, image=load_icon, text="", fg_color=bg_color)
-                icon_label.grid(row=0, column=0, rowspan=5, padx=(10, 20), pady=10, sticky="n")
+                load_icon = ctk.CTkImage(light_image=load_image, size=(96, 96))
+                icon_label = ctk.CTkLabel(main_frame, image=load_icon, text="", fg_color="transparent")
+                icon_label.pack(pady=(20, 10))
         except Exception as e:
             logger.warning(f"Could not display loading icon: {e}")
-
+        
         ctk.CTkLabel(
             main_frame,
             text=self.lang_manager.get_string("app_title"),
-            font=ctk.CTkFont(size=24, weight="bold"),
-            text_color=accent_color
-        ).grid(row=0, column=1, pady=(5, 3), sticky="w")
+            font=ctk.CTkFont(size=32, weight="bold"),
+            text_color=text_color
+        ).pack(pady=(5, 5))
 
         ctk.CTkLabel(
             main_frame,
             text=self.lang_manager.get_string("app_slogan"),
-            font=ctk.CTkFont(size=11),
+            font=ctk.CTkFont(size=12, slant="italic"),
             text_color=slogan_color
-        ).grid(row=1, column=1, pady=(0, 15), sticky="w")
-
-        progress_bar = ctk.CTkProgressBar(
-            main_frame,
-            width=300,
-            height=12,
-            progress_color=accent_color,
-            corner_radius=10
-        )
-        progress_bar.grid(row=2, column=1, pady=10, sticky="w")
-        progress_bar.set(0)
+        ).pack(pady=(0, 25))
 
         status_label = ctk.CTkLabel(
             main_frame,
             text=self.lang_manager.get_string("initializing"),
-            font=ctk.CTkFont(size=14, weight="bold"),
+            font=ctk.CTkFont(size=12),
             text_color=accent_color
         )
-        status_label.grid(row=3, column=1, pady=(15, 5), sticky="w")
+        status_label.pack(pady=(10, 5))
 
-        details_label = ctk.CTkLabel(
+        # Progress bar
+        progress_bar = ctk.CTkProgressBar(
             main_frame,
-            text=self.lang_manager.get_string("starting_engine"),
-            font=ctk.CTkFont(size=10),
-            text_color=subtext_color
+            width=320,
+            height=8,
+            progress_color=accent_color,
+            fg_color="#333333",
+            corner_radius=4
         )
-        details_label.grid(row=4, column=1, sticky="w")
+        progress_bar.pack(pady=5)
+        progress_bar.set(0)
 
-        def update_loading(step):
-            if step == 1:
-                progress_bar.set(0.25)
-                status_label.configure(text=self.lang_manager.get_string("loading_components"))
-                details_label.configure(text=self.lang_manager.get_string("loading_gui"))
-                loading_window.after(700, lambda: update_loading(2))
-            elif step == 2:
-                progress_bar.set(0.55)
-                status_label.configure(text=self.lang_manager.get_string("verifying_security"))
-                details_label.configure(text=self.lang_manager.get_string("checking_vault"))
-                loading_window.after(1000, lambda: update_loading(3))
-            elif step == 3:
-                progress_bar.set(0.85)
-                status_label.configure(text=self.lang_manager.get_string("preparing_workspace"))
-                details_label.configure(text=self.lang_manager.get_string("setting_up_main_interface"))
-                loading_window.after(600, lambda: update_loading(4))
-            elif step == 4:
-                progress_bar.set(1.0)
-                status_label.configure(text=self.lang_manager.get_string("done"))
-                details_label.configure(text=self.lang_manager.get_string("launching_application"))
-                loading_window.after(600, lambda: finish_loading())
+        # Copyright/version label
+        ctk.CTkLabel(
+            main_frame,
+            text="© 2024 SecureVault Pro. All rights reserved.",
+            font=ctk.CTkFont(size=9),
+            text_color=slogan_color
+        ).pack(side="bottom", pady=10)
+
+        # Animation and logic
+        def update_loading(progress, status_text):
+            progress_bar.set(progress)
+            status_label.configure(text=status_text)
+            loading_window.update_idletasks()
+
+        def animate_progress(current_progress, target_progress, status_text, duration_ms, steps=20):
+            step_progress = (target_progress - current_progress) / steps
+            step_delay = duration_ms // steps
+            
+            def step_func(step_num):
+                if step_num <= steps:
+                    new_progress = current_progress + step_progress * step_num
+                    update_loading(new_progress, status_text)
+                    loading_window.after(step_delay, lambda: step_func(step_num + 1))
+            
+            step_func(1)
+
+        def sequence_loader():
+            # Initial state
+            update_loading(0, self.lang_manager.get_string("initializing"))
+            loading_window.after(500)
+
+            # Step 1: Loading components
+            animate_progress(0, 0.25, self.lang_manager.get_string("loading_components"), 700)
+            loading_window.after(700, lambda: sequence_step_2())
+
+        def sequence_step_2():
+            # Step 2: Verifying security
+            animate_progress(0.25, 0.55, self.lang_manager.get_string("verifying_security"), 1000)
+            loading_window.after(1000, lambda: sequence_step_3())
+
+        def sequence_step_3():
+            # Step 3: Preparing workspace
+            animate_progress(0.55, 0.85, self.lang_manager.get_string("preparing_workspace"), 600)
+            loading_window.after(600, lambda: sequence_step_4())
+
+        def sequence_step_4():
+            # Step 4: Finalizing
+            animate_progress(0.85, 1.0, self.lang_manager.get_string("launching_application"), 600)
+            loading_window.after(600, lambda: finish_loading())
 
         def finish_loading():
             loading_window.destroy()
@@ -1107,7 +1125,7 @@ class ModernPasswordManagerGUI:
 
             self._initialize_app()
 
-        loading_window.after(200, lambda: update_loading(1))
+        loading_window.after(200, sequence_loader)
 
     def _setup_secure_file_manager(self):
         try:
