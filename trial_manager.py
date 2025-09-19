@@ -271,7 +271,7 @@ class TrialManager:
             update_countdown(lockout_time)
 
         elif is_tampered:
-            message = "Critical security components have been modified or corrupted, or tampering has been detected.\nThe application cannot continue.\n\nPlease contact support and provide your Machine ID to resolve this issue."
+            message = "Critical security components have been modified or corrupted, or tampering has been detected.\nThe application cannot continue.\n\nPlease contact support and provide your APPLICATION ID to resolve this issue."
             message_label.configure(text=message, text_color="red")
             message_label.pack(pady=10)
         else: # EXPIRED
@@ -281,7 +281,7 @@ class TrialManager:
 
         machine_id_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         machine_id_frame.pack(pady=10)
-        ctk.CTkLabel(machine_id_frame, text="Your Machine ID:").pack(side="left", padx=(10, 5))
+        ctk.CTkLabel(machine_id_frame, text="Your Application ID:").pack(side="left", padx=(10, 5))
         machine_id_entry = ctk.CTkEntry(machine_id_frame, width=300)
         machine_id_entry.insert(0, self._get_machine_id())
         machine_id_entry.configure(state="readonly")
