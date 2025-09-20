@@ -3,13 +3,18 @@
 اذا انطفء الويندوز بشكل مفاجء قد تتم المطالبة بتفعيل البرنامج خطءا 
 
 
+تحسين 
+loading 
 
 
+جعل جميع النوافذ لها الشعار نفسه للبرنامج لرئيسي
 
 
+اضافة زر تفعيل البرنامج اذا كان البرنامج في الفترة التجريبية 
 
 
-trial :
-    def __init__(self, parent_window, secure_file_manager, restart_callback=None):
-        self.TRIAL_MINUTES = 2  # Set trial duration to 2 minutes for testing
-        self.LICENSE_FILE = os.path.expanduser("~/.sv_license")
+اضافة تذكير بضرورة تفعيل البرنامج في اقرب وقت واضهار مكان كتابة رمز التفعيل في 
+dialog 
+نفسه الذي يذكر المستخدم 
+كما هو الامر في برنامج التحميل 
+idman

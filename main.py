@@ -31,12 +31,14 @@ from localization import LanguageManager
 import threading
 import asyncio
 from notification_manager import start_notification_loop, notifier
+from desktop_notifier import Icon
 from trial_manager import TrialManager
 from tamper_manager import TamperManager
 from icon_manager import set_icon, ThemedToplevel
 from auth_guardian import AuthGuardian
 from typing import List
 import secrets
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -2024,10 +2026,28 @@ class ModernPasswordManagerGUI:
             if remaining_seconds <= 20 and not self.trial_notification_sent:
                 try:
                     logger.info("Sending trial ending soon notification.")
-                    asyncio.run(notifier.send(
-                        title="Trial Period Ending Soon",
-                        message="Your trial is about to end in less than 20 seconds. Please activate to keep using SecureVault Pro."
-                    ))
+                    # Import Path from pathlib
+                    from pathlib import Path
+                    from desktop_notifier import DesktopNotifier
+                    
+                    # Create a new notifier instance with custom app name
+                    custom_notifier = DesktopNotifier(app_name="SecureVault Pro")
+                    
+                    icon_path = Path(__file__).parent / "icons" / "main.ico"
+                    
+                    # Check if icon file exists before using it
+                    if icon_path.exists():
+                        asyncio.run(custom_notifier.send(
+                            title="Trial Period Ending Soon",
+                            message="Your trial is about to end in less than 20 seconds. Please activate to keep using SecureVault Pro.",
+                            icon=Icon(icon_path)  # Now using Path object
+                        ))
+                    else:
+                        # Fallback: send notification without icon if file doesn't exist
+                        asyncio.run(custom_notifier.send(
+                            title="Trial Period Ending Soon",
+                            message="Your trial is about to end in less than 20 seconds. Please activate to keep using SecureVault Pro."
+                        ))
                     self.trial_notification_sent = True
                 except Exception as e:
                     logger.error(f"Failed to send trial notification: {e}")
@@ -2043,7 +2063,7 @@ class ModernPasswordManagerGUI:
 
         # Start the first check
         self.root.after(1000, _check)
-
+                        
     def show_restore_dialog(self):
         import glob, os, tempfile, shutil, json, sys
         from datetime import datetime

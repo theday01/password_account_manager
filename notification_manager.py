@@ -1,7 +1,10 @@
 import asyncio
-from desktop_notifier import DesktopNotifier
+from desktop_notifier import DesktopNotifier, Icon
+from pathlib import Path
+import os
 
-notifier = DesktopNotifier()
+# Create notifier with custom app name
+notifier = DesktopNotifier(app_name="SecureVault Pro")
 
 async def _periodic_sender(is_trial_active: bool):
     """
@@ -13,10 +16,22 @@ async def _periodic_sender(is_trial_active: bool):
 
     while True:
         try:
-            await notifier.send(
-                title="Backup Reminder",
-                message="It’s time to back up your data to keep everything safe and secure.",
-            )
+            # Get the icon path
+            icon_path = Path(__file__).parent / "icons" / "main.ico"
+            
+            # Send notification with icon if available
+            if icon_path.exists():
+                await notifier.send(
+                    title="Backup Reminder",
+                    message="It's time to back up your data to keep everything safe and secure.",
+                    icon=Icon(icon_path)
+                )
+            else:
+                # Fallback without icon if file doesn't exist
+                await notifier.send(
+                    title="Backup Reminder",
+                    message="It's time to back up your data to keep everything safe and secure.",
+                )
         except Exception as e:
             print(f"Error sending notification: {e}")
         await asyncio.sleep(240)  # 4 minutes
