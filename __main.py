@@ -3981,54 +3981,7 @@ class ModernPasswordManagerGUI:
                 except Exception as e:
                     logger.error(f"Cleanup error: {e}")
 
-import sys
-import subprocess
-
-def build_executable():
-    """Builds the executable using PyInstaller."""
-    import platform
-    
-    # Correct --add-data syntax for different platforms
-    if platform.system() == 'Windows':
-        add_data_arg = 'icons;icons'  # Windows uses semicolon
-    else:
-        add_data_arg = 'icons:icons'  # Unix-like systems use colon
-    
-    command = [
-        'pyinstaller',
-        '--name', 'SecureVault Pro',
-        '--noconfirm',
-        '--onefile',
-        '--windowed',
-        '--hidden-import', 'desktop_notifier.resources',
-        '--add-data', add_data_arg,
-        'main.py'
-    ]
-    
-    print(f"Running command: {' '.join(command)}")
-    
-    try:
-        proc = subprocess.run(command, check=True, capture_output=True, text=True,
-                              cwd=os.path.dirname(os.path.abspath(__file__)))
-        print(proc.stdout)
-        print("\nBuild successful! Executable is in the 'dist' folder.")
-    except subprocess.CalledProcessError as e:
-        print(f"\nBuild failed with error: {e}")
-        print("STDOUT:")
-        print(e.stdout)
-        print("STDERR:")
-        print(e.stderr)
-    except FileNotFoundError:
-        print("\nPyInstaller is not installed. Please install it using: pip install pyinstaller")
-    except Exception as e:
-        print(f"\nAn unexpected error occurred: {e}")
-        
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] == 'build':
-        print("Build process started...")
-        build_executable()
-        return
-
     try:
         setup_logging()
         logger.info("Starting SecureVault Pro...")
@@ -4041,7 +3994,7 @@ def main():
     except Exception as e:
         logger.error(f"Failed to start application: {e}")
         logger.info("Please ensure all required dependencies are installed:")
-        logger.info("pip install customtkinter cryptography pillow desktop_notifier")
+        logger.info("pip install customtkinter cryptography pillow")
         try:
             import tkinter.messagebox as msgbox
             msgbox.showerror("Startup Error",
