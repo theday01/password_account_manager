@@ -5,6 +5,7 @@ import json
 import hmac
 import base64
 from datetime import datetime
+import sys
 
 from machine_id_utils import generate_machine_id
 
@@ -15,10 +16,17 @@ class TamperManager:
     """
     def __init__(self, app_files_to_monitor=None):
         self.machine_id = generate_machine_id()
-        self.app_files = app_files_to_monitor or [
-            'main.py', 'trial_manager.py', 'tamper_manager.py',
-            'machine_id_utils.py', 'secure_file_manager.py'
-        ]
+        
+        # If the application is frozen (e.g., by PyInstaller), monitor the executable itself.
+        # Otherwise, monitor the individual source files.
+        if getattr(sys, 'frozen', False):
+            self.app_files = [sys.executable]
+        else:
+            self.app_files = app_files_to_monitor or [
+                'main.py', 'trial_manager.py', 'tamper_manager.py',
+                'machine_id_utils.py', 'secure_file_manager.py'
+            ]
+        
         self._watermark_cache = None
         if platform.system() == "Windows":
             self.registry_key_path = self._get_registry_key_path()
