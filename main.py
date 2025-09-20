@@ -1342,7 +1342,10 @@ class ModernPasswordManagerGUI:
                 self.settings['last_login_timestamp'] = now
                 self.settings['consecutive_logins'] = consecutive_logins
                 self.save_settings_to_file()
-                notification_thread = threading.Thread(target=start_notification_loop, daemon=True)
+                notification_thread = threading.Thread(
+                    target=lambda: start_notification_loop(is_trial_active=self.trial_manager.is_trial_active),
+                    daemon=True
+                )
                 notification_thread.start()
                 self.show_main_interface()
         else:

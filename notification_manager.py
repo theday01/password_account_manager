@@ -3,10 +3,14 @@ from desktop_notifier import DesktopNotifier
 
 notifier = DesktopNotifier()
 
-async def _periodic_sender():
+async def _periodic_sender(is_trial_active: bool):
     """
-    An async function that sends a notification every 4 minutes.
+    An async function that sends a notification every 4 minutes, unless in trial.
     """
+    if is_trial_active:
+        # Do not send backup reminders during the trial period
+        return
+
     while True:
         try:
             await notifier.send(
@@ -17,12 +21,12 @@ async def _periodic_sender():
             print(f"Error sending notification: {e}")
         await asyncio.sleep(240)  # 4 minutes
 
-def start_notification_loop():
+def start_notification_loop(is_trial_active: bool):
     """
     Starts the notification loop. This function is meant to be run in a thread.
     """
     try:
-        asyncio.run(_periodic_sender())
+        asyncio.run(_periodic_sender(is_trial_active=is_trial_active))
     except Exception as e:
         # It's good practice to log exceptions in a thread
         print(f"Error in notification loop: {e}")
