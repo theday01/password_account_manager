@@ -1944,17 +1944,6 @@ class ModernPasswordManagerGUI:
         ).pack(side="right", padx=10, pady=8)
         
         ctk.CTkButton(
-            toolbar, 
-            text=self.lang_manager.get_string("settings"), 
-            width=120, 
-            height=55,
-            image=settings,
-            compound="left",  # icon on the left, text on the right
-            command=self.show_settings,
-            font=ctk.CTkFont(size=18)
-        ).pack(side="right", padx=10, pady=8)
-
-        ctk.CTkButton(
             toolbar,
             text=self.lang_manager.get_string("about"),
             width=120,
@@ -2372,19 +2361,24 @@ class ModernPasswordManagerGUI:
         icon_accounts   = ctk.CTkImage(Image.open("icons/user.png"), size=(24, 24))
         icon_generator  = ctk.CTkImage(Image.open("icons/password.png"), size=(24, 24))
         icon_report     = ctk.CTkImage(Image.open("icons/security.png"), size=(24, 24))
+        icon_update     = ctk.CTkImage(Image.open("icons/upload.png"), size=(24, 24))
+
+        top_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        top_frame.pack(side="top", fill="x", anchor="n")
 
         sidebar_configs = [
             (self.lang_manager.get_string("your_accounts"), icon_accounts, self.show_passwords),
             (self.lang_manager.get_string("password_generator"), icon_generator, self.show_password_generator),
             (self.lang_manager.get_string("security_report"), icon_report, self.show_security_report),
         ]
+
         for text, icon, command in sidebar_configs:
             btn = ctk.CTkButton(
-                self.sidebar,
+                top_frame,
                 text=text,
                 image=icon,
-                compound="left",         # show icon + text
-                anchor="w",              # left-align content
+                compound="left",
+                anchor="w",
                 command=lambda cmd=command, txt=text: self.handle_sidebar_click(cmd, txt),
                 height=60,
                 font=ctk.CTkFont(size=18),
@@ -2394,6 +2388,43 @@ class ModernPasswordManagerGUI:
             )
             btn.pack(fill="x", padx=15, pady=10)
             self.sidebar_buttons.append(btn)
+
+        update_config = (self.lang_manager.get_string("check_for_updates"), icon_update, self.show_update_checker)
+        text, icon, command = update_config
+        btn = ctk.CTkButton(
+            self.sidebar,
+            text=text,
+            image=icon,
+            compound="left",
+            anchor="w",
+            command=lambda cmd=command, txt=text: self.handle_sidebar_click(cmd, txt),
+            height=60,
+            font=ctk.CTkFont(size=18),
+            corner_radius=10,
+            fg_color=("gray75", "gray25"),
+            hover_color=("gray70", "gray30")
+        )
+        btn.pack(side="bottom", fill="x", padx=15, pady=10)
+        self.sidebar_buttons.append(btn)
+
+        settings_config = (self.lang_manager.get_string("settings"), settings, self.show_settings)
+        text, icon, command = settings_config
+        btn = ctk.CTkButton(
+            self.sidebar,
+            text=text,
+            image=icon,
+            compound="left",
+            anchor="w",
+            command=lambda cmd=command, txt=text: self.handle_sidebar_click(cmd, txt),
+            height=60,
+            font=ctk.CTkFont(size=18),
+            corner_radius=10,
+            fg_color=("gray75", "gray25"),
+            hover_color=("gray70", "gray30")
+        )
+        btn.pack(side="bottom", fill="x", padx=15, pady=(20, 10))
+        self.sidebar_buttons.append(btn)
+        
         if self.sidebar_buttons:
             self.set_active_button(self.sidebar_buttons[0])
     
@@ -3713,6 +3744,50 @@ class ModernPasswordManagerGUI:
         except Exception as e:
             ctk.CTkLabel(content, text=self.lang_manager.get_string("report_error_template", error=str(e)), 
                          text_color="#FF4444").pack(pady=20)
+
+    def show_update_checker(self):
+        for widget in self.main_panel.winfo_children():
+            widget.destroy()
+
+        header = ctk.CTkFrame(self.main_panel)
+        header.pack(fill="x", padx=15, pady=15)
+        
+        ctk.CTkLabel(header, text=self.lang_manager.get_string("check_for_updates_title"), 
+                     font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
+
+        content = ctk.CTkFrame(self.main_panel)
+        content.pack(fill="both", expand=True, padx=15, pady=15)
+
+        info_label = ctk.CTkLabel(content, text=self.lang_manager.get_string("update_check_info"),
+                                  font=ctk.CTkFont(size=14))
+        info_label.pack(pady=20)
+
+        update_button = ctk.CTkButton(content, text=self.lang_manager.get_string("check_updates_now"),
+                                      command=self.check_for_updates_action,
+                                      width=200, height=50, font=ctk.CTkFont(size=16))
+        update_button.pack(pady=10)
+
+        url_entry = ctk.CTkEntry(content, width=350)
+        url_entry.insert(0, self.lang_manager.get_string("update_url_placeholder"))
+        url_entry.configure(state="readonly")
+        url_entry.pack(pady=10)
+
+
+        contact_button = ctk.CTkButton(content, text=self.lang_manager.get_string("contact_developer"),
+                                       command=self.contact_developer,
+                                       width=200, height=50, font=ctk.CTkFont(size=16))
+        contact_button.pack(pady=10)
+
+        self.update_status_label = ctk.CTkLabel(content, text="", font=ctk.CTkFont(size=14))
+        self.update_status_label.pack(pady=20)
+
+    def check_for_updates_action(self):
+        self.update_status_label.configure(text=self.lang_manager.get_string("checking_for_updates"), text_color=("#3B82F6", "#1E40AF"))
+        # Simulate a network request
+        self.root.after(2000, lambda: self.update_status_label.configure(text=self.lang_manager.get_string("no_updates_available"), text_color="#44FF44"))
+
+    def contact_developer(self):
+        webbrowser.open_new_tab("https://wa.me/212623422858")
 
     def get_remaining_lockout_time(self) -> int:
         return self.auth_guardian.get_remaining_lockout_time()
