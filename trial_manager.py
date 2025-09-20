@@ -257,7 +257,7 @@ class TrialManager:
             messagebox.showerror("Error", f"Activation failed. Please contact support. Error: {e}")
             return False
 
-    def show_trial_expired_dialog(self, lockout_time_remaining=None):
+    def show_trial_expired_dialog(self, lockout_time_remaining=None, from_runtime=False):
         """
         Shows a dialog for expired, tampered, or locked-out states.
         """
@@ -410,24 +410,28 @@ class TrialManager:
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)
 
-        ctk.CTkButton(button_frame, text="Contact Developer", command=on_contact, width=180, height=40).pack(side="left", padx=10)
-    
-        if is_tampered:
-            activate_button = HoldButton(
-                button_frame, 
-                text="Activate", 
-                hold_callback=on_activate, 
-                width=120, 
-                height=40,
-                fg_color="#4CAF50", 
-                hover_color="#45a049"
-            )
-            activate_button.pack(side="left", padx=10)
+        if from_runtime and self.status == "EXPIRED":
+            message_label.configure(text="We're sorry, but your trial period has ended.\nPlease activate the program to continue.")
+            ctk.CTkButton(button_frame, text="OK", command=on_exit, width=120, height=40).pack()
         else:
-            activate_button = ctk.CTkButton(button_frame, text="Activate", command=on_activate, width=120, height=40,fg_color="#4CAF50", hover_color="#45a049")
-            activate_button.pack(side="left", padx=10)
+            ctk.CTkButton(button_frame, text="Contact Developer", command=on_contact, width=180, height=40).pack(side="left", padx=10)
+    
+            if is_tampered:
+                activate_button = HoldButton(
+                    button_frame, 
+                    text="Activate", 
+                    hold_callback=on_activate, 
+                    width=120, 
+                    height=40,
+                    fg_color="#4CAF50", 
+                    hover_color="#45a049"
+                )
+                activate_button.pack(side="left", padx=10)
+            else:
+                activate_button = ctk.CTkButton(button_frame, text="Activate", command=on_activate, width=120, height=40,fg_color="#4CAF50", hover_color="#45a049")
+                activate_button.pack(side="left", padx=10)
 
-        ctk.CTkButton(button_frame, text="Exit", command=on_exit, width=100, height=40, fg_color="#D32F2F", hover_color="#D10E00").pack(side="right", padx=10)
+            ctk.CTkButton(button_frame, text="Exit", command=on_exit, width=100, height=40, fg_color="#D32F2F", hover_color="#D10E00").pack(side="right", padx=10)
             
         dialog.wait_window()
         return self.status == "FULL"

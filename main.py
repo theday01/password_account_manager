@@ -2033,9 +2033,9 @@ class ModernPasswordManagerGUI:
                     logger.error(f"Failed to send trial notification: {e}")
 
             if remaining_seconds <= 0:
-                logger.warning("Trial has expired. Locking application.")
-                self.trial_manager.show_trial_expired_dialog()
-                self.lock_vault()
+                logger.warning("Trial has expired. Closing application.")
+                self.trial_manager.show_trial_expired_dialog(from_runtime=True)
+                self.root.quit()
                 return  # Stop timer
 
             # Reschedule the check
