@@ -10,6 +10,7 @@ from machine_id_utils import generate_machine_id
 from icon_manager import ThemedToplevel
 from guardian_anchor import GuardianAnchor
 from guardian_observer import GuardianObserver
+import logging
 
 class HoldButton(ctk.CTkButton):
     """A button that requires being held down to activate."""
@@ -149,40 +150,60 @@ class TrialManager:
         Checks the trial status by consulting the guardians.
         This is the single point of truth for the trial state.
         """
+        logging.info("--- Starting Trial Status Check ---")
         # 1. A valid license file always wins.
         if os.path.exists(self.LICENSE_FILE):
+            logging.info(f"License file found at {self.LICENSE_FILE}. Status: FULL")
             return "FULL"
 
         # 2. Check the anchor guardian for the installation timestamp and shutdown status.
         anchor_status, anchor_data = self.anchor.check()
+        logging.info(f"Guardian Anchor check returned: status={anchor_status}, data={anchor_data}")
 
         if anchor_status == "OK_UNEXPECTED_SHUTDOWN":
             # Gracefully handle the unexpected shutdown. Log it, but don't tamper the app.
             # The observer check will be skipped because its state might be unreliable.
+            logging.warning("Guardian Anchor reported an unexpected shutdown.")
             pass  # Continue to expiration check
         elif "TAMPERED" in anchor_status:
+            logging.error(f"Guardian Anchor reported tampering. Status: {anchor_status}")
             return "TAMPERED"
         
         install_ts_str = anchor_data.get('install_ts')
         if not install_ts_str:
+            logging.error("No installation timestamp found in anchor data. Status: TAMPERED")
             return "TAMPERED"
 
         # 3. Check for expiration.
-        install_ts = datetime.fromisoformat(install_ts_str)
-        elapsed = datetime.utcnow() - install_ts
-        
-        if elapsed >= self.TRIAL_PERIOD:
-            return "EXPIRED"
+        try:
+            install_ts = datetime.fromisoformat(install_ts_str)
+            current_time_utc = datetime.utcnow()
+            elapsed = current_time_utc - install_ts
+            
+            logging.info(f"Installation timestamp: {install_ts}")
+            logging.info(f"Current UTC time: {current_time_utc}")
+            logging.info(f"Time elapsed since installation: {elapsed}")
+            logging.info(f"Trial period: {self.TRIAL_PERIOD}")
+
+            if elapsed >= self.TRIAL_PERIOD:
+                logging.warning("Trial period has expired. Status: EXPIRED")
+                return "EXPIRED"
+        except (ValueError, TypeError) as e:
+            logging.error(f"Error parsing timestamp '{install_ts_str}': {e}. Status: TAMPERED")
+            return "TAMPERED"
         
         # 4. If the trial is active and shutdown was clean, check the observer.
         if anchor_status != "OK_UNEXPECTED_SHUTDOWN":
             observer_status = self.observer.check()
+            logging.info(f"Guardian Observer check returned: {observer_status}")
             if "TAMPERED" in observer_status:
+                logging.error(f"Guardian Observer reported tampering. Status: {observer_status}")
                 return "TAMPERED"
 
         # 5. If we reach here, the trial is active and valid.
         self.is_trial_active = True
         self.minutes_remaining = (self.TRIAL_PERIOD - elapsed).total_seconds() / 60
+        logging.info(f"Trial is active. Minutes remaining: {self.minutes_remaining:.2f}. Status: TRIAL")
         return "TRIAL"
 
     def activate_full_version(self):

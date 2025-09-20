@@ -1118,8 +1118,11 @@ class ModernPasswordManagerGUI:
             self._setup_secure_file_manager()
             
             self.trial_manager = TrialManager(self.root, self.secure_file_manager, restart_callback=self.restart_program)
+            logger.info(f"Trial status at startup: {self.trial_manager.status}")
             if self.trial_manager.status in ["EXPIRED", "TAMPERED"]:
+                logger.warning("Trial has expired or is tampered. Showing dialog.")
                 if not self.trial_manager.show_trial_expired_dialog():
+                    logger.warning("User exited the application from the trial dialog.")
                     self.root.quit()
                     return
 
@@ -1958,9 +1961,9 @@ class ModernPasswordManagerGUI:
         ).pack(side="right", padx=10, pady=8)
 
         # Determine state for backup/restore buttons based on trial status
-        backup_restore_state = "normal"
-        if self.trial_manager and self.trial_manager.status == 'TRIAL':
-            backup_restore_state = "disabled"
+        backup_restore_state = "disabled"
+        if self.trial_manager and self.trial_manager.status == 'FULL':
+            backup_restore_state = "normal"
 
         ctk.CTkButton(
             toolbar,
