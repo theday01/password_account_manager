@@ -19,18 +19,25 @@ class TamperManager:
             'main.py', 'trial_manager.py', 'tamper_manager.py',
             'machine_id_utils.py', 'secure_file_manager.py'
         ]
-        self.watermark_path = self._get_watermark_path()
         self._watermark_cache = None
+        if platform.system() == "Windows":
+            self.registry_key_path = self._get_registry_key_path()
+            self.registry_value_name = self._get_registry_value_name()
+            self.watermark_path = None
+        else:
+            self.watermark_path = self._get_watermark_path()
+
+    def _get_registry_key_path(self):
+        return r"SOFTWARE\Microsoft\Windows\CurrentVersion\ShellCompatibility"
+
+    def _get_registry_value_name(self):
+        return hashlib.sha256(f"sys-integrity-{self.machine_id}".encode()).hexdigest()[:16]
 
     def _get_watermark_path(self):
         system = platform.system()
-        filename = hashlib.sha256(f"sys-integrity-{self.machine_id}".encode()).hexdigest()[:16]
+        filename = self._get_registry_value_name()
 
-        if system == 'Windows':
-            base_path = os.path.join(os.environ.get("SystemRoot", "C:\\Windows"), "System32")
-            if not os.path.exists(base_path) or not os.access(base_path, os.W_OK):
-                base_path = os.path.join(os.environ.get("ProgramData", "C:\\ProgramData"), "SystemLogs")
-        elif system == 'Linux':
+        if system == 'Linux':
             base_path = "/var/lib"
             filename = f".{filename}"
             if not os.access(base_path, os.W_OK):
@@ -41,6 +48,7 @@ class TamperManager:
             if not os.access(base_path, os.W_OK):
                 base_path = os.path.expanduser("~/Library/Application Support/system")
         else:
+            # Fallback for other non-Windows systems
             base_path = os.path.expanduser("~")
             filename = ".sys_integrity_watermark"
 
@@ -63,12 +71,47 @@ class TamperManager:
     def _sign_data(self, data_str):
         return hmac.new(self.machine_id.encode(), data_str.encode(), hashlib.sha256).hexdigest()
 
+    def _write_to_registry(self, payload):
+        import winreg
+        keys_to_try = [
+            (winreg.HKEY_LOCAL_MACHINE, self.registry_key_path),
+            (winreg.HKEY_CURRENT_USER, self.registry_key_path)
+        ]
+        for hkey, key_path in keys_to_try:
+            try:
+                with winreg.CreateKey(hkey, key_path) as key:
+                    winreg.SetValueEx(key, self.registry_value_name, 0, winreg.REG_SZ, payload)
+                return True
+            except OSError:
+                continue
+        return False
+
+    def _read_from_registry(self):
+        import winreg
+        keys_to_try = [
+            (winreg.HKEY_LOCAL_MACHINE, self.registry_key_path),
+            (winreg.HKEY_CURRENT_USER, self.registry_key_path)
+        ]
+        for hkey, key_path in keys_to_try:
+            try:
+                with winreg.OpenKey(hkey, key_path, 0, winreg.KEY_READ) as key:
+                    value, _ = winreg.QueryValueEx(key, self.registry_value_name)
+                    return value
+            except (FileNotFoundError, PermissionError):
+                continue
+            except OSError:
+                return "TAMPERED"
+        return None
+
     def _write_watermark(self, data_dict):
         try:
             self._watermark_cache = data_dict # Update cache
             encrypted_data = self._encrypt_data(data_dict)
             signature = self._sign_data(encrypted_data)
             payload = json.dumps({'data': encrypted_data, 'sig': signature})
+
+            if platform.system() == "Windows":
+                return self._write_to_registry(payload)
             
             temp_path = self.watermark_path + ".tmp"
             with open(temp_path, 'w') as f:
@@ -76,8 +119,6 @@ class TamperManager:
             
             os.replace(temp_path, self.watermark_path)
             
-            if platform.system() == 'Windows':
-                os.system(f"attrib +h +s {self.watermark_path}")
             return True
         except (IOError, OSError, PermissionError):
             return False
@@ -85,11 +126,31 @@ class TamperManager:
     def _read_watermark(self):
         if self._watermark_cache:
             return self._watermark_cache
-        if not os.path.exists(self.watermark_path):
+
+        payload = None
+        if platform.system() == "Windows":
+            payload_str = self._read_from_registry()
+            if payload_str is None:
+                return None
+            if payload_str == "TAMPERED":
+                return "TAMPERED"
+            try:
+                payload = json.loads(payload_str)
+            except json.JSONDecodeError:
+                return "TAMPERED"
+        else:
+            if not os.path.exists(self.watermark_path):
+                return None
+            try:
+                with open(self.watermark_path, 'r') as f:
+                    payload = json.load(f)
+            except (IOError, OSError, json.JSONDecodeError):
+                return "TAMPERED"
+
+        if payload is None:
             return None
+
         try:
-            with open(self.watermark_path, 'r') as f:
-                payload = json.load(f)
             encrypted_data = payload['data']
             signature = payload['sig']
             if not hmac.compare_digest(self._sign_data(encrypted_data), signature):
@@ -99,7 +160,7 @@ class TamperManager:
                 return "TAMPERED"
             self._watermark_cache = decrypted_data
             return decrypted_data
-        except Exception:
+        except (KeyError, TypeError):
             return "TAMPERED"
 
     def get_or_create_watermark(self):

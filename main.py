@@ -29,8 +29,10 @@ from two_factor_auth import TwoFactorAuthManager
 from tutorial import TutorialManager
 from localization import LanguageManager
 import threading
-from notification_manager import start_notification_loop
+import asyncio
+from notification_manager import start_notification_loop, notifier
 from trial_manager import TrialManager
+from tamper_manager import TamperManager
 from icon_manager import set_icon, ThemedToplevel
 from auth_guardian import AuthGuardian
 from typing import List
@@ -1125,6 +1127,14 @@ class ModernPasswordManagerGUI:
                     logger.warning("User exited the application from the trial dialog.")
                     self.root.quit()
                     return
+            
+            # Perform application integrity check
+            self.tamper_manager = TamperManager()
+            if self.tamper_manager.perform_full_check() == "TAMPERED":
+                logger.critical("Tampering detected! Shutting down.")
+                messagebox.showerror("Security Alert", "Application files have been tampered with. The program will now exit.")
+                self.root.quit()
+                return
 
             self._initialize_app()
 
@@ -1995,7 +2005,44 @@ class ModernPasswordManagerGUI:
         self.create_sidebar(content_frame)
         self.main_panel = ctk.CTkFrame(content_frame)
         self.main_panel.pack(side="right", fill="both", expand=True, padx=10, pady=10)
+        
+        if self.trial_manager and self.trial_manager.is_trial_active:
+            self._start_trial_check_timer()
+
         self.show_passwords()
+
+    def _start_trial_check_timer(self):
+        """Starts a recurring timer to check the trial status."""
+        self.trial_notification_sent = False
+
+        def _check():
+            if not self.trial_manager or not self.trial_manager.is_trial_active:
+                return  # Stop the timer if trial is no longer active
+
+            remaining_seconds = self.trial_manager.get_remaining_seconds()
+
+            if remaining_seconds <= 20 and not self.trial_notification_sent:
+                try:
+                    logger.info("Sending trial ending soon notification.")
+                    asyncio.run(notifier.send(
+                        title="Trial Period Ending Soon",
+                        message="Your trial is about to end in less than 20 seconds. Please activate to keep using SecureVault Pro."
+                    ))
+                    self.trial_notification_sent = True
+                except Exception as e:
+                    logger.error(f"Failed to send trial notification: {e}")
+
+            if remaining_seconds <= 0:
+                logger.warning("Trial has expired. Locking application.")
+                self.trial_manager.show_trial_expired_dialog()
+                self.lock_vault()
+                return  # Stop timer
+
+            # Reschedule the check
+            self.root.after(1000, _check)
+
+        # Start the first check
+        self.root.after(1000, _check)
 
     def show_restore_dialog(self):
         import glob, os, tempfile, shutil, json, sys

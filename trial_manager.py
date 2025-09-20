@@ -145,6 +145,40 @@ class TrialManager:
         remaining = self.activation_lockout_end_time - datetime.now()
         return max(0, int(remaining.total_seconds()))
 
+    def get_remaining_seconds(self):
+        """
+        Calculates the remaining trial time in seconds.
+        This is a real-time check and does not rely on the cached status.
+        """
+        if self.status != "TRIAL" and not self.is_trial_active:
+            return 0
+
+        # We need to re-check the anchor to get the most up-to-date timestamp
+        # in case it was modified.
+        anchor_status, anchor_data = self.anchor.check()
+        install_ts_str = anchor_data.get('install_ts')
+        
+        if not install_ts_str or "TAMPERED" in anchor_status:
+            self.status = "TAMPERED"
+            self.is_trial_active = False
+            return 0
+
+        try:
+            install_ts = datetime.fromisoformat(install_ts_str)
+            elapsed = datetime.utcnow() - install_ts
+            remaining = self.TRIAL_PERIOD - elapsed
+            
+            if remaining.total_seconds() <= 0:
+                self.status = "EXPIRED"
+                self.is_trial_active = False
+                return 0
+            
+            return remaining.total_seconds()
+        except (ValueError, TypeError):
+            self.status = "TAMPERED"
+            self.is_trial_active = False
+            return 0
+
     def check_trial_status(self):
         """
         Checks the trial status by consulting the guardians.
