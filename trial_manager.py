@@ -153,30 +153,32 @@ class TrialManager:
         if os.path.exists(self.LICENSE_FILE):
             return "FULL"
 
-        # 2. Check the anchor guardian to get the installation timestamp.
-        #    This is the primary source of truth for the trial period.
+        # 2. Check the anchor guardian for the installation timestamp and shutdown status.
         anchor_status, anchor_data = self.anchor.check()
-        if "TAMPERED" in anchor_status:
+
+        if anchor_status == "OK_UNEXPECTED_SHUTDOWN":
+            # Gracefully handle the unexpected shutdown. Log it, but don't tamper the app.
+            # The observer check will be skipped because its state might be unreliable.
+            pass  # Continue to expiration check
+        elif "TAMPERED" in anchor_status:
             return "TAMPERED"
         
         install_ts_str = anchor_data.get('install_ts')
         if not install_ts_str:
-            # The anchor is corrupt or missing the timestamp.
             return "TAMPERED"
 
-        # 3. With a valid timestamp, check for expiration *before* other checks.
-        #    An expired trial is an expired trial, regardless of other factors.
+        # 3. Check for expiration.
         install_ts = datetime.fromisoformat(install_ts_str)
         elapsed = datetime.utcnow() - install_ts
         
         if elapsed >= self.TRIAL_PERIOD:
             return "EXPIRED"
         
-        # 4. If the trial is still active, perform the observer check for clock tampering.
-        #    This check is only relevant for an ongoing trial.
-        observer_status = self.observer.check()
-        if "TAMPERED" in observer_status:
-            return "TAMPERED"
+        # 4. If the trial is active and shutdown was clean, check the observer.
+        if anchor_status != "OK_UNEXPECTED_SHUTDOWN":
+            observer_status = self.observer.check()
+            if "TAMPERED" in observer_status:
+                return "TAMPERED"
 
         # 5. If we reach here, the trial is active and valid.
         self.is_trial_active = True

@@ -72,22 +72,22 @@ class GuardianAnchor:
         return hmac.new(self.machine_fp.encode(), data_str.encode(), hashlib.sha256).hexdigest()
 
     def _write_anchor(self, data_dict):
-        """Encrypts, signs, and writes the anchor data to its file."""
+        """Encrypts, signs, and writes the anchor data atomically."""
         try:
             encrypted_data = self._encrypt(data_dict)
             signature = self._sign(encrypted_data)
             payload = json.dumps({'data': encrypted_data, 'sig': signature})
             
-            with open(self.anchor_path, 'w') as f:
+            temp_path = self.anchor_path + ".tmp"
+            with open(temp_path, 'w') as f:
                 f.write(payload)
+            
+            os.replace(temp_path, self.anchor_path)
             
             if platform.system() == 'Windows':
                 os.system(f"attrib +h +s {self.anchor_path}")
             return True
         except (IOError, OSError, PermissionError):
-            # This is expected if running without admin/root privileges and the fallback also fails.
-            # The application can still run, but the anchor won't be written.
-            # The observer guardian will detect the missing anchor as a problem.
             return False
 
     def check(self):
@@ -95,19 +95,19 @@ class GuardianAnchor:
         Checks the anchor file's existence and integrity. Creates it if it doesn't exist.
 
         :return: A tuple of (status, data).
-                 Status can be "OK_EXISTS", "OK_CREATED", "TAMPERED_FINGERPRINT", "TAMPERED_CORRUPT".
+                 Status can be "OK_EXISTS", "OK_CREATED", "OK_UNEXPECTED_SHUTDOWN",
+                 "TAMPERED_FINGERPRINT", "TAMPERED_CORRUPT".
                  Data is the anchor data dictionary if status is OK, otherwise None.
         """
         if not os.path.exists(self.anchor_path):
-            # First time running on this machine (or file was deleted).
             anchor_data = {
                 'install_ts': datetime.utcnow().isoformat(),
-                'machine_fp': self.machine_fp
+                'machine_fp': self.machine_fp,
+                'shutdown_status': 'RUNNING'
             }
             if self._write_anchor(anchor_data):
                 return "OK_CREATED", anchor_data
             else:
-                # Could not write the anchor file, this is a problem.
                 return "TAMPERED_CORRUPT", None
 
         try:
@@ -117,30 +117,58 @@ class GuardianAnchor:
             encrypted_data = payload['data']
             signature = payload['sig']
 
-            # Verify signature
             if not hmac.compare_digest(self._sign(encrypted_data), signature):
                 return "TAMPERED_CORRUPT", None
 
-            # Decrypt and verify fingerprint
             decrypted_data = self._decrypt(encrypted_data)
             if decrypted_data.get('machine_fp') != self.machine_fp:
-                # This could be a legitimate upgrade from a version with an unstable fingerprint.
-                # Attempt to "heal" the anchor file by updating the fingerprint
-                # while preserving the original installation timestamp.
                 original_install_ts = decrypted_data.get('install_ts')
                 if original_install_ts:
                     healed_data = {
                         'install_ts': original_install_ts,
-                        'machine_fp': self.machine_fp
+                        'machine_fp': self.machine_fp,
+                        'shutdown_status': 'RUNNING'
                     }
                     if self._write_anchor(healed_data):
-                        # Successfully healed the anchor file.
                         return "OK_HEALED", healed_data
                 
-                # If healing is not possible or fails, then it's considered tampering.
                 return "TAMPERED_FINGERPRINT", None
             
+            shutdown_status = decrypted_data.get('shutdown_status')
+            if shutdown_status == 'RUNNING':
+                # This indicates an unexpected shutdown.
+                # We can handle this gracefully in the TrialManager.
+                return "OK_UNEXPECTED_SHUTDOWN", decrypted_data
+
+            # If shutdown was clean, update status to RUNNING for the current session.
+            decrypted_data['shutdown_status'] = 'RUNNING'
+            if not self._write_anchor(decrypted_data):
+                return "TAMPERED_CORRUPT", None
+
             return "OK_EXISTS", decrypted_data
         except Exception:
-            # Any other error in reading/parsing/decrypting is a sign of tampering.
             return "TAMPERED_CORRUPT", None
+
+    def update_shutdown_status(self, status='SHUTDOWN_CLEAN'):
+        """
+        Updates the shutdown status in the anchor file.
+        This should be called on graceful application exit.
+        """
+        try:
+            with open(self.anchor_path, 'r') as f:
+                payload = json.load(f)
+            
+            encrypted_data = payload['data']
+            signature = payload['sig']
+
+            if not hmac.compare_digest(self._sign(encrypted_data), signature):
+                return False
+
+            decrypted_data = self._decrypt(encrypted_data)
+            if decrypted_data.get('machine_fp') != self.machine_fp:
+                return False
+
+            decrypted_data['shutdown_status'] = status
+            return self._write_anchor(decrypted_data)
+        except Exception:
+            return False

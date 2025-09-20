@@ -1854,11 +1854,9 @@ class ModernPasswordManagerGUI:
         self.root.bind("<Button-1>", self.reset_inactivity_timer)
 
         def on_closing():
-            self.show_message(
-                "action_not_allowed_title",
-                "action_not_allowed_body",
-                msg_type="info"
-            )
+            if self.trial_manager and self.trial_manager.anchor:
+                self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
+            self.root.destroy()
         
         self.root.protocol("WM_DELETE_WINDOW", on_closing)
 
@@ -2422,6 +2420,8 @@ class ModernPasswordManagerGUI:
 
     def lock_vault(self):
         try:
+            if self.trial_manager and self.trial_manager.anchor:
+                self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
             if self.secure_file_manager and self.authenticated:
                 logger.info("Syncing files to secure storage before lock...")
                 
@@ -2458,6 +2458,8 @@ class ModernPasswordManagerGUI:
         try:
             self.root.mainloop()
         finally:
+            if self.trial_manager and self.trial_manager.anchor:
+                self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
             if self.secure_file_manager:
                 logger.info("Performing final sync and cleanup...")
                 try:
@@ -2967,6 +2969,8 @@ class ModernPasswordManagerGUI:
         import subprocess
         try:
             logger.info("Initiating secure program restart...")
+            if self.trial_manager and self.trial_manager.anchor:
+                self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
             if self.secure_file_manager and self.authenticated:
                 logger.info("Syncing files to secure storage...")
                 self.secure_file_manager.sync_all_files()

@@ -64,12 +64,17 @@ class GuardianObserver:
         return hmac.new(self.encryption_key.encode(), data_str.encode(), hashlib.sha256).hexdigest()
 
     def _write_observer_data(self, data_dict):
+        """Encrypts, signs, and writes the observer data atomically."""
         try:
             encrypted_data = self._encrypt(data_dict)
             signature = self._sign(encrypted_data)
             payload = json.dumps({'data': encrypted_data, 'sig': signature})
-            with open(self.observer_path, 'w') as f:
+            
+            temp_path = self.observer_path + ".tmp"
+            with open(temp_path, 'w') as f:
                 f.write(payload)
+            
+            os.replace(temp_path, self.observer_path)
             return True
         except (IOError, OSError, PermissionError):
             return False
@@ -93,9 +98,16 @@ class GuardianObserver:
         Performs all observer checks.
 
         :return: A status string: "OK", "TAMPERED_ANCHOR_INVALID",
-                 "TAMPERED_ANCHOR_MISMATCH", "TAMPERED_CLOCK".
+                 "TAMPERED_ANCHOR_MISMATCH", "TAMPERED_CLOCK", "OK_UNEXPECTED_SHUTDOWN".
         """
         anchor_status, anchor_data = self.anchor.check()
+
+        if anchor_status == "OK_UNEXPECTED_SHUTDOWN":
+            # If the anchor reports an unexpected shutdown, the observer should not
+            # perform its clock check, as the 'last_run_ts' could be unreliable.
+            # We pass this status up to the TrialManager.
+            return "OK_UNEXPECTED_SHUTDOWN"
+            
         if "TAMPERED" in anchor_status:
             return "TAMPERED_ANCHOR_INVALID"
         
@@ -108,7 +120,6 @@ class GuardianObserver:
             return "TAMPERED_CORRUPT"
 
         if observer_data is None:
-            # First time this check runs. Create the observer file.
             new_data = {
                 'install_ts_hash': install_ts_hash,
                 'last_run_ts': datetime.utcnow().isoformat()
@@ -116,19 +127,15 @@ class GuardianObserver:
             self._write_observer_data(new_data)
             return "OK"
 
-        # Verify anchor integrity
         if observer_data.get('install_ts_hash') != install_ts_hash:
             return "TAMPERED_ANCHOR_MISMATCH"
 
-        # Verify clock
         now = datetime.utcnow()
         last_run_ts = datetime.fromisoformat(observer_data.get('last_run_ts', now.isoformat()))
         
-        # Allow a small grace period (e.g., 2 minutes) for minor clock adjustments
         if (last_run_ts - now).total_seconds() > 120:
             return "TAMPERED_CLOCK"
 
-        # All checks passed. Update the last run time.
         observer_data['last_run_ts'] = now.isoformat()
         self._write_observer_data(observer_data)
 
