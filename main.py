@@ -18,8 +18,9 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.backends import default_backend
 import tkinter as tk
-from tkinter import messagebox, filedialog
+from tkinter import filedialog
 import customtkinter as ctk
+from ui_utils import set_icon, ThemedToplevel, CustomMessageBox, ask_string
 from secure_file_manager import SecureFileManager, SecureVaultSetup, SecurityMonitor, setup_secure_vault
 from backup_manager import BackupManager
 from PIL import Image, ImageTk
@@ -928,17 +929,10 @@ class ModernPasswordManagerGUI:
         title = self.lang_manager.get_string(title_key)
         message = self.lang_manager.get_string(message_key, **kwargs)
 
-        result = None
-        if ask == "yesno":
-            result = messagebox.askyesno(title, message)
-        elif msg_type == "info":
-            messagebox.showinfo(title, message)
-        elif msg_type == "error":
-            messagebox.showerror(title, message)
-        
         self.lang_manager.set_language(current_lang)
-
-        return result if result is not None else False
+        
+        dialog = CustomMessageBox(title=title, message=message, msg_type=msg_type, ask=ask)
+        return dialog.show()
 
     def _initialize_app(self):
         self.authenticated = False
@@ -2067,8 +2061,6 @@ class ModernPasswordManagerGUI:
         import glob, os, tempfile, shutil, json, sys
         from datetime import datetime
         import tkinter as tk
-        import tkinter.simpledialog as simpledialog
-        from tkinter import messagebox
         from backup_manager import BackupManager, BackupError
 
         if not getattr(self, "database", None):
@@ -2164,7 +2156,7 @@ class ModernPasswordManagerGUI:
             idx = sel[0]
             backup_path = backups[idx]
 
-            code = simpledialog.askstring(self.lang_manager.get_string("backup_code_prompt_preview"), self.lang_manager.get_string("backup_code_prompt_preview"), parent=win, show="*")
+            code = ask_string(self.lang_manager.get_string("backup_code_prompt_preview"), self.lang_manager.get_string("backup_code_prompt_preview"), show="*")
             if code is None:
                 return
 
@@ -2218,7 +2210,7 @@ class ModernPasswordManagerGUI:
             idx = sel[0]
             backup_path = backups[idx]
 
-            code = simpledialog.askstring(self.lang_manager.get_string("backup_code_prompt_restore"), self.lang_manager.get_string("backup_code_prompt_restore"), parent=win, show="*")
+            code = ask_string(self.lang_manager.get_string("backup_code_prompt_restore"), self.lang_manager.get_string("backup_code_prompt_restore"), show="*")
             if code is None:
                 return
 

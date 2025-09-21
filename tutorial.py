@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from PIL import Image
 import os
+from ui_utils import ThemedToplevel, set_icon
 
 class TutorialManager:
     def __init__(self, parent, lang_manager):
@@ -96,6 +97,8 @@ class TutorialManager:
         # Configure properties while hidden
         self.tutorial_window.title(self.lang_manager.get_string("tutorial_title"))
         self.tutorial_window.resizable(False, False)
+        self.tutorial_window.transient(self.parent)
+        self.tutorial_window.lift()
 
         # Set up the window geometry
         width, height = self.win_width, self.win_height
