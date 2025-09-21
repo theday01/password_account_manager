@@ -2,6 +2,7 @@ import customtkinter as ctk
 from PIL import Image
 import os
 from icon_manager import ThemedToplevel
+from icon_manager import set_icon
 
 class TutorialManager:
     def __init__(self, parent, lang_manager):
@@ -11,7 +12,7 @@ class TutorialManager:
         self.current_step = 0
         self._current_image = None  # keep a reference to the image to avoid GC
 
-        # Window dimensions (increased width so titles won't be clipped)
+        # Window dimensions
         self.win_width = 650
         self.win_height = 470
 
@@ -19,8 +20,7 @@ class TutorialManager:
 
     def _center_window(self, window, width, height, parent=None):
         """
-        Center `window` of size (width,height) relative to parent if possible,
-        otherwise center on the screen.
+        Center window relative to parent or screen.
         """
         window.update_idletasks()
         if parent:
@@ -92,25 +92,29 @@ class TutorialManager:
         ]
 
     def show_tutorial_window(self):
-        # Create window with increased width to avoid clipping titles
+        # Create the tutorial window - it will be hidden initially by ThemedToplevel
         self.tutorial_window = ThemedToplevel(self.parent)
+        
+        # Configure the window properties while it's hidden
         self.tutorial_window.title(self.lang_manager.get_string("tutorial_title"))
-        width, height = self.win_width, self.win_height
-        self.tutorial_window.overrideredirect(False)
         self.tutorial_window.resizable(False, False)
         self.tutorial_window.grab_set()
-        self.tutorial_window.transient(self.parent)
-
-        # Center relative to parent (or screen fallback)
+        
+        # Set up the window geometry
+        width, height = self.win_width, self.win_height
         self._center_window(self.tutorial_window, width, height, parent=self.parent)
 
-        # Main frame with comfortable padding
+        # Create the main frame
         self.main_frame = ctk.CTkFrame(self.tutorial_window, fg_color="transparent")
         self.main_frame.pack(fill="both", expand=True, padx=18, pady=18)
 
-        # Show the first step (Welcome)
+        # Set up the first step
         self.current_step = 0
         self.show_step()
+        
+        # The window will show automatically after a brief delay due to ThemedToplevel
+        # Or you can force it to show immediately:
+        # self.tutorial_window.show_window_immediately()
 
         # Wait until tutorial is closed
         self.parent.wait_window(self.tutorial_window)
@@ -122,7 +126,7 @@ class TutorialManager:
 
         step_data = self.steps[self.current_step]
 
-        # Title: allow it to expand horizontally so it's never clipped
+        # Title
         title_label = ctk.CTkLabel(
             self.main_frame,
             text=step_data["title"],
@@ -130,7 +134,6 @@ class TutorialManager:
             anchor="center",
             justify="center"
         )
-        # fill the horizontal space and give horizontal padding
         title_label.pack(fill="x", padx=12, pady=(6, 12))
 
         # Progress indicator
@@ -161,7 +164,7 @@ class TutorialManager:
             except Exception as e:
                 print(f"Error loading image {step_data.get('image')}: {e}")
 
-        # Body text: match wraplength to window width so lines are readable
+        # Body text
         wrap_len = self.win_width - 100
         text_label = ctk.CTkLabel(
             self.main_frame,
@@ -178,7 +181,7 @@ class TutorialManager:
         button_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         button_frame.pack(side="bottom", fill="x", pady=(8, 6), padx=6)
 
-        # Use grid inside the button_frame so "Previous" stays left and "Next/Finish" stays right
+        # Use grid for button layout
         button_frame.columnconfigure(0, weight=1)
         button_frame.columnconfigure(1, weight=1)
         left_container = ctk.CTkFrame(button_frame, fg_color="transparent")
@@ -187,30 +190,47 @@ class TutorialManager:
         right_container.grid(row=0, column=1, sticky="e")
 
         if self.current_step > 0:
-            prev_button = ctk.CTkButton(left_container, text=self.lang_manager.get_string("previous_button"), command=self.prev_step, width=110)
+            prev_button = ctk.CTkButton(
+                left_container, 
+                text=self.lang_manager.get_string("previous_button"), 
+                command=self.prev_step, 
+                width=110
+            )
             prev_button.pack(side="left", padx=4)
 
         if self.current_step < len(self.steps) - 1:
-            skip_button = ctk.CTkButton(right_container, text=self.lang_manager.get_string("skip_button"), command=self.finish_tutorial, width=110)
+            skip_button = ctk.CTkButton(
+                right_container, 
+                text=self.lang_manager.get_string("skip_button"), 
+                command=self.finish_tutorial, 
+                width=110
+            )
             skip_button.pack(side="right", padx=4)
-            next_button = ctk.CTkButton(right_container, text=self.lang_manager.get_string("next_button"), command=self.next_step, width=110)
+            next_button = ctk.CTkButton(
+                right_container, 
+                text=self.lang_manager.get_string("next_button"), 
+                command=self.next_step, 
+                width=110
+            )
             next_button.pack(side="right", padx=4)
         else:
-            finish_button = ctk.CTkButton(right_container, text=self.lang_manager.get_string("finish_button"), command=self.finish_tutorial, width=110)
+            finish_button = ctk.CTkButton(
+                right_container, 
+                text=self.lang_manager.get_string("finish_button"), 
+                command=self.finish_tutorial, 
+                width=110
+            )
             finish_button.pack(side="right", padx=4)
 
     def next_step(self):
         if self.current_step < len(self.steps) - 1:
             self.current_step += 1
             self.show_step()
-            # re-center in case parent moved while tutorial open:
-            self._center_window(self.tutorial_window, self.win_width, self.win_height, parent=self.parent)
 
     def prev_step(self):
         if self.current_step > 0:
             self.current_step -= 1
             self.show_step()
-            self._center_window(self.tutorial_window, self.win_width, self.win_height, parent=self.parent)
 
     def finish_tutorial(self):
         self.tutorial_window.destroy()
