@@ -7,7 +7,6 @@ from tkinter import messagebox
 import customtkinter as ctk
 import hashlib
 from machine_id_utils import generate_machine_id
-from icon_manager import ThemedToplevel
 from guardian_anchor import GuardianAnchor
 from guardian_observer import GuardianObserver
 import logging

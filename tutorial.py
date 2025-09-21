@@ -1,8 +1,6 @@
 import customtkinter as ctk
 from PIL import Image
 import os
-from icon_manager import ThemedToplevel
-from icon_manager import set_icon
 
 class TutorialManager:
     def __init__(self, parent, lang_manager):
@@ -94,30 +92,40 @@ class TutorialManager:
     def show_tutorial_window(self):
         # Create the tutorial window - it will be hidden initially by ThemedToplevel
         self.tutorial_window = ThemedToplevel(self.parent)
-        
-        # Configure the window properties while it's hidden
+
+        # Configure properties while hidden
         self.tutorial_window.title(self.lang_manager.get_string("tutorial_title"))
         self.tutorial_window.resizable(False, False)
-        self.tutorial_window.grab_set()
-        
+
         # Set up the window geometry
         width, height = self.win_width, self.win_height
         self._center_window(self.tutorial_window, width, height, parent=self.parent)
 
-        # Create the main frame
+        # Create the main frame (widgets) while hidden
         self.main_frame = ctk.CTkFrame(self.tutorial_window, fg_color="transparent")
         self.main_frame.pack(fill="both", expand=True, padx=18, pady=18)
-
-        # Set up the first step
         self.current_step = 0
         self.show_step()
-        
-        # The window will show automatically after a brief delay due to ThemedToplevel
-        # Or you can force it to show immediately:
-        # self.tutorial_window.show_window_immediately()
 
-        # Wait until tutorial is closed
-        self.parent.wait_window(self.tutorial_window)
+        # Ensure the window is shown (ThemedToplevel will deiconify after its delay).
+        # Wait a bit and then apply grab on the mapped window to avoid focus issues.
+        def late_setup():
+            try:
+                # Apply icon to parent too (helps avoid default CTk icon takeover)
+                set_icon(self.parent)
+            except Exception:
+                pass
+            try:
+                # Now request grab (after the window is mapped)
+                self.tutorial_window.grab_set()
+            except Exception:
+                pass
+
+        # schedule late setup a little after the toplevel shows
+        self.tutorial_window.after(180, late_setup)
+
+        # Wait until tutorial is closed — wait on the toplevel itself
+        self.tutorial_window.wait_window()
 
     def show_step(self):
         # Clear existing widgets

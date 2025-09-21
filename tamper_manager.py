@@ -6,7 +6,6 @@ import hmac
 import base64
 from datetime import datetime
 import sys
-
 from machine_id_utils import generate_machine_id
 
 class TamperManager:

@@ -34,7 +34,6 @@ from notification_manager import start_notification_loop, notifier
 from desktop_notifier import Icon
 from trial_manager import TrialManager
 from tamper_manager import TamperManager
-from icon_manager import set_icon, ThemedToplevel
 from auth_guardian import AuthGuardian
 from typing import List
 import secrets
