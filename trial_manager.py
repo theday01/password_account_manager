@@ -9,6 +9,7 @@ import hashlib
 from machine_id_utils import generate_machine_id
 from guardian_anchor import GuardianAnchor
 from guardian_observer import GuardianObserver
+from ui_utils import ThemedToplevel
 import logging
 
 class HoldButton(ctk.CTkButton):
