@@ -1870,6 +1870,8 @@ class ModernPasswordManagerGUI:
         self.root.bind("<Button-1>", self.reset_inactivity_timer)
 
         def on_closing():
+            # Stop trial check timer if running
+            self._stop_trial_check_timer()
             if self.trial_manager and self.trial_manager.anchor:
                 self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
             self.root.destroy()
@@ -2014,37 +2016,50 @@ class ModernPasswordManagerGUI:
     def _start_trial_check_timer(self):
         """Starts a recurring timer to check the trial status."""
         self.trial_notification_sent = False
+        self.trial_timer_id = None
 
         def _check():
             if not self.trial_manager or not self.trial_manager.is_trial_active:
+                self.trial_timer_id = None
                 return  # Stop the timer if trial is no longer active
 
             remaining_seconds = self.trial_manager.get_remaining_seconds()
 
             if remaining_seconds <= 20 and not self.trial_notification_sent:
                 try:
-                    logger.info("Sending trial ending soon notification.")
-                    from asyncio_manager import asyncio_manager
+                    logger.info(f"Sending trial ending soon notification. {int(remaining_seconds)} seconds remaining.")
+                    from notification_manager import send_trial_notification_sync
                     
-                    # Use the enhanced notification system
-                    asyncio_manager.submit_coroutine(
-                        send_trial_notification("less than 20 seconds")
-                    )
+                    # Use the synchronous wrapper for the async notification system
+                    success = send_trial_notification_sync(f"{int(remaining_seconds)} seconds")
+                    if success:
+                        logger.info("Trial notification sent successfully")
+                    else:
+                        logger.warning("Trial notification failed to send")
                     self.trial_notification_sent = True
                 except Exception as e:
                     logger.error(f"Failed to send trial notification: {e}")
+                    # Still mark as sent to prevent spam
+                    self.trial_notification_sent = True
                     
             if remaining_seconds <= 0:
                 logger.warning("Trial has expired. Closing application.")
                 self.trial_manager.show_trial_expired_dialog(from_runtime=True)
+                self.trial_timer_id = None
                 self.root.quit()
                 return  # Stop timer
 
             # Reschedule the check
-            self.root.after(1000, _check)
+            self.trial_timer_id = self.root.after(1000, _check)
 
         # Start the first check
-        self.root.after(1000, _check)
+        self.trial_timer_id = self.root.after(1000, _check)
+
+    def _stop_trial_check_timer(self):
+        """Stops the trial check timer if it's running."""
+        if hasattr(self, 'trial_timer_id') and self.trial_timer_id:
+            self.root.after_cancel(self.trial_timer_id)
+            self.trial_timer_id = None
                         
     def show_restore_dialog(self):
         import glob, os, tempfile, shutil, json, sys
@@ -2678,6 +2693,8 @@ class ModernPasswordManagerGUI:
 
     def lock_vault(self):
         try:
+            # Stop trial check timer when locking vault
+            self._stop_trial_check_timer()
             if self.trial_manager and self.trial_manager.anchor:
                 self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
             if self.secure_file_manager and self.authenticated:
@@ -2709,6 +2726,7 @@ class ModernPasswordManagerGUI:
 
     def force_logout(self):
         logger.info("Logging out due to inactivity.")
+        self._stop_trial_check_timer()
         self.lock_vault()
         self.root.quit()
     

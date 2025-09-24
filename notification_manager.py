@@ -18,11 +18,6 @@ async def send_safe_notification(title: str, message: str, icon_path: Path = Non
     Send a notification with comprehensive error handling and fallbacks.
     """
     try:
-        # First, check if notifications are supported
-        if not await notifier.is_enabled():
-            logger.warning("Notifications are disabled on this system")
-            return False
-        
         # Create notification object
         notification = Notification(
             title=title,
@@ -153,6 +148,48 @@ async def send_trial_notification(remaining_time: str):
     
     return success
 
+def send_trial_notification_sync(remaining_time: str):
+    """
+    Synchronous wrapper for send_trial_notification.
+    This can be called from non-async contexts.
+    """
+    try:
+        # First try the system fallback method (more reliable on Windows)
+        logger.info("Attempting to send trial notification via system fallback...")
+        success = show_system_notification_fallback(
+            "Trial Period Ending Soon",
+            f"Your trial is about to end in {remaining_time}. Please activate to keep using SecureVault Pro."
+        )
+        
+        if success:
+            logger.info("Trial notification sent successfully via system fallback")
+            return True
+        
+        # If system fallback fails, try the async method
+        logger.info("System fallback failed, trying async notification...")
+        try:
+            # Try to get the existing event loop
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If the loop is running, schedule the coroutine as a task
+                task = asyncio.create_task(send_trial_notification(remaining_time))
+                logger.info("Trial notification scheduled as async task")
+                return task
+            else:
+                # If no loop is running, run until complete
+                return asyncio.run(send_trial_notification(remaining_time))
+        except RuntimeError:
+            # If we can't get a loop, try to create one
+            try:
+                return asyncio.run(send_trial_notification(remaining_time))
+            except Exception as e:
+                logger.error(f"Failed to send trial notification via async method: {e}")
+                return False
+                
+    except Exception as e:
+        logger.error(f"Failed to send trial notification: {e}")
+        return False
+
 # Alternative notification method for systems where desktop_notifier fails
 def show_system_notification_fallback(title: str, message: str):
     """
@@ -160,25 +197,78 @@ def show_system_notification_fallback(title: str, message: str):
     """
     try:
         if sys.platform == "win32":
-            # Windows toast notification fallback
+            # Windows notification fallback - try multiple methods
+            logger.info("Attempting Windows notification methods...")
+            
+            # Method 1: Try win32gui (most reliable for Windows)
             try:
                 import win32gui
                 import win32con
+                logger.info("Using win32gui for notification")
                 win32gui.MessageBox(0, message, title, win32con.MB_ICONINFORMATION | win32con.MB_TOPMOST)
                 return True
             except ImportError:
-                # If win32gui is not available, try using tkinter
-                try:
-                    import tkinter as tk
-                    from tkinter import messagebox
-                    root = tk.Tk()
-                    root.withdraw()  # Hide the main window
-                    root.attributes('-topmost', True)  # Make it topmost
-                    messagebox.showinfo(title, message)
-                    root.destroy()
-                    return True
-                except Exception as tk_error:
-                    logger.error(f"Tkinter fallback failed: {tk_error}")
+                logger.warning("win32gui not available, trying alternative methods...")
+            except Exception as win32_error:
+                logger.warning(f"win32gui failed: {win32_error}, trying alternatives...")
+            
+            # Method 2: Try tkinter messagebox (always available with Python)
+            try:
+                import tkinter as tk
+                from tkinter import messagebox
+                logger.info("Using tkinter messagebox for notification")
+                root = tk.Tk()
+                root.withdraw()  # Hide the main window
+                root.attributes('-topmost', True)  # Make it topmost
+                root.lift()  # Bring to front
+                messagebox.showinfo(title, message)
+                root.destroy()
+                return True
+            except Exception as tk_error:
+                logger.error(f"Tkinter fallback failed: {tk_error}")
+            
+            # Method 3: Try Windows toast notification via PowerShell
+            try:
+                import subprocess
+                logger.info("Using PowerShell for Windows toast notification")
+                ps_script = f'''
+                Add-Type -AssemblyName System.Windows.Forms
+                $notification = New-Object System.Windows.Forms.NotifyIcon
+                $notification.Icon = [System.Drawing.SystemIcons]::Information
+                $notification.BalloonTipTitle = "{title}"
+                $notification.BalloonTipText = "{message}"
+                $notification.Visible = $true
+                $notification.ShowBalloonTip(5000)
+                Start-Sleep -Seconds 6
+                $notification.Dispose()
+                '''
+                subprocess.run([
+                    "powershell", "-Command", ps_script
+                ], check=True, timeout=10)
+                return True
+            except Exception as ps_error:
+                logger.error(f"PowerShell notification failed: {ps_error}")
+            
+            # Method 4: Try Windows 10+ toast notification via ctypes
+            try:
+                import ctypes
+                from ctypes import wintypes
+                logger.info("Using ctypes for Windows notification")
+                
+                # Load user32.dll
+                user32 = ctypes.windll.user32
+                kernel32 = ctypes.windll.kernel32
+                
+                # Show a simple message box using ctypes
+                result = user32.MessageBoxW(
+                    0,  # hWnd
+                    message,  # lpText
+                    title,  # lpCaption
+                    0x40 | 0x1000  # MB_ICONINFORMATION | MB_TOPMOST
+                )
+                return result != 0
+            except Exception as ctypes_error:
+                logger.error(f"ctypes notification failed: {ctypes_error}")
         
         elif sys.platform == "darwin":  # macOS
             try:
@@ -203,6 +293,18 @@ def show_system_notification_fallback(title: str, message: str):
     
     except Exception as fallback_error:
         logger.error(f"System notification fallback failed: {fallback_error}")
+    
+    # Final fallback: Console notification
+    try:
+        print(f"\n{'='*60}")
+        print(f"NOTIFICATION: {title}")
+        print(f"{'='*60}")
+        print(f"{message}")
+        print(f"{'='*60}\n")
+        logger.info("Notification displayed via console fallback")
+        return True
+    except Exception as console_error:
+        logger.error(f"Console notification fallback failed: {console_error}")
     
     return False
 
