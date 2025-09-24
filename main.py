@@ -30,10 +30,10 @@ from two_factor_auth import TwoFactorAuthManager
 from tutorial import TutorialManager
 from localization import LanguageManager
 import threading
-import asyncio
-from notification_manager import start_notification_loop, notifier
+from notification_manager import _periodic_sender, notifier, send_safe_notification, send_trial_notification
 from desktop_notifier import Icon
 from trial_manager import TrialManager
+from asyncio_manager import asyncio_manager
 from tamper_manager import TamperManager
 from auth_guardian import AuthGuardian
 from typing import List
@@ -920,6 +920,8 @@ class ModernPasswordManagerGUI:
         ctk.set_appearance_mode("dark")  
         self.root = ctk.CTk()
         self.root.withdraw()
+        # Start the asyncio event loop manager
+        asyncio_manager.start()
         self.root.title(self.lang_manager.get_string("app_title"))
         self.root.geometry("1200x800")
         set_icon(self.root)
@@ -1354,11 +1356,10 @@ class ModernPasswordManagerGUI:
                 self.settings['last_login_timestamp'] = now
                 self.settings['consecutive_logins'] = consecutive_logins
                 self.save_settings_to_file()
-                notification_thread = threading.Thread(
-                    target=lambda: start_notification_loop(is_trial_active=self.trial_manager.is_trial_active),
-                    daemon=True
+                # Submit the periodic notification sender to the asyncio manager
+                asyncio_manager.submit_coroutine(
+                    _periodic_sender(is_trial_active=self.trial_manager.is_trial_active)
                 )
-                notification_thread.start()
                 self.show_main_interface()
         else:
             if hasattr(self.database, 'last_integrity_error') and self.database.last_integrity_error:
@@ -2023,32 +2024,16 @@ class ModernPasswordManagerGUI:
             if remaining_seconds <= 20 and not self.trial_notification_sent:
                 try:
                     logger.info("Sending trial ending soon notification.")
-                    # Import Path from pathlib
-                    from pathlib import Path
-                    from desktop_notifier import DesktopNotifier
+                    from asyncio_manager import asyncio_manager
                     
-                    # Create a new notifier instance with custom app name
-                    custom_notifier = DesktopNotifier(app_name="SecureVault Pro")
-                    
-                    icon_path = Path(__file__).parent / "icons" / "main.ico"
-                    
-                    # Check if icon file exists before using it
-                    if icon_path.exists():
-                        asyncio.run(custom_notifier.send(
-                            title="Trial Period Ending Soon",
-                            message="Your trial is about to end in less than 20 seconds. Please activate to keep using SecureVault Pro.",
-                            icon=Icon(icon_path)  # Now using Path object
-                        ))
-                    else:
-                        # Fallback: send notification without icon if file doesn't exist
-                        asyncio.run(custom_notifier.send(
-                            title="Trial Period Ending Soon",
-                            message="Your trial is about to end in less than 20 seconds. Please activate to keep using SecureVault Pro."
-                        ))
+                    # Use the enhanced notification system
+                    asyncio_manager.submit_coroutine(
+                        send_trial_notification("less than 20 seconds")
+                    )
                     self.trial_notification_sent = True
                 except Exception as e:
                     logger.error(f"Failed to send trial notification: {e}")
-
+                    
             if remaining_seconds <= 0:
                 logger.warning("Trial has expired. Closing application.")
                 self.trial_manager.show_trial_expired_dialog(from_runtime=True)
@@ -2731,6 +2716,8 @@ class ModernPasswordManagerGUI:
         try:
             self.root.mainloop()
         finally:
+            # Stop the asyncio event loop manager
+            asyncio_manager.stop()
             if self.trial_manager and self.trial_manager.anchor:
                 self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
             if self.secure_file_manager:
