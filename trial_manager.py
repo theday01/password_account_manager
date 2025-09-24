@@ -65,7 +65,7 @@ class TrialManager:
     _machine_id = None  # Cache for machine ID
 
     def __init__(self, parent_window, settings_manager, restart_callback=None):
-        self.TRIAL_PERIOD = timedelta(minutes=1)  # Changed from days=7 to minutes=1
+        self.TRIAL_PERIOD = timedelta(minutes=1)
         self.LICENSE_FILE = self._get_obfuscated_license_path()
 
         self.parent_window = parent_window
@@ -251,10 +251,36 @@ class TrialManager:
             if platform.system() == 'Windows':
                 os.system(f"attrib +h {self.LICENSE_FILE}")
             self.status = "FULL"
-            messagebox.showinfo("Activated", "Thank you for your purchase! The application is now fully activated.")
             return True
         except Exception as e:
-            messagebox.showerror("Error", f"Activation failed. Please contact support. Error: {e}")
+            logging.error(f"Activation failed: {e}")
+            return False
+
+    def validate_and_activate(self, license_key):
+        """
+        Validates a license key and activates the application if the key is correct.
+        Manages failed attempts and lockouts.
+        """
+        if self.is_activation_locked_out():
+            return False
+
+        machine_id = self._get_machine_id()
+        SECRET_SALT = "a-very-secret-and-long-salt-that-is-hard-to-guess"
+        expected_key = hashlib.sha256((machine_id + SECRET_SALT).encode()).hexdigest()
+
+        if license_key and license_key.strip() == expected_key:
+            self.failed_activation_attempts = 0
+            self.activation_lockout_end_time = None
+            self._save_activation_state()
+            return self.activate_full_version()
+        else:
+            self.failed_activation_attempts += 1
+            if self.failed_activation_attempts >= 3:
+                if self.activation_lockout_end_time and self.activation_lockout_end_time > datetime.now():
+                    self.activation_lockout_end_time += timedelta(minutes=30)
+                else:
+                    self.activation_lockout_end_time = datetime.now() + timedelta(minutes=15)
+            self._save_activation_state()
             return False
 
     def show_trial_expired_dialog(self, lockout_time_remaining=None, from_runtime=False):
@@ -366,32 +392,14 @@ class TrialManager:
 
             input_dialog = ctk.CTkInputDialog(text="Please enter your license key:", title="Activate Full Version")
             license_key = input_dialog.get_input()
-            if not license_key: return
-
-            machine_id = self._get_machine_id()
-            SECRET_SALT = "a-very-secret-and-long-salt-that-is-hard-to-guess"
-            expected_key = hashlib.sha256((machine_id + SECRET_SALT).encode()).hexdigest()
-
-            if license_key.strip() == expected_key:
-                self.failed_activation_attempts = 0
-                self.activation_lockout_end_time = None
-                self._save_activation_state()
-                if self.activate_full_version():
-                    dialog.destroy()
-                    if self.restart_callback:
-                        self.restart_callback()
+            
+            if self.validate_and_activate(license_key):
+                messagebox.showinfo("Activated", "Thank you for your purchase! The application is now fully activated.")
+                dialog.destroy()
+                if self.restart_callback:
+                    self.restart_callback()
             else:
-                self.failed_activation_attempts += 1
-                if self.failed_activation_attempts >= 3:
-                    # Initial lockout is 15 minutes; each subsequent lockout extends by 30 minutes
-                    if self.activation_lockout_end_time and self.activation_lockout_end_time > datetime.now():
-                        self.activation_lockout_end_time += timedelta(minutes=30)
-                    else:
-                        self.activation_lockout_end_time = datetime.now() + timedelta(minutes=15)
-                    
-                    self._save_activation_state()
-                    
-                    # Update UI without recursion
+                if self.is_activation_locked_out():
                     new_lockout_time = self.get_remaining_activation_lockout_time()
                     dialog.title("Activation Locked")
                     message_label.configure(text="Too many incorrect activation attempts. For your security, access has been temporarily blocked.", text_color="orange")
@@ -405,7 +413,6 @@ class TrialManager:
                     else:
                         message = f"The license key is incorrect. You have {attempts_left} attempts remaining."
                     messagebox.showerror("Activation Failed", message)
-                    self._save_activation_state()
 
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(pady=20)

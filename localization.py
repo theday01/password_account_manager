@@ -390,6 +390,13 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "no_updates_available": "You are on the latest version.",
         "update_available": "A new version is available!",
         "update_url_placeholder": "Or visit: https://example.com/updates",
+        "activation": "Activation",
+        "activation_prompt": "Please enter your license key:",
+        "activation_success_title": "Activation Successful",
+        "activation_success_message": "The application has been successfully activated. Please restart the program for the changes to take effect.",
+        "activation_failed_title": "Activation Failed",
+        "activation_failed_message": "The license key is incorrect. You have {attempts_left} attempts remaining.",
+        "activation_locked_out_message": "Too many incorrect activation attempts. For your security, activation has been temporarily blocked for {lockout_time}.",
     },
     "Arabic": {
         "loading": "جارٍ التحميل...",
@@ -763,6 +770,13 @@ SecureVault Pro هو مدير كلمات مرور لسطح المكتب يركز
         "no_updates_available": "أنت تستخدم أحدث إصدار.",
         "update_available": "يتوفر إصدار جديد!",
         "update_url_placeholder": "أو قم بزيارة: https://example.com/updates",
+        "activation": "تفعيل",
+        "activation_prompt": "الرجاء إدخال مفتاح الترخيص الخاص بك:",
+        "activation_success_title": "تم التفعيل بنجاح",
+        "activation_success_message": "تم تفعيل التطبيق بنجاح. الرجاء إعادة تشغيل البرنامج لتطبيق التغييرات.",
+        "activation_failed_title": "فشل التفعيل",
+        "activation_failed_message": "مفتاح الترخيص غير صحيح. تبقى لديك {attempts_left} محاولات.",
+        "activation_locked_out_message": "لقد تجاوزت الحد المسموح به من محاولات التفعيل الفاشلة. لأمانك، تم حظر التفعيل مؤقتًا لمدة {lockout_time}.",
     }
 }
 

@@ -82,6 +82,10 @@ info = ctk.CTkImage(
     light_image=Image.open("icons/info.png"),   # path to your icon
     size=(24, 24)  # adjust size
 )
+activation_icon = ctk.CTkImage(
+    light_image=Image.open("icons/activation.png"),
+    size=(24, 24)
+)
 class SecurityLevel(Enum):
     LOW = 1
     MEDIUM = 2
@@ -2471,6 +2475,26 @@ class ModernPasswordManagerGUI:
         btn.pack(side="bottom", fill="x", padx=15, pady=10)
         self.sidebar_buttons.append(btn)
 
+        if self.trial_manager and self.trial_manager.is_trial_active:
+            activation_config = (self.lang_manager.get_string("activation"), activation_icon, self.show_activation_dialog)
+            text, icon, command = activation_config
+            btn = ctk.CTkButton(
+                self.sidebar,
+                text=text,
+                image=icon,
+                compound="left",
+                anchor="w",
+                command=lambda cmd=command, txt=text: self.handle_sidebar_click(cmd, txt),
+                height=60,
+                font=ctk.CTkFont(size=18),
+                corner_radius=10,
+                fg_color=("#3B82F6", "#1E40AF"),
+                hover_color=("#2563EB", "#1D4ED8"),
+                text_color=("white", "white")
+            )
+            btn.pack(side="bottom", fill="x", padx=15, pady=10)
+            self.sidebar_buttons.append(btn)
+
         settings_config = (self.lang_manager.get_string("settings"), settings, self.show_settings)
         text, icon, command = settings_config
         btn = ctk.CTkButton(
@@ -2492,6 +2516,160 @@ class ModernPasswordManagerGUI:
         if self.sidebar_buttons:
             self.set_active_button(self.sidebar_buttons[0])
     
+    def show_activation_dialog(self):
+        if self.trial_manager.is_activation_locked_out():
+            lockout_time = self.trial_manager.get_remaining_activation_lockout_time()
+            self.show_message(
+                "error",
+                "activation_locked_out_message",
+                msg_type="error",
+                lockout_time=f"{lockout_time // 60} minutes"
+            )
+            return
+
+        # Create modern activation dialog
+        dialog = ThemedToplevel(self.root)
+        dialog.title(self.lang_manager.get_string("activation"))
+        dialog.geometry("500x350")
+        dialog.resizable(False, False)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (250)
+        y = (dialog.winfo_screenheight() // 2) - (175)
+        dialog.geometry(f"500x350+{x}+{y}")
+        
+        result = {"license_key": None}
+        
+        # Main container with padding
+        main_frame = ctk.CTkFrame(dialog, corner_radius=15)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Header section
+        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(20, 30))
+        
+        # Icon and title
+        title_label = ctk.CTkLabel(
+            header_frame,
+            text="🔑 " + self.lang_manager.get_string("activation"),
+            font=ctk.CTkFont(size=24, weight="bold")
+        )
+        title_label.pack()
+        
+        subtitle_label = ctk.CTkLabel(
+            header_frame,
+            text="Activate your full version of SecureVault Pro",
+            font=ctk.CTkFont(size=14),
+            text_color=("gray60", "gray40")
+        )
+        subtitle_label.pack(pady=(5, 0))
+        
+        # Content section
+        content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        content_frame.pack(fill="both", expand=True, padx=30, pady=20)
+        
+        # License key input
+        input_label = ctk.CTkLabel(
+            content_frame,
+            text=self.lang_manager.get_string("activation_prompt"),
+            font=ctk.CTkFont(size=16, weight="bold"),
+            anchor="w"
+        )
+        input_label.pack(fill="x", pady=(0, 10))
+        
+        # License key entry with modern styling
+        license_entry = SecureEntry(
+            content_frame,
+            placeholder_text="Enter your license key here...",
+            width=400,
+            height=45
+        )
+        license_entry.pack(fill="x", pady=(0, 20))
+        license_entry.focus()
+        
+        # Info text
+        info_text = ctk.CTkLabel(
+            content_frame,
+            text="Your license key was provided when you purchased SecureVault Pro.\nIf you don't have a license key, contact our support team.",
+            font=ctk.CTkFont(size=12),
+            text_color=("gray50", "gray50"),
+            justify="center"
+        )
+        info_text.pack(pady=(0, 30))
+        
+        def on_ok():
+            license_key = license_entry.get().strip()
+            if not license_key:
+                self.show_message("error", "Please enter a license key", msg_type="error")
+                license_entry.focus()
+                return
+            result["license_key"] = license_key
+            dialog.destroy()
+        
+        def on_cancel():
+            result["license_key"] = None
+            dialog.destroy()
+        
+        # Button section
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(fill="x", padx=30, pady=(0, 20))
+        
+        # Cancel button
+        cancel_btn = ctk.CTkButton(
+            button_frame,
+            text=self.lang_manager.get_string("cancel_button"),
+            command=on_cancel,
+            width=120,
+            height=45,
+            font=ctk.CTkFont(size=16),
+            fg_color=("gray70", "gray30"),
+            hover_color=("gray60", "gray40")
+        )
+        cancel_btn.pack(side="left")
+        
+        # OK button
+        ok_btn = ctk.CTkButton(
+            button_frame,
+            text=self.lang_manager.get_string("ok_button"),
+            command=on_ok,
+            width=120,
+            height=45,
+            font=ctk.CTkFont(size=16, weight="bold"),
+            fg_color=("#2B6CB0", "#1E40AF"),
+            hover_color=("#2563EB", "#1D4ED8")
+        )
+        ok_btn.pack(side="right")
+        
+        # Bind Enter key to OK button
+        dialog.bind('<Return>', lambda e: on_ok())
+        dialog.bind('<Escape>', lambda e: on_cancel())
+        
+        # Wait for user action
+        dialog.wait_window()
+        license_key = result["license_key"]
+
+        if license_key:
+            if self.trial_manager.validate_and_activate(license_key):
+                if self.show_message(
+                    "activation_success_title",
+                    "activation_success_message",
+                    ask="yesno"
+                ):
+                    self.restart_program()
+            else:
+                attempts_left = 3 - self.trial_manager.failed_activation_attempts
+                if attempts_left > 0:
+                    self.show_message(
+                        "activation_failed_title",
+                        "activation_failed_message",
+                        msg_type="error",
+                        attempts_left=attempts_left
+                    )
+                else:
+                    self.show_activation_dialog() # This will now show the lockout message
+                    
     def handle_sidebar_click(self, command, button_text):
         clicked_button = next((btn for btn in self.sidebar_buttons if btn.cget("text") == button_text), None)
         if clicked_button:
