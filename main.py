@@ -2530,15 +2530,14 @@ class ModernPasswordManagerGUI:
         # Create modern activation dialog
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("activation"))
-        dialog.geometry("500x350")
-        dialog.resizable(False, False)
+        #dialog.resizable(False, False)
         dialog.grab_set()
         
         # Center the dialog
         dialog.update_idletasks()
         x = (dialog.winfo_screenwidth() // 2) - (250)
         y = (dialog.winfo_screenheight() // 2) - (175)
-        dialog.geometry(f"500x350+{x}+{y}")
+        dialog.geometry(f"650x430+{x}+{y}")
         
         result = {"license_key": None}
         

@@ -3,6 +3,7 @@ import sys
 import argparse
 import platform
 import hashlib
+import ctypes
 
 # It is safe to import these as this script is not part of the main application
 # and is only intended for development/testing.
@@ -15,6 +16,38 @@ from tamper_manager import TamperManager
 # THIS IS A SECRET PASSWORD. A real application might use a more secure method
 # for developer authentication, but for this context, a hardcoded secret is sufficient.
 DEV_PASSWORD = "a_very_secret_dev_password_for_testing_only"
+
+def is_admin():
+    """
+    Checks if the script is running with administrative privileges on Windows.
+    Returns True if it is, False otherwise. On non-Windows systems, it always
+    returns True as this elevation concept is specific to Windows UAC.
+    """
+    if platform.system() == "Windows":
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except:
+            return False
+    return True
+
+def run_as_admin():
+    """
+    Re-launches the script with administrative privileges on Windows if not
+    already running as an admin. This will trigger a UAC prompt.
+    """
+    if platform.system() == "Windows":
+        if not is_admin():
+            script = os.path.abspath(sys.argv[0])
+            params = ' '.join([f'"{p}"' for p in sys.argv[1:]])
+            try:
+                result = ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, f'"{script}" {params}', None, 1)
+                if result <= 32:
+                    print(f"[ERROR] Failed to elevate privileges. ShellExecuteW returned {result}")
+                    sys.exit(1)
+            except Exception as e:
+                print(f"[ERROR] An error occurred while trying to elevate privileges: {e}")
+                sys.exit(1)
+            sys.exit(0) # Exit the non-elevated instance
 
 def secure_delete(path):
     """
@@ -183,6 +216,9 @@ def main():
     Main function to run the cleanup script.
     Parses command-line arguments to verify the developer password.
     """
+    if platform.system() == "Windows":
+        run_as_admin()
+
     parser = argparse.ArgumentParser(
         description="""
         *** SecureVault Pro Developer Cleanup Tool ***
