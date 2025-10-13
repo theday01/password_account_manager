@@ -9,6 +9,7 @@ class ReminderManager:
         self.trial_manager = trial_manager
         self.parent_window = parent_window
         #self.REMINDER_INTERVAL = 3 * 60 * 60  # 3 hours in seconds
+        #self.REMINDER_INTERVAL = 2 * 60  # 2 minutes in seconds
         self.REMINDER_INTERVAL = 30  # 30 seconds
         self.timer = None
         self.start()
@@ -21,7 +22,7 @@ class ReminderManager:
             remaining_seconds = self.trial_manager.get_remaining_seconds()
             if remaining_seconds > 0:
                 # Ensure the dialog is created in the main UI thread
-                self.parent_window.after(0, show_reminder_dialog, self.parent_window, remaining_seconds, self.activate_now)
+                self.parent_window.root.after(0, show_reminder_dialog, self.parent_window.root, remaining_seconds, self.activate_now)
         
         # Reschedule the next reminder
         self.start()
