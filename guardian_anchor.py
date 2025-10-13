@@ -5,6 +5,7 @@ import json
 import hmac
 import base64
 from datetime import datetime
+from typing import Optional
 
 from machine_id_utils import generate_machine_id
 
@@ -17,6 +18,37 @@ class GuardianAnchor:
     def __init__(self):
         self.machine_fp = self._get_machine_fingerprint()
         self.anchor_path = self._get_anchor_path()
+        self.backup_anchor_path = self._get_backup_anchor_path()
+
+    def _get_backup_anchor_path(self):
+        """
+        Determines a secondary, user-writable, and even more obscure path for the backup anchor file.
+        This provides redundancy in case the primary anchor is removed.
+        """
+        system = platform.system()
+        # Different filename to avoid conflicts and make it less obvious
+        filename = f"sv-ts-validation-{hashlib.sha256(self.machine_fp.encode()).hexdigest()[:16]}.dat"
+
+        if system == 'Windows':
+            # A path within the WinSxS directory is highly obscure and unlikely to be cleared.
+            # Requires admin in theory, but we're writing to a subdirectory we create.
+            # Let's try a safer, user-writable but still obscure path first.
+            base_path = os.path.join(os.environ.get("APPDATA"), "Microsoft", "Windows", "Caches")
+        elif system == 'Linux':
+            # A hidden file in a non-obvious, typically cache-related directory.
+            base_path = os.path.expanduser("~/.cache/fontconfig")
+            filename = f".{filename}"
+        elif system == 'Darwin': # macOS
+            # A user-specific cache directory that is less likely to be cleared by users.
+            base_path = os.path.expanduser("~/Library/Caches/com.apple.helpd")
+            filename = f".{filename}" # Hidden file
+        else:
+            # Fallback to a hidden directory in the user's home.
+            base_path = os.path.expanduser("~/.local/state")
+            filename = f".{filename}"
+
+        os.makedirs(base_path, exist_ok=True)
+        return os.path.join(base_path, filename)
 
     def _get_machine_fingerprint(self):
         """
@@ -86,9 +118,41 @@ class GuardianAnchor:
             
             if platform.system() == 'Windows':
                 os.system(f"attrib +h +s {self.anchor_path}")
+
+            # Also write to the backup, but only the timestamp
+            self._write_backup_anchor(data_dict['install_ts'])
             return True
         except (IOError, OSError, PermissionError):
             return False
+
+    def _write_backup_anchor(self, install_ts: str):
+        """Encrypts and writes only the installation timestamp to the backup."""
+        try:
+            data_to_encrypt = {'install_ts': install_ts}
+            encrypted_ts = self._encrypt(data_to_encrypt)
+            # No signature needed, as we verify by successful decryption and ISO format.
+            with open(self.backup_anchor_path, 'w') as f:
+                f.write(encrypted_ts)
+            if platform.system() == 'Windows':
+                os.system(f"attrib +h +s {self.backup_anchor_path}")
+            return True
+        except (IOError, OSError, PermissionError):
+            return False
+
+    def _read_backup_anchor(self) -> Optional[str]:
+        """Reads and decrypts the installation timestamp from the backup."""
+        if not os.path.exists(self.backup_anchor_path):
+            return None
+        try:
+            with open(self.backup_anchor_path, 'r') as f:
+                encrypted_ts = f.read()
+            decrypted_data = self._decrypt(encrypted_ts)
+            install_ts = decrypted_data.get('install_ts')
+            # Verify the format to ensure it's a valid timestamp
+            datetime.fromisoformat(install_ts)
+            return install_ts
+        except Exception:
+            return None
 
     def check(self):
         """
@@ -100,6 +164,20 @@ class GuardianAnchor:
                  Data is the anchor data dictionary if status is OK, otherwise None.
         """
         if not os.path.exists(self.anchor_path):
+            # If primary anchor is missing, try to restore from backup.
+            backup_ts = self._read_backup_anchor()
+            if backup_ts:
+                anchor_data = {
+                    'install_ts': backup_ts,
+                    'machine_fp': self.machine_fp,
+                    'shutdown_status': 'RUNNING' # Assume unexpected shutdown
+                }
+                if self._write_anchor(anchor_data):
+                    return "OK_RESTORED_FROM_BACKUP", anchor_data
+                else:
+                    return "TAMPERED_CORRUPT", None
+
+            # If no primary and no backup, this is a fresh install.
             anchor_data = {
                 'install_ts': datetime.utcnow().isoformat(),
                 'machine_fp': self.machine_fp,
