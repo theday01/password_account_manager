@@ -33,6 +33,7 @@ import threading
 from notification_manager import _periodic_sender, notifier, send_safe_notification, send_trial_notification
 from desktop_notifier import Icon
 from trial_manager import TrialManager
+from reminder import ReminderManager
 from asyncio_manager import asyncio_manager
 from tamper_manager import TamperManager
 from auth_guardian import AuthGuardian
@@ -916,6 +917,7 @@ class ModernPasswordManagerGUI:
         self.database = None
         self.secure_file_manager = None
         self.trial_manager = None
+        self.reminder_manager = None
         self.authenticated = False  # Initialize here to prevent cleanup error
         ctk.set_appearance_mode("dark")  
         self.root = ctk.CTk()
@@ -1121,6 +1123,7 @@ class ModernPasswordManagerGUI:
             self._setup_secure_file_manager()
             
             self.trial_manager = TrialManager(self.root, self.secure_file_manager, restart_callback=self.restart_program)
+            self.reminder_manager = ReminderManager(self.trial_manager, self)
             logger.info(f"Trial status at startup: {self.trial_manager.status}")
             if self.trial_manager.status in ["EXPIRED", "TAMPERED"]:
                 logger.warning("Trial has expired or is tampered. Showing dialog.")

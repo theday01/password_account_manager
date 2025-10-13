@@ -187,6 +187,7 @@ def clean_all_artifacts(secure_mode=False):
         )
         search_locations = {
             "Anchor File(s)": {"prefix": "sv-anchor-", "dir": os.path.dirname(anchor.anchor_path)},
+            "Backup Anchor File(s)": {"prefix": "sv-ts-validation-", "dir": os.path.dirname(anchor.backup_anchor_path)},
             "Observer File(s)": {"prefix": "sv-observer-", "dir": os.path.dirname(observer.observer_path)},
             "License File(s)": {"prefix": "sv-license-" if platform.system() == "Windows" else ".sv-license-", "dir": os.path.dirname(trial_manager.LICENSE_FILE)}
         }
