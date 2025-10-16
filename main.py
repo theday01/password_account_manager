@@ -4228,7 +4228,6 @@ def main():
     try:
         setup_logging()
         logger.info("Starting SecureVault Pro...")
-        ModernPasswordManagerGUI.create_desktop_integration()
         app = ModernPasswordManagerGUI()
         app.root.app = app  # Attach app instance to root
         logger.info("Application initialized successfully")
