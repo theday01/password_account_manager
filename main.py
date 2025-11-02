@@ -18,6 +18,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.backends import default_backend
 import tkinter as tk
+from tkinter import messagebox
 from tkinter import filedialog
 import customtkinter as ctk
 from ui_utils import set_icon, ThemedToplevel, CustomMessageBox, ask_string
