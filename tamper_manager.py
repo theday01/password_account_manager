@@ -178,7 +178,8 @@ class TamperManager:
                 'timestamp': datetime.utcnow().isoformat(),
                 'machine_id_hash': hashlib.sha256(self.machine_id.encode()).hexdigest(),
                 'file_hashes': {},
-                'start_date': None
+                'start_date': None,
+                'shutdown_status': 'RUNNING'
             }
             self._write_watermark(new_watermark)
             return new_watermark
@@ -227,10 +228,29 @@ class TamperManager:
         watermark = self.get_or_create_watermark()
         if watermark == "TAMPERED" or watermark.get('status') == "TAMPERED":
             return "TAMPERED"
-        if not self.verify_app_integrity():
+
+        # If the app was not shut down cleanly, verify integrity but don't immediately flag as tampered.
+        # This allows recovery from crashes or power failures.
+        if watermark.get('shutdown_status') == 'RUNNING':
+            if not self.verify_app_integrity():
+                self.update_watermark_field('status', 'TAMPERED')
+                return "TAMPERED"
+            # If integrity is fine, we assume it was a crash and proceed.
+            # The status will be updated to RUNNING for the new session.
+        elif not self.verify_app_integrity():
             self.update_watermark_field('status', 'TAMPERED')
             return "TAMPERED"
+
+        # Mark the current session as running
+        self.update_watermark_field('shutdown_status', 'RUNNING')
         return "OK"
+
+    def update_shutdown_status(self, status='SHUTDOWN_CLEAN'):
+        """
+        Updates the shutdown status in the watermark file.
+        This should be called on graceful application exit.
+        """
+        self.update_watermark_field('shutdown_status', status)
 
     def get_watermark_data(self):
         return self.get_or_create_watermark()

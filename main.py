@@ -1878,6 +1878,8 @@ class ModernPasswordManagerGUI:
             self._stop_trial_check_timer()
             if self.trial_manager and self.trial_manager.anchor:
                 self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
+            if hasattr(self, 'tamper_manager'):
+                self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
             self.root.destroy()
         
         self.root.protocol("WM_DELETE_WINDOW", on_closing)
@@ -1894,6 +1896,7 @@ class ModernPasswordManagerGUI:
         
         if self.trial_manager and self.trial_manager.is_trial_active:
             remaining_minutes = int(self.trial_manager.minutes_remaining)
+            remaining_days = remaining_minutes // (24 * 60)
 
             def _english_time(n, unit):
                 if unit == "day":
@@ -1904,7 +1907,6 @@ class ModernPasswordManagerGUI:
                 return f"{n} minute" if n == 1 else f"{n} minutes"
 
             if remaining_minutes >= 24 * 60:
-                remaining_days = remaining_minutes // (24 * 60)
                 time_text = _english_time(remaining_days, "day")
             elif remaining_minutes >= 60:
                 remaining_hours = remaining_minutes // 60
@@ -1916,11 +1918,15 @@ class ModernPasswordManagerGUI:
             trial_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
             trial_frame.pack(side="left", padx=20, pady=8)
 
+            text_color = "#FF7A18"  # Default orange
+            if remaining_days <= 3:
+                text_color = "red"
+
             primary_label = ctk.CTkLabel(
                 trial_frame,
                 text=f"⏳ Trial — {time_text} remaining",
                 font=ctk.CTkFont(size=14, weight="bold"),
-                text_color="#FF7A18",  # warm orange to attract attention
+                text_color=text_color,
                 anchor="w",
                 justify="left"
             )
@@ -2700,6 +2706,8 @@ class ModernPasswordManagerGUI:
             self._stop_trial_check_timer()
             if self.trial_manager and self.trial_manager.anchor:
                 self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
+            if hasattr(self, 'tamper_manager'):
+                self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
             if self.secure_file_manager and self.authenticated:
                 logger.info("Syncing files to secure storage before lock...")
                 
@@ -2741,6 +2749,8 @@ class ModernPasswordManagerGUI:
             asyncio_manager.stop()
             if self.trial_manager and self.trial_manager.anchor:
                 self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
+            if hasattr(self, 'tamper_manager'):
+                self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
             if self.secure_file_manager:
                 logger.info("Performing final sync and cleanup...")
                 try:
@@ -3252,6 +3262,8 @@ class ModernPasswordManagerGUI:
             logger.info("Initiating secure program restart...")
             if self.trial_manager and self.trial_manager.anchor:
                 self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
+            if hasattr(self, 'tamper_manager'):
+                self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
             if self.secure_file_manager and self.authenticated:
                 logger.info("Syncing files to secure storage...")
                 self.secure_file_manager.sync_all_files()

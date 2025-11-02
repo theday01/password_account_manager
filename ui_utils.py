@@ -227,6 +227,12 @@ def show_reminder_dialog(parent_window, remaining_seconds, activation_callback):
     dialog.resizable(False, False)
     dialog.grab_set()
 
+    # Center the dialog
+    dialog.update_idletasks()
+    x = (dialog.winfo_screenwidth() // 2) - (400 // 2)
+    y = (dialog.winfo_screenheight() // 2) - (200 // 2)
+    dialog.geometry(f"400x200+{x}+{y}")
+
     main_frame = ctk.CTkFrame(dialog)
     main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
