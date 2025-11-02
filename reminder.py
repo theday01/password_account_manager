@@ -8,9 +8,9 @@ class ReminderManager:
     def __init__(self, trial_manager, parent_window):
         self.trial_manager = trial_manager
         self.parent_window = parent_window
-        #self.REMINDER_INTERVAL = 3 * 60 * 60  # 3 hours in seconds
+        self.REMINDER_INTERVAL = 3 * 60 * 60  # 3 hours in seconds
         #self.REMINDER_INTERVAL = 2 * 60  # 2 minutes in seconds
-        self.REMINDER_INTERVAL = 30  # 30 seconds
+        #self.REMINDER_INTERVAL = 30  # 30 seconds
         self.timer = None
         self.start()
 
