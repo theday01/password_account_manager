@@ -1006,7 +1006,7 @@ class ModernPasswordManagerGUI:
         text_color = "#1a202c"     
         slogan_color = "#4a5568" 
         
-        width, height = 480, 320   # more compact and centered
+        width, height = 700, 300
         loading_window = ThemedToplevel(self.root, fg_color=bg_color)
         loading_window.title(self.lang_manager.get_string("loading"))
         loading_window.geometry(f"{width}x{height}")
@@ -1022,53 +1022,64 @@ class ModernPasswordManagerGUI:
         main_frame = ctk.CTkFrame(loading_window, fg_color=bg_color, corner_radius=10)
         main_frame.pack(fill="both", expand=True, padx=2, pady=2)
 
+        # Left frame for the logo
+        left_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        left_frame.pack(side="left", fill="both", expand=True, padx=20, pady=20)
+
         try:
             load_icon_path = os.path.join("icons", "load.png")
             if os.path.exists(load_icon_path):
                 load_image = Image.open(load_icon_path)
-                load_icon = ctk.CTkImage(light_image=load_image, size=(96, 96))
-                icon_label = ctk.CTkLabel(main_frame, image=load_icon, text="", fg_color="transparent")
-                icon_label.pack(pady=(20, 10))
+                load_icon = ctk.CTkImage(light_image=load_image, size=(250, 200))
+                icon_label = ctk.CTkLabel(left_frame, image=load_icon, text="", fg_color="transparent")
+                icon_label.pack(expand=True)
         except Exception as e:
             logger.warning(f"Could not display loading icon: {e}")
+
+        # Right frame for the data and progress bar
+        right_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        right_frame.pack(side="right", fill="both", expand=True, padx=20, pady=20)
         
+        # Use a frame to center the content vertically in the right column
+        right_content_frame = ctk.CTkFrame(right_frame, fg_color="transparent")
+        right_content_frame.pack(expand=True)
+
         ctk.CTkLabel(
-            main_frame,
+            right_content_frame,
             text=self.lang_manager.get_string("app_title"),
             font=ctk.CTkFont(size=32, weight="bold"),
             text_color=text_color
-        ).pack(pady=(5, 5))
+        ).pack(pady=(5, 5), anchor="w")
 
         ctk.CTkLabel(
-            main_frame,
+            right_content_frame,
             text=self.lang_manager.get_string("app_slogan"),
             font=ctk.CTkFont(size=12, slant="italic"),
             text_color=slogan_color
-        ).pack(pady=(0, 25))
+        ).pack(pady=(0, 25), anchor="w")
 
         status_label = ctk.CTkLabel(
-            main_frame,
+            right_content_frame,
             text=self.lang_manager.get_string("initializing"),
             font=ctk.CTkFont(size=12),
             text_color=accent_color
         )
-        status_label.pack(pady=(10, 5))
+        status_label.pack(pady=(10, 5), anchor="w")
 
         # Progress bar
         progress_bar = ctk.CTkProgressBar(
-            main_frame,
+            right_content_frame,
             width=320,
             height=8,
             progress_color=accent_color,
             fg_color="#333333",
             corner_radius=4
         )
-        progress_bar.pack(pady=5)
-        progress_bar.set(0)
+        progress_bar.pack(pady=5, anchor="w")
 
         # Copyright/version label
         ctk.CTkLabel(
-            main_frame,
+            loading_window,
             text="© 2024 SecureVault Pro. All rights reserved.",
             font=ctk.CTkFont(size=9),
             text_color=slogan_color
