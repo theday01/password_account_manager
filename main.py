@@ -3591,8 +3591,6 @@ class ModernPasswordManagerGUI:
             entry.configure(state="readonly")
 
     def copy_password_to_clipboard(self, account):
-        if not self.verify_security_questions():
-            return
         if not self.verify_master_password_dialog():
             return
         try:
@@ -3722,7 +3720,7 @@ class ModernPasswordManagerGUI:
                 if not self.verify_tfa_dialog():
                     return
             else:
-                if not self.verify_security_questions():
+                if not self.verify_master_password_dialog():
                     return
         try:
             name = entries["name"].get().strip()

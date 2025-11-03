@@ -10,3 +10,6 @@ otp
 
 welcome + securevault pro setup wizard + tutorial + create secure backup + about securevault pro 
 + add new account+ settings + verify master password + security questinons + enable 2fa 
+
+
+عندما يريد المستخدم تعديل البيانات او نسخ كلمة المرور لا تطلب منه الاجابة على الاسئلة التي كتبها او مرة ، فقط اكتفي بالمطالبة بالماستر كود
