@@ -3124,8 +3124,6 @@ class ModernPasswordManagerGUI:
         verify_button.pack(pady=20)
 
     def change_master_password_dialog(self):
-        if not self.verify_security_questions():
-            return
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("change_master_password_dialog_title"))
         dialog.geometry("450x530")
@@ -3505,7 +3503,7 @@ class ModernPasswordManagerGUI:
             if not self.verify_tfa_dialog():
                 return
         else:
-            if not self.verify_security_questions():
+            if not self.verify_master_password_dialog():
                 return
         result = self.show_message("delete_confirm_title", "delete_confirm_message", ask="yesno", account_name=account['name'])
         if result:
