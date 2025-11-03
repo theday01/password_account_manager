@@ -32,6 +32,10 @@ class AuthGuardian:
 
         self._validate_state()
 
+    def get_settings(self):
+        """Returns a copy of the current settings."""
+        return self._settings.copy()
+
     def _validate_state(self):
         """Sanity check and cleanup of the loaded state."""
         if self.is_locked_out():
@@ -127,3 +131,20 @@ class AuthGuardian:
         self.failed_attempts = 0 # Reset attempts after a lockout
         # `consecutive_lockouts` is not reset, to penalize repeated lockouts.
         self._save_state()
+
+    def reload_settings(self):
+        """Reloads settings from the settings manager."""
+        new_settings = self._settings_manager.read_settings() or {}
+        logger.info(f"Reloading settings, read_settings returned: {list(new_settings.keys())}")
+        self._settings.clear()
+        self._settings.update(new_settings)
+        
+        # Re-load state from new settings
+        self.failed_attempts = self._settings.get('guardian_failed_attempts', 0)
+        self.consecutive_lockouts = self._settings.get('guardian_consecutive_lockouts', 0)
+        
+        lockout_end_iso = self._settings.get('guardian_lockout_end_time')
+        self.lockout_end_time = datetime.fromisoformat(lockout_end_iso) if lockout_end_iso else None
+
+        self._validate_state()
+        logger.info(f"After reload, _settings has: {list(self._settings.keys())}")
