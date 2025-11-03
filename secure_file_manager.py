@@ -633,6 +633,7 @@ class SecureFileManager:
             try:
                 settings_json = json.dumps(settings, indent=4).encode('utf-8')
                 _atomic_write(self.settings_path, settings_json)
+                self.rotate_integrity_signature()
                 return True
             except Exception:
                 LOG.exception("Failed to write plaintext settings.")
@@ -654,6 +655,7 @@ class SecureFileManager:
             final_data = b"ENC_V1:" + encoded_bundle
             
             _atomic_write(self.settings_path, final_data)
+            self.rotate_integrity_signature()
             return True
         except Exception:
             LOG.exception("Failed to encrypt and write settings.")

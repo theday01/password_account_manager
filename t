@@ -12,4 +12,4 @@ welcome + securevault pro setup wizard + tutorial + create secure backup + about
 + add new account+ settings + verify master password + security questinons + enable 2fa 
 
 
-عندما يريد المستخدم تعديل البيانات او نسخ كلمة المرور لا تطلب منه الاجابة على الاسئلة التي كتبها او مرة ، فقط اكتفي بالمطالبة بالماستر كود
+tutorial dialog  تظهر حتى بعد اول مرة يتم فيها اضهارها وهذا مشكلة في البرنامج
