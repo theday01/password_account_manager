@@ -1918,16 +1918,17 @@ class ModernPasswordManagerGUI:
         
         self.root.protocol("WM_DELETE_WINDOW", on_closing)
 
-        logger.info(f"Tutorial check: tutorial_completed = {self.settings.get('tutorial_completed', False)}")
-        if not self.settings.get('tutorial_completed', False):
-            logger.info("Showing tutorial window...")
-            tutorial = TutorialManager(self.root, self.lang_manager)
-            tutorial.show_tutorial_window()
-            self.settings['tutorial_completed'] = True
-            logger.info("Tutorial completed, saving settings...")
-            self.save_settings_to_file()
-        else:
-            logger.info("Tutorial already completed, skipping.")
+        # The tutorial is now started manually from the "About" window.
+        # logger.info(f"Tutorial check: tutorial_completed = {self.settings.get('tutorial_completed', False)}")
+        # if not self.settings.get('tutorial_completed', False):
+        #     logger.info("Showing tutorial window...")
+        #     tutorial = TutorialManager(self.root, self.lang_manager)
+        #     tutorial.show_tutorial_window()
+        #     self.settings['tutorial_completed'] = True
+        #     logger.info("Tutorial completed, saving settings...")
+        #     self.save_settings_to_file()
+        # else:
+        #     logger.info("Tutorial already completed, skipping.")
 
         toolbar = ctk.CTkFrame(self.main_frame, height=70)
         toolbar.pack(fill="x", padx=10, pady=10)
@@ -2958,8 +2959,26 @@ class ModernPasswordManagerGUI:
         textbox.insert("1.0", about_text)
         textbox.configure(state="disabled")
 
-        close_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("close_button"), command=about_dialog.destroy, width=100)
-        close_button.pack(pady=(15, 0))
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(pady=(15, 0))
+
+        tutorial_button = ctk.CTkButton(button_frame, text="Tutorial", command=lambda: self.show_tutorial(about_dialog), width=100)
+        tutorial_button.pack(side="left", padx=10)
+
+        close_button = ctk.CTkButton(button_frame, text=self.lang_manager.get_string("close_button"), command=about_dialog.destroy, width=100)
+        close_button.pack(side="right", padx=10)
+
+    def show_tutorial(self, about_dialog=None):
+        if about_dialog:
+            about_dialog.destroy()
+        logger.info("Showing tutorial window from About dialog...")
+        tutorial = TutorialManager(self.root, self.lang_manager)
+        tutorial.show_tutorial_window()
+        # Mark tutorial as completed if it's the first time
+        if not self.settings.get('tutorial_completed', False):
+            self.settings['tutorial_completed'] = True
+            self.save_settings_to_file()
+            logger.info("Tutorial marked as completed.")
 
     def show_tfa_dialog(self):
         tfa_enabled = self.settings.get('tfa_secret') is not None

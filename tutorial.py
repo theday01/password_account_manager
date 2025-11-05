@@ -210,13 +210,6 @@ class TutorialManager:
             prev_button.pack(side="left", padx=4)
 
         if self.current_step < len(self.steps) - 1:
-            skip_button = ctk.CTkButton(
-                right_container, 
-                text=self.lang_manager.get_string("skip_button"), 
-                command=self.finish_tutorial, 
-                width=110
-            )
-            skip_button.pack(side="right", padx=4)
             next_button = ctk.CTkButton(
                 right_container, 
                 text=self.lang_manager.get_string("next_button"), 
