@@ -3485,7 +3485,37 @@ class ModernPasswordManagerGUI:
         
         content = ctk.CTkFrame(card, fg_color="transparent")
         content.pack(fill="x", padx=20, pady=20)
+
+        logo_mapping = {
+            "facebook": "icons/facebook.png",
+            "whatsapp": "icons/whatsapp.png",
+            "gmail": "icons/gmail.png",
+            "google": "icons/gmail.png",
+            "instagram": "icons/instagram.png",
+            "twitter": "icons/x.png",
+            "x.com": "icons/x.png",
+        }
+
+        logo_path = None
+        # Check both the name and the URL for keywords
+        search_text = f"{name.lower()} {url.lower()}"
+        for domain, path in logo_mapping.items():
+            # Use word boundaries for more precise matching
+            if re.search(f"\\b{re.escape(domain)}\\b", search_text):
+                logo_path = path
+                break
         
+        if not logo_path:
+            logo_path = "icons/unknown.png"
+
+        try:
+            logo_image = Image.open(logo_path)
+            logo_icon = ctk.CTkImage(light_image=logo_image, size=(64, 64))
+            logo_label = ctk.CTkLabel(content, image=logo_icon, text="")
+            logo_label.pack(side="left", padx=(0, 20))
+        except Exception as e:
+            logger.warning(f"Could not display logo for {url}: {e}")
+
         left_frame = ctk.CTkFrame(content, fg_color="transparent")
         left_frame.pack(side="left", fill="both", expand=True)
         ctk.CTkLabel(left_frame, text=name, 

@@ -13,3 +13,6 @@ welcome + securevault pro setup wizard + tutorial + create secure backup + about
 
 
 tutorial dialog  تظهر حتى بعد اول مرة يتم فيها اضهارها وهذا مشكلة في البرنامج
+
+
+التذكير بضرورة تغيير المودباس بعد اسابيع قليلة او شيء من هاذا القبيل
