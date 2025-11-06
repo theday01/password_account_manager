@@ -35,6 +35,7 @@ from notification_manager import _periodic_sender, notifier, send_safe_notificat
 from desktop_notifier import Icon
 from trial_manager import TrialManager
 from reminder import ReminderManager
+from password_reminder import PasswordReminder
 from asyncio_manager import asyncio_manager
 from tamper_manager import TamperManager
 from auth_guardian import AuthGuardian
@@ -766,6 +767,9 @@ class DatabaseManager:
         finally:
             metadata_conn.close()
 
+    def get_metadata_connection(self):
+        return sqlite3.connect(self.metadata_db)
+
 class SecurityQuestionsDialog(ThemedToplevel):
     def __init__(self, parent, db_manager, crypto_manager, lang_manager):
         super().__init__(parent)
@@ -919,6 +923,7 @@ class ModernPasswordManagerGUI:
         self.secure_file_manager = None
         self.trial_manager = None
         self.reminder_manager = None
+        self.password_reminder = None
         self.authenticated = False  # Initialize here to prevent cleanup error
         ctk.set_appearance_mode("dark")  
         self.root = ctk.CTk()
@@ -949,7 +954,7 @@ class ModernPasswordManagerGUI:
         self.auth_guardian = AuthGuardian(self.secure_file_manager)
         self.settings = self.auth_guardian._settings
         self.inactivity_timer = None
-        self.INACTIVITY_TIMEOUT = 2 * 60 * 1000  # 2 minutes in milliseconds
+        self.INACTIVITY_TIMEOUT = 15 * 60 * 1000  # 15 minutes in milliseconds
         self.load_settings()
         self.setup_ui()
         self.start_lockout_validation_timer()
@@ -1456,57 +1461,58 @@ class ModernPasswordManagerGUI:
         if self.enforce_lockout(show_error=True):
             return False
 
-        dialog = ThemedToplevel(self.root)
-        dialog.title(self.lang_manager.get_string("verify_master_password_title"))
-        dialog.geometry("400x230")
-        dialog.grab_set()
-        dialog.resizable(False, False)
-        result = {"password": None, "confirmed": False}
-        main_frame = ctk.CTkFrame(dialog)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("auth_required"),
-                    font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
-        
-        password_entry = SecureEntry(main_frame, width=300, height=40, show="*",
-                                    placeholder_text=self.lang_manager.get_string("master_password_placeholder"))
-        password_entry.pack(pady=15)
-        password_entry.focus()
-        
-        def on_ok():
-            result["password"] = password_entry.get()
-            result["confirmed"] = True
-            dialog.destroy()
-        
-        def on_cancel():
-            result["confirmed"] = False
-            dialog.destroy()
-        
-        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        button_frame.pack(pady=10)
-        
-        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), command=on_cancel, width=100).pack(side="left", padx=10)
-        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("ok_button"), command=on_ok, width=100).pack(side="right", padx=10)
-        
-        dialog.wait_window()
-        
-        if not result["confirmed"] or not result["password"]:
-            return False
-        
-        try:
-            temp_db = DatabaseManager(self.database.db_path, self.crypto, self.secure_file_manager)
-            auth_success = temp_db.authenticate(result["password"])
-            self.auth_guardian.record_login_attempt(auth_success)
-            if auth_success:
-                return True
-            else:
-                self.show_message("error", "invalid_master_password", msg_type="error")
-                if self.auth_guardian.is_locked_out():
-                    self.lock_vault() # Force lock and show screen
+        while True:
+            dialog = ThemedToplevel(self.root)
+            dialog.title(self.lang_manager.get_string("verify_master_password_title"))
+            dialog.geometry("400x230")
+            dialog.grab_set()
+            dialog.resizable(False, False)
+            result = {"password": None, "confirmed": False}
+            main_frame = ctk.CTkFrame(dialog)
+            main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+            ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("auth_required"),
+                        font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
+
+            password_entry = SecureEntry(main_frame, width=300, height=40, show="*",
+                                        placeholder_text=self.lang_manager.get_string("master_password_placeholder"))
+            password_entry.pack(pady=15)
+            password_entry.focus()
+
+            def on_ok():
+                result["password"] = password_entry.get()
+                result["confirmed"] = True
+                dialog.destroy()
+
+            def on_cancel():
+                result["confirmed"] = False
+                dialog.destroy()
+
+            button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+            button_frame.pack(pady=10)
+
+            ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), command=on_cancel, width=100).pack(side="left", padx=10)
+            ctk.CTkButton(button_frame, text=self.lang_manager.get_string("ok_button"), command=on_ok, width=100).pack(side="right", padx=10)
+
+            dialog.wait_window()
+
+            if not result["confirmed"] or not result["password"]:
                 return False
-        except Exception:
-            self.show_message("error", "auth_failed", msg_type="error")
-            return False
+
+            try:
+                temp_db = DatabaseManager(self.database.db_path, self.crypto, self.secure_file_manager)
+                auth_success = temp_db.authenticate(result["password"])
+                self.auth_guardian.record_login_attempt(auth_success)
+                if auth_success:
+                    return True
+                else:
+                    self.show_message("error", "invalid_master_password", msg_type="error")
+                    if self.auth_guardian.is_locked_out():
+                        self.lock_vault()  # Force lock and show screen
+                        return False
+            except Exception:
+                self.show_message("error", "auth_failed", msg_type="error")
+                return False
 
     def show_setup_wizard(self):
         if self.is_vault_initialized():
@@ -2061,6 +2067,7 @@ class ModernPasswordManagerGUI:
         if self.trial_manager and self.trial_manager.is_trial_active:
             self._start_trial_check_timer()
 
+        self.password_reminder = PasswordReminder(self.database, self)
         self.show_passwords()
 
     def _start_trial_check_timer(self):
@@ -2742,6 +2749,8 @@ class ModernPasswordManagerGUI:
 
     def lock_vault(self):
         try:
+            if self.password_reminder:
+                self.password_reminder.stop()
             # Stop trial check timer when locking vault
             self._stop_trial_check_timer()
             if self.trial_manager and self.trial_manager.anchor:
@@ -3529,15 +3538,18 @@ class ModernPasswordManagerGUI:
         right_frame = ctk.CTkFrame(content, fg_color="transparent")
         right_frame.pack(side="right")
         strength_color = self.get_strength_color(strength)
-        ctk.CTkLabel(right_frame, text=self.lang_manager.get_string("strength_template", strength=strength), 
+        strength_text = self.lang_manager.get_string("strength_template", strength=strength)
+        if strength in ["Weak", "Very Weak"]:
+            strength_text += f" {self.lang_manager.get_string('weak_password_recommendation')}"
+        ctk.CTkLabel(right_frame, text=strength_text, 
                      text_color=strength_color, font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(0, 10))
         
         self.create_action_buttons(right_frame, account_data)
 
     def get_strength_color(self, strength):
         colors = {
-            "Excellent": "#00FF00", "Very Strong": "#00FF00", "Strong": "#44FF44",
-            "Medium": "#FFAA44", "Weak": "#FF8844", "Very Weak": "#FF4444", "Unknown": "#888888"
+            "Excellent": "green", "Very Strong": "green", "Strong": "green",
+            "Medium": "orange", "Weak": "red", "Very Weak": "red", "Unknown": "#888888"
         }
         return colors.get(strength, "#888888")
 
@@ -3882,6 +3894,26 @@ class ModernPasswordManagerGUI:
             logger.error(f"Full error details: {e}")
             import traceback
             traceback.print_exc()
+
+    def show_password_change_dialog(self, account_id, account_name):
+        title = self.lang_manager.get_string("password_change_reminder_title")
+        message = self.lang_manager.get_string("password_change_reminder", account_name=account_name)
+        if self.show_message(title, message, ask="yesno"):
+            if self.verify_master_password_dialog():
+                metadata_conn = self.database.get_metadata_connection()
+                cursor = metadata_conn.execute("SELECT id, name, email, url, notes, created_at, updated_at, tags, security_level FROM accounts WHERE id = ?", (account_id,))
+                account_row = cursor.fetchone()
+                metadata_conn.close()
+
+                if account_row:
+                    account_data = {
+                        "id": account_row[0],
+                        "name": account_row[1],
+                        "email": account_row[2],
+                        "url": account_row[3],
+                        "notes": account_row[4],
+                    }
+                    self.show_account_dialog(account_data)
             
     def show_password_generator(self):
         for widget in self.main_panel.winfo_children():

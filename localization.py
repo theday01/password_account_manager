@@ -397,6 +397,9 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "activation_failed_title": "Activation Failed",
         "activation_failed_message": "The license key is incorrect. You have {attempts_left} attempts remaining.",
         "activation_locked_out_message": "Too many incorrect activation attempts. For your security, activation has been temporarily blocked for {lockout_time}.",
+        "password_change_reminder_title": "Password Change Reminder",
+        "password_change_reminder": "It's been 5 minutes since you created the account '{account_name}'.\n\nWould you like to change the password now?",
+        "weak_password_recommendation": "(please change the password !!)",
     },
     "Arabic": {
         "loading": "جارٍ التحميل...",
@@ -777,6 +780,9 @@ SecureVault Pro هو مدير كلمات مرور لسطح المكتب يركز
         "activation_failed_title": "فشل التفعيل",
         "activation_failed_message": "مفتاح الترخيص غير صحيح. تبقى لديك {attempts_left} محاولات.",
         "activation_locked_out_message": "لقد تجاوزت الحد المسموح به من محاولات التفعيل الفاشلة. لأمانك، تم حظر التفعيل مؤقتًا لمدة {lockout_time}.",
+        "password_change_reminder_title": "تذكير تغيير كلمة المرور",
+        "password_change_reminder": "لقد مرت 5 دقائق منذ إنشاء حساب '{account_name}'.\n\nهل ترغب في تغيير كلمة المرور الآن؟",
+        "weak_password_recommendation": "(يرجى تغيير كلمة المرور أو تمكين المصادقة الثنائية أو إعادة تعيين الحساب)",
     }
 }
 
