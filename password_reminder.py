@@ -39,3 +39,6 @@ class PasswordReminder:
     def stop(self):
         if self.timer:
             self.timer.cancel()
+
+    def get_reminded_accounts(self):
+        return self.reminded_accounts

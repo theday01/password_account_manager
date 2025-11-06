@@ -3489,9 +3489,17 @@ class ModernPasswordManagerGUI:
             "score": score
         }
         
-        card = ctk.CTkFrame(self.passwords_container, corner_radius=10)
+        reminded_accounts = set()
+        if self.password_reminder:
+            reminded_accounts = self.password_reminder.get_reminded_accounts()
+
+        card_fg_color = None
+        if account_id in reminded_accounts:
+            card_fg_color = "#451a1a"
+
+        card = ctk.CTkFrame(self.passwords_container, corner_radius=10, fg_color=card_fg_color)
         card.pack(fill="x", padx=10, pady=8)
-        
+
         content = ctk.CTkFrame(card, fg_color="transparent")
         content.pack(fill="x", padx=20, pady=20)
 
