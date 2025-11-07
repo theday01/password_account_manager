@@ -15,21 +15,22 @@ class PasswordReminder:
         try:
             now = datetime.now()
             five_minutes_ago = now - timedelta(minutes=5)
-            six_minutes_ago = now - timedelta(minutes=6)
             
             metadata_conn = self.db_manager.get_metadata_connection()
-            cursor = metadata_conn.execute("SELECT id, name, created_at FROM accounts WHERE created_at BETWEEN ? AND ?", (six_minutes_ago.isoformat(), five_minutes_ago.isoformat()))
+            cursor = metadata_conn.execute("SELECT id, name, updated_at FROM accounts WHERE updated_at <= ?", (five_minutes_ago.isoformat(),))
             accounts_to_remind = cursor.fetchall()
             metadata_conn.close()
 
-            for account_id, name, created_at in accounts_to_remind:
+            for account_id, name, updated_at in accounts_to_remind:
                 if account_id not in self.reminded_accounts:
                     self.reminded_accounts.add(account_id)
-                    self.parent_window.root.after(0, self.parent_window.show_password_change_dialog, account_id, name)
-                    break # Only show one reminder per check
-
+                    self.parent_window.root.after(0, self.parent_window.load_password_cards) # Refresh UI
+                    
         finally:
-            self.start()
+            # Reschedule the next check
+            self.timer = threading.Timer(self.REMINDER_INTERVAL, self._check_accounts)
+            self.timer.daemon = True
+            self.timer.start()
 
     def start(self):
         self.timer = threading.Timer(self.REMINDER_INTERVAL, self._check_accounts)
@@ -42,3 +43,7 @@ class PasswordReminder:
 
     def get_reminded_accounts(self):
         return self.reminded_accounts
+
+    def mark_as_changed(self, account_id):
+        if account_id in self.reminded_accounts:
+            self.reminded_accounts.remove(account_id)

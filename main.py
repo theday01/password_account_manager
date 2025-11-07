@@ -3495,7 +3495,7 @@ class ModernPasswordManagerGUI:
 
         card_fg_color = None
         if account_id in reminded_accounts:
-            card_fg_color = "#451a1a"
+            card_fg_color = "yellow"
 
         card = ctk.CTkFrame(self.passwords_container, corner_radius=10, fg_color=card_fg_color)
         card.pack(fill="x", padx=10, pady=8)
@@ -3833,6 +3833,8 @@ class ModernPasswordManagerGUI:
             email = entries["email"].get().strip()
             if account:  # Update existing account
                 self.database.update_account(account["id"], name, email, url, notes, username, password)
+                if self.password_reminder:
+                    self.password_reminder.mark_as_changed(account["id"])
                 self.show_message("success", "update_success_message", account_name=name)
             else:  # Create new account
                 max_attempts = 10
