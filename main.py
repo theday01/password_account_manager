@@ -3420,16 +3420,19 @@ class ModernPasswordManagerGUI:
         self.update_expired_passwords_count()
 
     def update_expired_passwords_count(self):
-        if self.password_reminder:
-            count = len(self.password_reminder.get_reminded_accounts())
-            if count > 0:
-                self.expired_passwords_label.configure(text=self.lang_manager.get_string("expired_passwords_count", count=count))
+        if hasattr(self, 'expired_passwords_label') and self.expired_passwords_label.winfo_exists():
+            if self.password_reminder:
+                count = len(self.password_reminder.get_reminded_accounts())
+                if count > 0:
+                    self.expired_passwords_label.configure(text=self.lang_manager.get_string("expired_passwords_count", count=count))
+                else:
+                    self.expired_passwords_label.configure(text="")
             else:
                 self.expired_passwords_label.configure(text="")
-        else:
-            self.expired_passwords_label.configure(text="")
 
     def load_password_cards(self, query: str = None):
+        if not hasattr(self, 'passwords_container') or not self.passwords_container.winfo_exists():
+            return
         for widget in self.passwords_container.winfo_children():
             widget.destroy()
         if not self.database:
@@ -3930,26 +3933,6 @@ class ModernPasswordManagerGUI:
             logger.error(f"Full error details: {e}")
             import traceback
             traceback.print_exc()
-
-    def show_password_change_dialog(self, account_id, account_name):
-        title = self.lang_manager.get_string("password_change_reminder_title")
-        message = self.lang_manager.get_string("password_change_reminder", account_name=account_name)
-        if self.show_message(title, message, ask="yesno"):
-            if self.verify_master_password_dialog():
-                metadata_conn = self.database.get_metadata_connection()
-                cursor = metadata_conn.execute("SELECT id, name, email, url, notes, created_at, updated_at, tags, security_level FROM accounts WHERE id = ?", (account_id,))
-                account_row = cursor.fetchone()
-                metadata_conn.close()
-
-                if account_row:
-                    account_data = {
-                        "id": account_row[0],
-                        "name": account_row[1],
-                        "email": account_row[2],
-                        "url": account_row[3],
-                        "notes": account_row[4],
-                    }
-                    self.show_account_dialog(account_data)
             
     def show_password_generator(self):
         for widget in self.main_panel.winfo_children():
