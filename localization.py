@@ -147,6 +147,7 @@ LANGUAGES = {
         "website_url_label": "Website URL:",
         "update_account_button": "Update Account",
         "add_account_button": "Add Account",
+        "expired_passwords_count": "Expired Passwords: {count}",
         "account_name_required": "Account name is required",
         "password_required": "Password is required",
         "update_success_message": "Account '{account_name}' updated successfully!",

@@ -25,6 +25,7 @@ class PasswordReminder:
                 if account_id not in self.reminded_accounts:
                     self.reminded_accounts.add(account_id)
                     self.parent_window.root.after(0, self.parent_window.load_password_cards) # Refresh UI
+                    self.parent_window.root.after(0, self.parent_window.update_expired_passwords_count)
                     
         finally:
             # Reschedule the next check

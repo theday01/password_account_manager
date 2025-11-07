@@ -269,10 +269,16 @@ class DatabaseManager:
         self.crypto = crypto_manager
         self.secure_file_manager = secure_file_manager
         if secure_file_manager:
-            self.metadata_db = secure_file_manager.metadata_db
-            self.sensitive_db = secure_file_manager.sensitive_db
-            self.salt_path = secure_file_manager.salt_path
-            self.integrity_path = secure_file_manager.signature_path
+            if secure_file_manager.temp_dir:
+                self.metadata_db = os.path.join(secure_file_manager.temp_dir, "metadata.db")
+                self.sensitive_db = os.path.join(secure_file_manager.temp_dir, "sensitive.db")
+                self.salt_path = os.path.join(secure_file_manager.temp_dir, "salt_file")
+                self.integrity_path = os.path.join(secure_file_manager.temp_dir, "integrity_file")
+            else:
+                self.metadata_db = secure_file_manager.metadata_db
+                self.sensitive_db = secure_file_manager.sensitive_db
+                self.salt_path = secure_file_manager.salt_path
+                self.integrity_path = secure_file_manager.signature_path
         else:
             self.metadata_db = f"{db_path}_metadata.db"
             self.sensitive_db = f"{db_path}_sensitive.db"
@@ -3400,12 +3406,28 @@ class ModernPasswordManagerGUI:
         self.search_entry = NonArabicEntry(search_frame, placeholder_text=self.lang_manager.get_string("search_placeholder"),
                                          width=400, height=45)
         self.search_entry.pack(side="left", padx=25, pady=15)
+        
+        self.expired_passwords_label = ctk.CTkLabel(search_frame, text="", 
+                                                    font=ctk.CTkFont(size=14, weight="bold"),
+                                                    text_color="red")
+        self.expired_passwords_label.pack(side="right", padx=25, pady=15)
 
         self.search_entry.bind("<KeyRelease>", self.search_accounts)
 
         self.passwords_container = ctk.CTkScrollableFrame(self.main_panel)
         self.passwords_container.pack(fill="both", expand=True, padx=15, pady=15)
         self.load_password_cards()
+        self.update_expired_passwords_count()
+
+    def update_expired_passwords_count(self):
+        if self.password_reminder:
+            count = len(self.password_reminder.get_reminded_accounts())
+            if count > 0:
+                self.expired_passwords_label.configure(text=self.lang_manager.get_string("expired_passwords_count", count=count))
+            else:
+                self.expired_passwords_label.configure(text="")
+        else:
+            self.expired_passwords_label.configure(text="")
 
     def load_password_cards(self, query: str = None):
         for widget in self.passwords_container.winfo_children():
@@ -3606,6 +3628,9 @@ class ModernPasswordManagerGUI:
         if result:
             try:
                 self.database.delete_account(account['id'])
+                if self.password_reminder:
+                    self.password_reminder.mark_as_changed(account['id'])
+                self.update_expired_passwords_count()
                 self.show_message("delete_success_title", "delete_success_message", account_name=account['name'])
                 self.load_password_cards()
             except Exception as e:
@@ -3835,6 +3860,7 @@ class ModernPasswordManagerGUI:
                 self.database.update_account(account["id"], name, email, url, notes, username, password)
                 if self.password_reminder:
                     self.password_reminder.mark_as_changed(account["id"])
+                self.update_expired_passwords_count()
                 self.show_message("success", "update_success_message", account_name=name)
             else:  # Create new account
                 max_attempts = 10
