@@ -2656,7 +2656,7 @@ class ModernPasswordManagerGUI:
         input_label.pack(fill="x", pady=(0, 10))
         
         # License key entry with modern styling
-        license_entry = SecureEntry(
+        license_entry = ctk.CTkEntry(
             content_frame,
             placeholder_text="Enter your license key here...",
             width=400,
