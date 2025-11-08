@@ -1529,7 +1529,7 @@ class ModernPasswordManagerGUI:
         self.setup_window = ThemedToplevel(self.root)
         self.setup_window.title(self.lang_manager.get_string("setup_wizard_title"))
         
-        width, height = 700, 500
+        width, height = 550, 650
         x = (self.setup_window.winfo_screenwidth() // 2) - (width // 2)
         y = (self.setup_window.winfo_screenheight() // 2) - (height // 2)
         self.setup_window.geometry(f"{width}x{height}+{x}+{y}")
@@ -1551,6 +1551,15 @@ class ModernPasswordManagerGUI:
             font=ctk.CTkFont(size=18, weight="bold")
         ).pack(pady=20)
         
+        warning_label = ctk.CTkLabel(
+            step1_frame,
+            text=self.lang_manager.get_string("master_password_warning"),
+            font=ctk.CTkFont(size=12),
+            text_color="#FFC107", 
+            wraplength=450
+        )
+        warning_label.pack(pady=(0, 15), padx=20)
+
         self.setup_full_name_entry = NonArabicEntry(
             step1_frame, 
             placeholder_text="Full Name Ex. Hamza Saadi", 
@@ -1565,23 +1574,63 @@ class ModernPasswordManagerGUI:
         )
         self.setup_email_entry.pack(pady=10)
         
+        password_frame = ctk.CTkFrame(step1_frame, fg_color="transparent")
+        password_frame.pack(pady=10)
+
         self.setup_master_password = SecureEntry(
-            step1_frame, 
+            password_frame, 
             placeholder_text=self.lang_manager.get_string("master_password_placeholder"),
             show="*", width=300, height=40
         )
-        self.setup_master_password.pack(pady=10)
+        self.setup_master_password.pack(side="left")
+
+        self.toggle_master_password_btn = ctk.CTkButton(
+            password_frame,
+            text="👁️",
+            width=40,
+            height=40,
+            command=lambda: self.toggle_password_visibility(self.setup_master_password, self.toggle_master_password_btn)
+        )
+        self.toggle_master_password_btn.pack(side="left", padx=(5, 0))
+
+        confirm_password_frame = ctk.CTkFrame(step1_frame, fg_color="transparent")
+        confirm_password_frame.pack(pady=10)
 
         self.setup_confirm_password = SecureEntry(
-            step1_frame, 
+            confirm_password_frame, 
             placeholder_text=self.lang_manager.get_string("confirm_password_placeholder"),
             show="*", width=300, height=40
         )
-        self.setup_confirm_password.pack(pady=10)
+        self.setup_confirm_password.pack(side="left")
 
-        self.strength_label = ctk.CTkLabel(step1_frame, text="")
-        self.strength_label.pack(pady=10)
-        self.setup_master_password.bind("<KeyRelease>", self.update_password_strength)
+        self.toggle_confirm_password_btn = ctk.CTkButton(
+            confirm_password_frame,
+            text="👁️",
+            width=40,
+            height=40,
+            command=lambda: self.toggle_password_visibility(self.setup_confirm_password, self.toggle_confirm_password_btn)
+        )
+        self.toggle_confirm_password_btn.pack(side="left", padx=(5, 0))
+
+        # --- Password Requirements Checklist ---
+        checklist_frame = ctk.CTkFrame(step1_frame, fg_color="transparent")
+        checklist_frame.pack(pady=10, padx=20, anchor="w")
+
+        self.req_labels = {}
+        requirements = {
+            "length": self.lang_manager.get_string("password_req_length"),
+            "uppercase": self.lang_manager.get_string("password_req_uppercase"),
+            "lowercase": self.lang_manager.get_string("password_req_lowercase"),
+            "number": self.lang_manager.get_string("password_req_number"),
+            "symbol": self.lang_manager.get_string("password_req_symbol"),
+        }
+
+        for key, text in requirements.items():
+            label = ctk.CTkLabel(checklist_frame, text=f"❌ {text}", text_color="gray", font=ctk.CTkFont(size=12))
+            label.pack(anchor="w")
+            self.req_labels[key] = label
+        
+        self.setup_master_password.bind("<KeyRelease>", self.validate_master_password_realtime)
 
         # Step 2: Security Questions
         step2_frame = ctk.CTkFrame(self.setup_window)
@@ -1698,8 +1747,8 @@ class ModernPasswordManagerGUI:
             elif not master_password or master_password != confirm_password:
                 self.show_message("error", "passwords_dont_match", msg_type="error")
                 validation_passed = False
-            elif len(master_password) < 1:
-                self.show_message("error", "password_too_short", msg_type="error")
+            elif not self.validate_master_password_realtime():
+                self.show_message("error", "password_requirements_not_met", msg_type="error")
                 validation_passed = False
 
         if validation_passed and self.wizard_step < len(self.wizard_frames) - 1:
@@ -1711,19 +1760,37 @@ class ModernPasswordManagerGUI:
             self.wizard_step -= 1
             self.show_step()
 
-    def update_password_strength(self, event):
+    def validate_master_password_realtime(self, event=None):
         password = self.setup_master_password.get()
-        if password:
-            score, strength, recommendations = self.password_generator.assess_strength(password)
-            color_map = {
-                "Excellent": "#00FF00", "Very Strong": "#00FF00", "Strong": "#44FF44",
-                "Medium": "#FFAA44", "Weak": "#FF8844", "Very Weak": "#FF4444"
-            }
-            color = color_map.get(strength, "#888888")
-            self.strength_label.configure(
-                text=self.lang_manager.get_string("password_strength_template", length=len(password), strength=strength, score=score), 
-                text_color=color
-            )
+        
+        # Define validation checks
+        checks = {
+            "length": len(password) >= 16,
+            "uppercase": any(c.isupper() for c in password),
+            "lowercase": any(c.islower() for c in password),
+            "number": any(c.isdigit() for c in password),
+            "symbol": any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password),
+        }
+
+        # Update labels based on checks
+        for key, is_met in checks.items():
+            if key in self.req_labels:
+                label = self.req_labels[key]
+                base_text = self.lang_manager.get_string(f"password_req_{key}")
+                if is_met:
+                    label.configure(text=f"✅ {base_text}", text_color="green")
+                else:
+                    label.configure(text=f"❌ {base_text}", text_color="gray")
+        
+        return all(checks.values())
+
+    def toggle_password_visibility(self, entry, button):
+        if entry.cget("show") == "*":
+            entry.configure(show="")
+            button.configure(text="🙈")
+        else:
+            entry.configure(show="*")
+            button.configure(text="👁️")
 
     def _generate_welcome_message(self, count: int = 1) -> str:
         """
@@ -1859,8 +1926,8 @@ class ModernPasswordManagerGUI:
         if not master_password or master_password != confirm_password:
             self.show_message("error", "passwords_dont_match", msg_type="error")
             return
-        if len(master_password) < 1:
-            self.show_message("error", "password_too_short", msg_type="error")
+        if not self.validate_master_password_realtime():
+            self.show_message("error", "password_requirements_not_met", msg_type="error")
             return
 
         selected_questions = []

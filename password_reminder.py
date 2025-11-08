@@ -17,7 +17,7 @@ class PasswordReminder:
             five_minutes_ago = now - timedelta(minutes=5)
             
             metadata_conn = self.db_manager.get_metadata_connection()
-            cursor = metadata_conn.execute("SELECT id, name, updated_at FROM accounts WHERE updated_at <= ?", (five_minutes_ago.isoformat(),))
+            cursor = metadata_conn.execute("SELECT id, name, updated_at FROM accounts WHERE updated_at <= ? AND id != 'master_account'", (five_minutes_ago.isoformat(),))
             accounts_to_remind = cursor.fetchall()
             metadata_conn.close()
 
@@ -34,9 +34,8 @@ class PasswordReminder:
             self.timer.start()
 
     def start(self):
-        self.timer = threading.Timer(self.REMINDER_INTERVAL, self._check_accounts)
-        self.timer.daemon = True
-        self.timer.start()
+        # Run the first check immediately without delay
+        self._check_accounts()
 
     def stop(self):
         if self.timer:

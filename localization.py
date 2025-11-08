@@ -401,6 +401,13 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "password_change_reminder_title": "Password Change Reminder",
         "password_change_reminder": "It's been 5 minutes since you created the account '{account_name}'.\n\nWould you like to change the password now?",
         "weak_password_recommendation": "(please change the password !!)",
+        "master_password_warning": "Please be aware: Your Master Password is the only key to your vault. If you forget it, your data cannot be recovered. We recommend storing it in a secure, offline location.",
+        "password_req_length": "At least 16 characters",
+        "password_req_uppercase": "An uppercase letter (A-Z)",
+        "password_req_lowercase": "A lowercase letter (a-z)",
+        "password_req_number": "A number (0-9)",
+        "password_req_symbol": "A symbol (!@#$)",
+        "password_requirements_not_met": "Please ensure your password meets all requirements.",
     },
     "Arabic": {
         "loading": "جارٍ التحميل...",
@@ -784,6 +791,13 @@ SecureVault Pro هو مدير كلمات مرور لسطح المكتب يركز
         "password_change_reminder_title": "تذكير تغيير كلمة المرور",
         "password_change_reminder": "لقد مرت 5 دقائق منذ إنشاء حساب '{account_name}'.\n\nهل ترغب في تغيير كلمة المرور الآن؟",
         "weak_password_recommendation": "(يرجى تغيير كلمة المرور أو تمكين المصادقة الثنائية أو إعادة تعيين الحساب)",
+        "master_password_warning": "يرجى العلم: كلمة المرور الرئيسية هي المفتاح الوحيد لخزنتك. إذا نسيتها، لا يمكن استعادة بياناتك. نوصي بتخزينها في مكان آمن وغير متصل بالإنترنت.",
+        "password_req_length": "16 حرفًا على الأقل",
+        "password_req_uppercase": "حرف كبير (A-Z)",
+        "password_req_lowercase": "حرف صغير (a-z)",
+        "password_req_number": "رقم (0-9)",
+        "password_req_symbol": "رمز (!@#$)",
+        "password_requirements_not_met": "الرجاء التأكد من أن كلمة المرور الخاصة بك تلبي جميع المتطلبات.",
     }
 }
 
