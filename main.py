@@ -918,11 +918,27 @@ class ModernPasswordManagerGUI:
         main_frame = ctk.CTkFrame(welcome_window)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
+        title_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        title_frame.pack(pady=(10, 15))
+
         ctk.CTkLabel(
-            main_frame,
-            text="Welcome to SecureVault Pro",
+            title_frame,
+            text="Welcome to ",
             font=ctk.CTkFont(size=24, weight="bold")
-        ).pack(pady=(10, 15))
+        ).pack(side="left", anchor="s")
+
+        try:
+            logo_image = Image.open("icons/mainlogo.png")
+            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(190, 45))
+            logo_label = ctk.CTkLabel(title_frame, image=logo_ctk_image, text="")
+            logo_label.pack(side="left", anchor="s", padx=(5, 0))
+        except Exception as e:
+            logger.error(f"Failed to load logo in welcome dialog: {e}")
+            ctk.CTkLabel(
+                title_frame,
+                text="SecureVault Pro",
+                font=ctk.CTkFont(size=24, weight="bold")
+            ).pack(side="left", anchor="s")
 
         welcome_message = (
             "It looks like this is your first time using the application.\n\n"
@@ -1211,19 +1227,27 @@ class ModernPasswordManagerGUI:
         x = (self.root.winfo_screenwidth() // 2) - (width // 2)
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
-        title = ctk.CTkLabel(
-            login_card, 
-            text="🔒 " + self.lang_manager.get_string("app_title"),
-            font=ctk.CTkFont(size=28, weight="bold")
-        )
-        title.pack(pady=(30, 20), padx=40)
-        subtitle = ctk.CTkLabel(
-            login_card,
-            text=self.lang_manager.get_string("app_slogan"),
-            font=ctk.CTkFont(size=16),
-            text_color="#888888"
-        )
-        subtitle.pack(pady=(0, 30), padx=40)
+        try:
+            logo_image = Image.open("icons/mainlogo.png")
+            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(400, 80))
+            logo_label = ctk.CTkLabel(login_card, image=logo_ctk_image, text="")
+            logo_label.pack(pady=(30, 30), padx=40)
+        except Exception as e:
+            logger.error(f"Failed to load logo: {e}")
+            # Fallback to text if image fails to load
+            title = ctk.CTkLabel(
+                login_card, 
+                text="🔒 " + self.lang_manager.get_string("app_title"),
+                font=ctk.CTkFont(size=28, weight="bold")
+            )
+            title.pack(pady=(30, 20), padx=40)
+            subtitle = ctk.CTkLabel(
+                login_card,
+                text=self.lang_manager.get_string("app_slogan"),
+                font=ctk.CTkFont(size=16),
+                text_color="#888888"
+            )
+            subtitle.pack(pady=(0, 30), padx=40)
         password_frame = ctk.CTkFrame(login_card, fg_color="transparent")
         password_frame.pack(pady=15, padx=40)
         self.master_password_entry = ctk.CTkEntry(

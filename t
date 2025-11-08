@@ -22,3 +22,6 @@ remove copy and paste password from the clipboard to avoid tampering
 
 
 123456789hamzaSAADI@
+
+
+            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(400, 200))
