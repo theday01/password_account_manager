@@ -1443,8 +1443,7 @@ class ModernPasswordManagerGUI:
                 return False
 
             try:
-                temp_db = DatabaseManager(self.database.db_path, self.crypto, self.secure_file_manager)
-                auth_success = temp_db.authenticate(result["password"])
+                auth_success = self.database.authenticate(result["password"])
                 self.auth_guardian.record_login_attempt(auth_success)
                 if auth_success:
                     return True
