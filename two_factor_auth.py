@@ -15,7 +15,7 @@ class TwoFactorAuthManager:
         # Note: Google Authenticator shows the first letter of issuer_name
         # Other apps (Authy, Microsoft Authenticator) may support custom image_url
         if full_name:
-            account_name = f"{email} ({full_name})"
+            account_name = f"{email}"
         else:
             account_name = email
         

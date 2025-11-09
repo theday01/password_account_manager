@@ -977,7 +977,7 @@ class ModernPasswordManagerGUI:
             text=self.lang_manager.get_string("get_started_button"),
             command=welcome_window.destroy,
             height=50,
-            font=ctk.CTkFont(size=18, weight="bold")
+            font=ctk.CTkFont(size=13, weight="bold")
         )
         close_button.pack(pady=20, padx=20)
 
@@ -2976,9 +2976,13 @@ class ModernPasswordManagerGUI:
 
         tfa_enabled = self.settings.get('tfa_secret') is not None
         tfa_button_text = self.lang_manager.get_string("disable_2fa_button") if tfa_enabled else self.lang_manager.get_string("enable_2fa_button")
+        
+        button_color = "red" if tfa_enabled else ctk.ThemeManager.theme["CTkButton"]["fg_color"]
+        
         tfa_button = ctk.CTkButton(tfa_frame, text=tfa_button_text,
                                    command=self.show_tfa_dialog,
-                                   height=40)
+                                   height=40,
+                                   fg_color=button_color)
         tfa_button.pack(pady=10)
 
 

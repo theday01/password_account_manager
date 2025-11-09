@@ -323,7 +323,7 @@ _THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025_
         "preview_contents_button": "Preview contents",
         "restore_selected_backup_button": "Restore Selected Backup",
         "tutorial_title": "Tutorial",
-        "tutorial_step_1_title": "Welcome to SecureVault Pro!",
+        "tutorial_step_1_title": "Welcome to SecureVault Pro",
         "tutorial_step_1_text": """This short tutorial will walk you through the essential features of SecureVault Pro.
 
 This application is your personal digital vault for storing passwords and other sensitive information. All your data is stored securely on your local computer, not in the cloud. Everything is encrypted using powerful, industry-standard algorithms.
@@ -420,7 +420,7 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "welcome_feature_2_desc": "Create strong, random passwords to protect your online accounts from unauthorized access.",
         "welcome_feature_3_title": "🛡️ Stay Safe",
         "welcome_feature_3_desc": "Use our security report to find and fix weak or reused passwords.",
-        "get_started_button": "Let's Get Started!",
+        "get_started_button": "Let's Get Started",
     }
 }
 
