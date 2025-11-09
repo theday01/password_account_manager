@@ -421,6 +421,16 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "welcome_feature_3_title": "🛡️ Stay Safe",
         "welcome_feature_3_desc": "Use our security report to find and fix weak or reused passwords.",
         "get_started_button": "Let's Get Started",
+        "tfa_verification_title": "2FA Verification",
+        "tfa_enter_code_label": "Enter Verification Code",
+        "tfa_prompt_message": "Open your authenticator app and enter the 6-digit code.",
+        "tfa_invalid_code_format": "Please enter a 6-digit code.",
+        "tfa_incorrect_code_attempts_left": "Incorrect code. {count} attempts remaining.",
+        "tfa_locked_out_message": "Too many attempts. Locked for {minutes:02d}:{seconds:02d}.",
+        "tfa_verification_failed": "2FA verification failed due to an unexpected error.",
+        "delete_account_tfa_title": "Delete Account - 2FA",
+        "view_account_tfa_title": "View Account - 2FA",
+        "edit_account_tfa_title": "Edit Account - 2FA",
     }
 }
 

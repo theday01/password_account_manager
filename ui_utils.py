@@ -257,3 +257,234 @@ def show_reminder_dialog(parent_window, remaining_seconds, activation_callback):
     ctk.CTkButton(button_frame, text="Later", command=on_later).pack(side="right", padx=10)
 
     dialog.wait_window()
+
+class TfaVerificationDialog(ThemedToplevel):
+    """
+    A dialog for verifying a 2FA code, including brute-force protection UI.
+    """
+    def __init__(self, parent, lang_manager, auth_guardian, verification_callback):
+        super().__init__(parent)
+        self.lang_manager = lang_manager
+        self.auth_guardian = auth_guardian
+        self.verification_callback = verification_callback
+        self.result = None  # Can be "verified", "cancelled", or "locked"
+
+        self.title(self.lang_manager.get_string("tfa_verification_title"))
+        self.geometry("450x350")
+        self.resizable(False, False)
+        self.grab_set()
+        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
+
+        self._build_ui()
+        self._update_lockout_state()
+
+    def _build_ui(self):
+        main_frame = ctk.CTkFrame(self, corner_radius=15)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(
+            main_frame,
+            text=self.lang_manager.get_string("tfa_enter_code_label"),
+            font=ctk.CTkFont(size=18, weight="bold")
+        ).pack(pady=(20, 10))
+
+        ctk.CTkLabel(
+            main_frame,
+            text=self.lang_manager.get_string("tfa_prompt_message"),
+            font=ctk.CTkFont(size=12),
+            text_color=("gray60", "gray40")
+        ).pack(pady=(0, 20))
+
+        self.code_entry = ctk.CTkEntry(
+            main_frame,
+            width=200,
+            height=50,
+            font=ctk.CTkFont(size=24, weight="bold"),
+            justify="center"
+        )
+        self.code_entry.pack()
+        self.code_entry.focus()
+        self.code_entry.bind("<KeyRelease>", self._validate_input)
+        self.code_entry.bind("<Return>", lambda e: self._on_verify())
+
+        self.error_label = ctk.CTkLabel(
+            main_frame,
+            text="",
+            font=ctk.CTkFont(size=12),
+            text_color="red"
+        )
+        self.error_label.pack(pady=(10, 0))
+
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(pady=20)
+
+        self.cancel_button = ctk.CTkButton(
+            button_frame,
+            text=self.lang_manager.get_string("cancel_button"),
+            command=self._on_cancel,
+            width=120,
+            height=45
+        )
+        self.cancel_button.pack(side="left", padx=10)
+
+        self.verify_button = ctk.CTkButton(
+            button_frame,
+            text=self.lang_manager.get_string("verify_button"),
+            command=self._on_verify,
+            width=120,
+            height=45,
+            font=ctk.CTkFont(weight="bold")
+        )
+        self.verify_button.pack(side="right", padx=10)
+
+    def _validate_input(self, event=None):
+        current_value = self.code_entry.get()
+        new_value = "".join(filter(str.isdigit, current_value))
+        if len(new_value) > 6:
+            new_value = new_value[:6]
+        if new_value != current_value:
+            self.code_entry.delete(0, tk.END)
+            self.code_entry.insert(0, new_value)
+
+    def _on_verify(self):
+        code = self.code_entry.get().strip()
+        if len(code) != 6:
+            self.error_label.configure(text=self.lang_manager.get_string("tfa_invalid_code_format"))
+            return
+
+        is_correct = self.verification_callback(code)
+        self.auth_guardian.record_tfa_attempt(is_correct)
+
+        if is_correct:
+            self.result = "verified"
+            self.destroy()
+        else:
+            self.code_entry.delete(0, tk.END)
+            if self.auth_guardian.is_tfa_locked_out():
+                self.result = "locked"
+                self._update_lockout_state()
+            else:
+                attempts_left = self.auth_guardian.MAX_TFA_ATTEMPTS_BEFORE_LOCKOUT - self.auth_guardian.tfa_failed_attempts
+                self.error_label.configure(text=self.lang_manager.get_string("tfa_incorrect_code_attempts_left", count=attempts_left))
+
+    def _on_cancel(self):
+        self.result = "cancelled"
+        self.destroy()
+
+    def _update_lockout_state(self):
+        if self.auth_guardian.is_tfa_locked_out():
+            self.code_entry.configure(state="disabled")
+            self.verify_button.configure(state="disabled")
+            remaining_time = self.auth_guardian.get_remaining_tfa_lockout_time()
+            minutes, seconds = divmod(remaining_time, 60)
+            lockout_message = self.lang_manager.get_string("tfa_locked_out_message", minutes=minutes, seconds=seconds)
+            self.error_label.configure(text=lockout_message)
+            self.after(1000, self._update_lockout_state)
+        else:
+            self.code_entry.configure(state="normal")
+            self.verify_button.configure(state="normal")
+            # Clear the lockout message if it wasn't replaced by an error
+            if "locked" in self.error_label.cget("text").lower():
+                self.error_label.configure(text="")
+    
+    def show(self):
+        """Show the dialog and wait for it to close."""
+        self.wait_window()
+        return self.result
+
+class SimpleTfaVerificationDialog(ThemedToplevel):
+    """
+    A simplified, modal 2FA dialog for re-authentication during sensitive actions.
+    It does not contain complex lockout UI, only the essential input fields.
+    Returns the verified code on success, None on failure/cancellation.
+    """
+    def __init__(self, parent, lang_manager, title):
+        super().__init__(parent)
+        self.lang_manager = lang_manager
+        self.result = None
+
+        self.title(title)
+        self.geometry("380x220")
+        self.resizable(False, False)
+        self.grab_set()
+        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
+
+        self._build_ui()
+        self.center_window()
+        self.lift()
+        self.attributes('-topmost', True)
+        self.after_idle(lambda: self.attributes('-topmost', False))
+        self.code_entry.focus()
+
+
+    def _build_ui(self):
+        main_frame = ctk.CTkFrame(self, fg_color="transparent")
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(
+            main_frame,
+            text=self.lang_manager.get_string("tfa_enter_code_label"),
+            font=ctk.CTkFont(size=16, weight="bold")
+        ).pack(pady=(0, 15))
+
+        self.code_entry = ctk.CTkEntry(
+            main_frame,
+            width=180,
+            height=45,
+            font=ctk.CTkFont(size=22, weight="bold"),
+            justify="center"
+        )
+        self.code_entry.pack()
+        self.code_entry.bind("<KeyRelease>", self._validate_input)
+        self.code_entry.bind("<Return>", lambda e: self._on_verify())
+
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(pady=(20, 0))
+
+        cancel_button = ctk.CTkButton(
+            button_frame,
+            text=self.lang_manager.get_string("cancel_button"),
+            command=self._on_cancel,
+            width=100
+        )
+        cancel_button.pack(side="left", padx=10)
+
+        verify_button = ctk.CTkButton(
+            button_frame,
+            text=self.lang_manager.get_string("verify_button"),
+            command=self._on_verify,
+            width=100
+        )
+        verify_button.pack(side="right", padx=10)
+
+    def _validate_input(self, event=None):
+        current_value = self.code_entry.get()
+        new_value = "".join(filter(str.isdigit, current_value))
+        if len(new_value) > 6:
+            new_value = new_value[:6]
+        if new_value != current_value:
+            self.code_entry.delete(0, tk.END)
+            self.code_entry.insert(0, new_value)
+
+    def _on_verify(self):
+        code = self.code_entry.get().strip()
+        if len(code) == 6:
+            self.result = code
+            self.destroy()
+
+    def _on_cancel(self):
+        self.result = None
+        self.destroy()
+
+    def center_window(self):
+        self.update_idletasks()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        x = (self.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f'{width}x{height}+{x}+{y}')
+
+    def get_code(self):
+        """Show the dialog and wait for user input."""
+        self.wait_window()
+        return self.result

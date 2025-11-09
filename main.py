@@ -21,7 +21,7 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter import filedialog
 import customtkinter as ctk
-from ui_utils import set_icon, ThemedToplevel, CustomMessageBox, ask_string
+from ui_utils import set_icon, ThemedToplevel, CustomMessageBox, ask_string, TfaVerificationDialog, SimpleTfaVerificationDialog
 from secure_file_manager import SecureFileManager, SecureVaultSetup, SecurityMonitor, setup_secure_vault
 from backup_manager import BackupManager
 from PIL import Image, ImageTk
@@ -1178,26 +1178,6 @@ class ModernPasswordManagerGUI:
         if 'language' in self.settings:
             self.lang_manager.set_language(self.settings['language'])
 
-    def save_settings_to_file(self):
-        # This method now just saves the current state of self.settings.
-        # AuthGuardian is responsible for saving its own state.
-        if self.secure_file_manager:
-            try:
-                result = self.secure_file_manager.write_settings(self.settings)
-                if not result:
-                    logger.error(f"Failed to save settings - write_settings returned False")
-                else:
-                    logger.info(f"Settings saved successfully")
-            except Exception as e:
-                logger.error(f"Error saving settings: {e}")
-        else:
-            # Fallback for when secure manager isn't available
-            try:
-                with open("vault_settings.json", 'w') as f:
-                    json.dump(self.settings, f, indent=4)
-            except Exception as e:
-                logger.error(f"Error saving settings to fallback file: {e}")
-
     def log_security_event(self, event_type: str, details: str):
         logger.info(f"SECURITY EVENT: {event_type} - {details}")
 
@@ -1382,9 +1362,10 @@ class ModernPasswordManagerGUI:
                     consecutive_logins = 1
                 else:
                     consecutive_logins += 1
+                self.auth_guardian.update_setting('last_login_timestamp', now)
+                self.auth_guardian.update_setting('consecutive_logins', consecutive_logins)
                 self.settings['last_login_timestamp'] = now
                 self.settings['consecutive_logins'] = consecutive_logins
-                self.save_settings_to_file()
                 # Submit the periodic notification sender to the asyncio manager
                 asyncio_manager.submit_coroutine(
                     _periodic_sender(is_trial_active=self.trial_manager.is_trial_active)
@@ -3033,8 +3014,8 @@ class ModernPasswordManagerGUI:
         tutorial.show_tutorial_window()
         # Mark tutorial as completed if it's the first time
         if not self.settings.get('tutorial_completed', False):
+            self.auth_guardian.update_setting('tutorial_completed', True)
             self.settings['tutorial_completed'] = True
-            self.save_settings_to_file()
             logger.info("Tutorial marked as completed.")
 
     def show_tfa_dialog(self):
@@ -3154,8 +3135,7 @@ class ModernPasswordManagerGUI:
             code = code_entry.get().strip()
             if self.tfa_manager.verify_code(secret, code):
                 encrypted_secret = self.crypto.encrypt_data(secret, self.database.encryption_key)
-                self.settings['tfa_secret'] = base64.b64encode(encrypted_secret).decode('utf-8')
-                self.save_settings_to_file()
+                self.auth_guardian.update_setting('tfa_secret', base64.b64encode(encrypted_secret).decode('utf-8'))
                 self.show_message("success", "tfa_enabled_success")
                 dialog.destroy()
             else:
@@ -3204,8 +3184,7 @@ class ModernPasswordManagerGUI:
             encrypted_secret = base64.b64decode(encrypted_secret_b64)
             secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
             if self.tfa_manager.verify_code(secret, code):
-                self.settings['tfa_secret'] = None
-                self.save_settings_to_file()
+                self.auth_guardian.update_setting('tfa_secret', None)
                 self.show_message("success", "tfa_disabled_success")
                 dialog.destroy()
             else:
@@ -3214,105 +3193,48 @@ class ModernPasswordManagerGUI:
         verify_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("verify_and_disable_button"), command=verify_and_disable)
         verify_button.pack(pady=20)
 
-    def verify_tfa_dialog(self):
-        if not self.settings.get('tfa_secret'):
-            return True
-        if self.enforce_lockout(show_error=True):
-            return False
-
-        dialog = ThemedToplevel(self.root)
-        dialog.title(self.lang_manager.get_string("tfa_dialog_title"))
-        dialog.geometry("400x250")
-        dialog.grab_set()
-        
-        result = {"verified": False}
-        main_frame = ctk.CTkFrame(dialog)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("enter_2fa_code_label"),
-                     font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
-        code_entry = ctk.CTkEntry(main_frame, width=200)
-        code_entry.pack(pady=10)
-        code_entry.focus()
-
-        def verify_tfa():
-            code = code_entry.get().strip()
-            encrypted_secret_b64 = self.settings.get('tfa_secret')
-            encrypted_secret = base64.b64decode(encrypted_secret_b64)
-            secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
-            
-            is_valid = self.tfa_manager.verify_code(secret, code)
-            self.auth_guardian.record_login_attempt(is_valid)
-
-            if is_valid:
-                result["verified"] = True
-                dialog.destroy()
-            else:
-                self.show_message("error", "invalid_2fa_code", msg_type="error")
-                if self.auth_guardian.is_locked_out():
-                    dialog.destroy()
-                    self.lock_vault()
-        
-        def on_cancel():
-            dialog.destroy()
-
-        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        button_frame.pack(pady=20)
-        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), command=on_cancel, width=100).pack(side="left", padx=10)
-        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("verify_button"), command=verify_tfa, width=100).pack(side="right", padx=10)
-
-        dialog.wait_window()
-        return result["verified"]
-
     def prompt_for_tfa(self):
-        dialog = ThemedToplevel(self.root)
-        dialog.title(self.lang_manager.get_string("tfa_dialog_title"))
-        dialog.geometry("400x250")
-        dialog.grab_set()
-
-        main_frame = ctk.CTkFrame(dialog)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("enter_2fa_code_label"),
-                     font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
-        
-        code_entry = ctk.CTkEntry(main_frame, width=200)
-        code_entry.pack(pady=10)
-
-        def verify_tfa():
+        """
+        Handles the 2FA verification process using the new dialog.
+        """
+        def _verify_callback(code):
+            """Callback function passed to the dialog to verify the code."""
             try:
-                code = code_entry.get().strip()
                 encrypted_secret_b64 = self.settings.get('tfa_secret')
                 encrypted_secret = base64.b64decode(encrypted_secret_b64)
                 secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
-                
-                is_valid = self.tfa_manager.verify_code(secret, code)
-                # A failed TFA attempt should also count towards lockout
-                self.auth_guardian.record_login_attempt(is_valid)
-
-                if is_valid:
-                    self.authenticated = True
-                    if self.secure_file_manager:
-                        self.security_monitor = SecurityMonitor(self.secure_file_manager)
-                        self.security_monitor.set_alert_callback(self.handle_security_alert)
-                        self._start_security_monitoring()
-                    dialog.destroy()
-                    self.show_main_interface()
-                else:
-                    self.show_message("error", "invalid_2fa_code", msg_type="error")
-                    if self.auth_guardian.is_locked_out():
-                        dialog.destroy()
-                        self.lock_vault()
-
+                return self.tfa_manager.verify_code(secret, code)
             except InvalidTag:
-                messagebox.showerror(
-                    "2FA Verification Error",
-                    "2FA verification failed, this is most likely due to an incorrect 'master password'. Please try logging in again."
-                )
-                dialog.destroy()
-                self.lock_vault()
+                logger.error("2FA verification failed due to InvalidTag, likely wrong master password.")
+                return False
+            except Exception as e:
+                logger.error(f"An unexpected error occurred during 2FA verification: {e}")
+                return False
 
-        verify_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("verify_button"), command=verify_tfa)
-        verify_button.pack(pady=20)
+        dialog = TfaVerificationDialog(self.root, self.lang_manager, self.auth_guardian, _verify_callback)
+        result = dialog.show()
+
+        if result == "verified":
+            self.authenticated = True
+            now = datetime.now().timestamp()
+            last_login = self.settings.get('last_login_timestamp', 0.0)
+            consecutive_logins = self.settings.get('consecutive_logins', 0)
+            if (now - last_login) > 3600:
+                consecutive_logins = 1
+            else:
+                consecutive_logins += 1
+            self.settings['last_login_timestamp'] = now
+            self.settings['consecutive_logins'] = consecutive_logins
+            self.save_settings_to_file()
+            asyncio_manager.submit_coroutine(
+                _periodic_sender(is_trial_active=self.trial_manager.is_trial_active)
+            )
+            self.show_main_interface()
+        elif result == "locked":
+            self.lock_vault() # Force a lock if the user gets locked out
+        else: # Cancelled
+            # Do nothing, just return to the login screen
+            pass
 
     def change_master_password_dialog(self):
         dialog = ThemedToplevel(self.root)
@@ -3743,13 +3665,40 @@ class ModernPasswordManagerGUI:
                           command=command, font=ctk.CTkFont(size=16),
                           fg_color=color).pack(side="left", padx=5)
 
+    def _verify_tfa_for_action(self, title_key: str) -> bool:
+        """Handles 2FA verification for a sensitive in-app action."""
+        dialog = SimpleTfaVerificationDialog(self.root, self.lang_manager, self.lang_manager.get_string(title_key))
+        code = dialog.get_code()
+
+        if not code:
+            return False
+
+        try:
+            encrypted_secret_b64 = self.settings.get('tfa_secret')
+            if not encrypted_secret_b64:
+                return False
+            encrypted_secret = base64.b64decode(encrypted_secret_b64)
+            secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
+            
+            is_correct = self.tfa_manager.verify_code(secret, code)
+            if not is_correct:
+                self.show_message("error", "invalid_code", msg_type="error")
+            return is_correct
+        except Exception as e:
+            logger.error(f"Error during TFA verification for action: {e}")
+            self.show_message("error", "tfa_verification_failed", msg_type="error")
+            return False
+
     def delete_account(self, account):
+        # Re-authentication for sensitive action
         if self.settings.get('tfa_secret'):
-            if not self.verify_tfa_dialog():
+            if not self._verify_tfa_for_action("delete_account_tfa_title"):
                 return
         else:
             if not self.verify_master_password_dialog():
                 return
+
+        # Confirmation dialog
         result = self.show_message("delete_confirm_title", "delete_confirm_message", ask="yesno", account_name=account['name'])
         if result:
             try:
@@ -3763,8 +3712,9 @@ class ModernPasswordManagerGUI:
                 self.show_message("error", "delete_failed_message", msg_type="error", error=str(e))
 
     def view_account_details(self, account):
+        # Re-authentication for sensitive action
         if self.settings.get('tfa_secret'):
-            if not self.verify_tfa_dialog():
+            if not self._verify_tfa_for_action("view_account_tfa_title"):
                 return
         else:
             if not self.verify_master_password_dialog():
@@ -3961,9 +3911,9 @@ class ModernPasswordManagerGUI:
                       width=150, height=45, font=ctk.CTkFont(size=16, weight="bold")).pack(side="right", padx=15)
 
     def save_account(self, dialog, entries, account=None):
-        if account:
+        if account:  # This is an edit, requires re-authentication
             if self.settings.get('tfa_secret'):
-                if not self.verify_tfa_dialog():
+                if not self._verify_tfa_for_action("edit_account_tfa_title"):
                     return
             else:
                 if not self.verify_master_password_dialog():
