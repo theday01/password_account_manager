@@ -924,7 +924,7 @@ class ModernPasswordManagerGUI:
 
         try:
             logo_image = Image.open("icons/mainlogo.png")
-            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(190, 45))
+            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(170, 45))
             logo_label = ctk.CTkLabel(header_frame, image=logo_ctk_image, text="")
             logo_label.pack(pady=(0, 10))
         except Exception as e:
@@ -1248,7 +1248,7 @@ class ModernPasswordManagerGUI:
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         try:
             logo_image = Image.open("icons/mainlogo.png")
-            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(400, 80))
+            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(330, 80))
             logo_label = ctk.CTkLabel(login_card, image=logo_ctk_image, text="")
             logo_label.pack(pady=(30, 30), padx=40)
         except Exception as e:
@@ -3046,39 +3046,102 @@ class ModernPasswordManagerGUI:
             return
 
         full_name, email = self.database.get_master_account_details()
-
-        # If email is not available, use the full name for the provisioning URI
         account_name = email if email else (full_name if full_name else "SecureVault User")
 
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("enable_tfa_dialog_title"))
-        dialog.geometry("380x550")
-        #dialog.resizable(False, False)
+        dialog.geometry("500x750")
+        dialog.resizable(False, False)
         dialog.grab_set()
 
-        main_frame = ctk.CTkFrame(dialog)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        main_frame = ctk.CTkFrame(dialog, corner_radius=15)
+        main_frame.pack(fill="both", expand=True, padx=15, pady=15)
 
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("scan_qr_code_label"),
-                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=10)
+        # --- Header ---
+        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(10, 20), padx=20)
+        ctk.CTkLabel(
+            header_frame,
+            text=self.lang_manager.get_string("enable_tfa_dialog_title"),
+            font=ctk.CTkFont(size=24, weight="bold")
+        ).pack()
+        ctk.CTkLabel(
+            header_frame,
+            text=self.lang_manager.get_string("scan_qr_code_instruction"),
+            font=ctk.CTkFont(size=14),
+            text_color=("gray60", "gray40"),
+            wraplength=380
+        ).pack(pady=(5, 0))
+
+        # --- QR Code Section ---
+        qr_frame = ctk.CTkFrame(main_frame, corner_radius=10, border_width=2, border_color=("gray80", "gray30"))
+        qr_frame.pack(pady=20, padx=20, fill="x")
 
         secret = self.tfa_manager.generate_secret()
-        # The public URL for the icon to be displayed in the authenticator app.
         icon_url = "https://eagleshadow.great-site.net/aboutus/main.png"
-        uri = self.tfa_manager.get_provisioning_uri(secret, account_name, full_name, image_url=icon_url)
+        uri = self.tfa_manager.get_provisioning_uri(secret, account_name, "SecureVault Pro", image_url=icon_url)
         qr_image_data = self.tfa_manager.generate_qr_code(uri, logo_path="icons/main.png")
-        qr_image = Image.open(qr_image_data)
-        qr_photo = ImageTk.PhotoImage(qr_image)
+        
+        try:
+            qr_image = Image.open(qr_image_data)
+            qr_photo = ctk.CTkImage(light_image=qr_image, size=(250, 250))
 
-        qr_label = ctk.CTkLabel(main_frame, image=qr_photo, text="")
-        qr_label.image = qr_photo
-        qr_label.pack(pady=10)
+            qr_label = ctk.CTkLabel(qr_frame, image=qr_photo, text="")
+            qr_label.pack(pady=20)
 
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("enter_6_digit_code_verify_label"),
-                     font=ctk.CTkFont(size=14)).pack(pady=10)
+            ctk.CTkLabel(
+                qr_frame,
+                text=f"Account: {account_name}\nIssuer: SecureVault Pro",
+                font=ctk.CTkFont(size=12),
+                text_color=("gray50", "gray50")
+            ).pack(pady=(0, 15))
 
-        code_entry = ctk.CTkEntry(main_frame, width=200)
-        code_entry.pack(pady=5)
+        except Exception as e:
+            logger.error(f"Failed to display QR code: {e}")
+            ctk.CTkLabel(qr_frame, text="Error: Could not display QR code.", text_color="red").pack(pady=20)
+
+        # --- Manual Code Entry ---
+        manual_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        manual_frame.pack(pady=10, padx=20, fill="x")
+        
+        ctk.CTkLabel(manual_frame, text=self.lang_manager.get_string("manual_code_label"), font=ctk.CTkFont(size=12)).pack(anchor="w")
+        secret_entry = ctk.CTkEntry(manual_frame, font=ctk.CTkFont(family="monospace", size=14), height=35)
+        secret_entry.insert(0, secret)
+        secret_entry.configure(state="readonly")
+        secret_entry.pack(fill="x")
+        
+        def copy_secret():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(secret)
+            self.show_message("success", "secret_key_copied")
+
+        copy_button = ctk.CTkButton(manual_frame, text=self.lang_manager.get_string("copy_secret_key_button"), command=copy_secret, height=30)
+        copy_button.pack(pady=10)
+
+        # --- Verification Section ---
+        verify_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        verify_frame.pack(pady=20, padx=20, fill="x")
+
+        ctk.CTkLabel(
+            verify_frame,
+            text=self.lang_manager.get_string("enter_6_digit_code_verify_label"),
+            font=ctk.CTkFont(size=15, weight="bold")
+        ).pack()
+
+        # Frame to hold entry and button in one line
+        action_frame = ctk.CTkFrame(verify_frame, fg_color="transparent")
+        action_frame.pack(pady=(10, 0))
+
+        code_entry = ctk.CTkEntry(
+            action_frame,
+            width=180,
+            height=50,
+            font=ctk.CTkFont(size=24, weight="bold"),
+            justify="center"
+        )
+        code_entry.pack(side="left", padx=(0, 10))
+        code_entry.focus()
+
 
         def verify_and_enable():
             code = code_entry.get().strip()
@@ -3091,8 +3154,14 @@ class ModernPasswordManagerGUI:
             else:
                 self.show_message("error", "invalid_code_try_again", msg_type="error")
 
-        verify_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("verify_and_enable_button"), command=verify_and_enable)
-        verify_button.pack(pady=20)
+        verify_button = ctk.CTkButton(
+            action_frame,
+            text=self.lang_manager.get_string("verify_and_enable_button"),
+            command=verify_and_enable,
+            height=50,
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        verify_button.pack(side="left")
 
     def disable_tfa_dialog(self):
         dialog = ThemedToplevel(self.root)

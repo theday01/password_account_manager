@@ -21,7 +21,16 @@ remove copy and paste password from the clipboard to avoid tampering
 ويجب ان يكون ذلك بشكل سريع وليس بطيئا
 
 
+اذا كتب المستخدم نفس كلمة السر في الاجوبة الخاصة بالامان
+قم بتحذيره
+وايضا لا تجعل البرنامج يقبل اجوبة مكررة لنفس السؤال
+
+
+
 123456789hamzaSAADI@
 
+1
+            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(330, 80))
 
-            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(400, 200))
+2
+            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(170, 45))
