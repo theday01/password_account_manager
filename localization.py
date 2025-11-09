@@ -408,6 +408,15 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "password_req_number": "A number (0-9)",
         "password_req_symbol": "A symbol (!@#$)",
         "password_requirements_not_met": "Please ensure your password meets all requirements.",
+        "welcome_title": "Welcome to SecureVault Pro!",
+        "welcome_message_1": "Your secure vault is ready. Let's get you started.",
+        "welcome_feature_1_title": "🔐 Store Securely",
+        "welcome_feature_1_desc": "Add your accounts, and we'll encrypt and store them securely on your device.",
+        "welcome_feature_2_title": "🎲 Generate Passwords",
+        "welcome_feature_2_desc": "Create strong, random passwords to protect your online accounts from unauthorized access.",
+        "welcome_feature_3_title": "🛡️ Stay Safe",
+        "welcome_feature_3_desc": "Use our security report to find and fix weak or reused passwords.",
+        "get_started_button": "Let's Get Started!",
     }
 }
 

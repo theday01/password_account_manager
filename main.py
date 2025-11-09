@@ -904,64 +904,83 @@ class ModernPasswordManagerGUI:
 
     def show_welcome_dialog(self):
         welcome_window = ThemedToplevel(self.root)
-        welcome_window.title("Welcome")
-        welcome_window.geometry("500x350")
+        welcome_window.title(self.lang_manager.get_string("welcome_title"))
+        welcome_window.geometry("550x550")
         welcome_window.resizable(False, False)
         welcome_window.grab_set()  # Make the window modal
 
         # Center the window
         self.root.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (500 // 2)
-        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (250 // 2)
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (550 // 2)
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (550 // 2)
         welcome_window.geometry(f"+{x}+{y}")
 
-        main_frame = ctk.CTkFrame(welcome_window)
+        main_frame = ctk.CTkFrame(welcome_window, corner_radius=15)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-        title_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        title_frame.pack(pady=(10, 15))
-
-        ctk.CTkLabel(
-            title_frame,
-            text="Welcome to ",
-            font=ctk.CTkFont(size=24, weight="bold")
-        ).pack(side="left", anchor="s")
+        # Header
+        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header_frame.pack(pady=(20, 15))
 
         try:
             logo_image = Image.open("icons/mainlogo.png")
             logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(190, 45))
-            logo_label = ctk.CTkLabel(title_frame, image=logo_ctk_image, text="")
-            logo_label.pack(side="left", anchor="s", padx=(5, 0))
+            logo_label = ctk.CTkLabel(header_frame, image=logo_ctk_image, text="")
+            logo_label.pack(pady=(0, 10))
         except Exception as e:
             logger.error(f"Failed to load logo in welcome dialog: {e}")
             ctk.CTkLabel(
-                title_frame,
+                header_frame,
                 text="SecureVault Pro",
-                font=ctk.CTkFont(size=24, weight="bold")
-            ).pack(side="left", anchor="s")
+                font=ctk.CTkFont(size=28, weight="bold")
+            ).pack()
 
-        welcome_message = (
-            "It looks like this is your first time using the application.\n\n"
-            "Please click the 'First Time Setup' button on the main screen  \n"
-            "to create your account and secure your vault. \n\n\n"
-            "If you encounter any problems, please contact the developer directly.\n\n"
-            "Enjoy your time with SecureVault Pro!"
-        )
         ctk.CTkLabel(
-            main_frame,
-            text=welcome_message,
-            font=ctk.CTkFont(size=14),
-            justify="left"
-        ).pack(pady=10, padx=10)
+            header_frame,
+            text=self.lang_manager.get_string("welcome_message_1"),
+            font=ctk.CTkFont(size=16),
+            text_color=("gray20", "gray80")
+        ).pack()
 
+        # Features
+        features_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        features_frame.pack(pady=20, padx=20, fill="x", expand=True)
+
+        def create_feature_frame(parent, title_key, desc_key):
+            feature_frame = ctk.CTkFrame(parent, fg_color=("gray90", "gray20"), corner_radius=10)
+            feature_frame.pack(pady=8, padx=10, fill="x")
+
+            title_label = ctk.CTkLabel(
+                feature_frame,
+                text=self.lang_manager.get_string(title_key),
+                font=ctk.CTkFont(size=14, weight="bold")
+            )
+            title_label.pack(anchor="w", padx=15, pady=(10, 2))
+
+            desc_label = ctk.CTkLabel(
+                feature_frame,
+                text=self.lang_manager.get_string(desc_key),
+                font=ctk.CTkFont(size=12),
+                text_color=("gray40", "gray60"),
+                wraplength=450,
+                justify="left"
+            )
+            desc_label.pack(anchor="w", padx=15, pady=(0, 10))
+
+        create_feature_frame(features_frame, "welcome_feature_1_title", "welcome_feature_1_desc")
+        create_feature_frame(features_frame, "welcome_feature_2_title", "welcome_feature_2_desc")
+        create_feature_frame(features_frame, "welcome_feature_3_title", "welcome_feature_3_desc")
+
+        # Button
         close_button = ctk.CTkButton(
             main_frame,
-            text="Okay, thanks!",
+            text=self.lang_manager.get_string("get_started_button"),
             command=welcome_window.destroy,
-            width=120,
-            height=50
+            height=50,
+            font=ctk.CTkFont(size=18, weight="bold")
         )
-        close_button.pack(pady=20)
+        close_button.pack(pady=20, padx=20)
+
         welcome_window.wait_window()
 
     def show_loading_screen(self):
@@ -2547,6 +2566,17 @@ class ModernPasswordManagerGUI:
             btn.pack(fill="x", padx=15, pady=10)
             self.sidebar_buttons.append(btn)
 
+            
+        # Add programmer credits at the bottom of the sidebar
+        credits_label = ctk.CTkLabel(
+            self.sidebar,
+            text="This program was designed by Hamza Saadi of EAGLESHADOW @2025",
+            font=ctk.CTkFont(size=10),
+            text_color="gray",
+            wraplength=250
+        )
+        credits_label.pack(side="bottom", fill="x", padx=15, pady=(10, 20))
+        
         update_config = (self.lang_manager.get_string("check_for_updates"), icon_update, self.show_update_checker)
         text, icon, command = update_config
         btn = ctk.CTkButton(
@@ -2605,16 +2635,6 @@ class ModernPasswordManagerGUI:
         
         if self.sidebar_buttons:
             self.set_active_button(self.sidebar_buttons[0])
-
-        # Add programmer credits at the bottom of the sidebar
-        credits_label = ctk.CTkLabel(
-            self.sidebar,
-            text="This program was designed by Hamza Saadi of EAGLESHADOW @2025",
-            font=ctk.CTkFont(size=10),
-            text_color="gray",
-            wraplength=250
-        )
-        credits_label.pack(side="bottom", fill="x", padx=15, pady=(10, 20))
     
     def show_activation_dialog(self):
         if self.trial_manager.is_activation_locked_out():
