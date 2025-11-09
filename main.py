@@ -3146,6 +3146,9 @@ class ModernPasswordManagerGUI:
         code_entry.pack(side="left", padx=(0, 10))
         code_entry.focus()
 
+        # Bind the validation function to the entry widget
+        code_entry.bind("<KeyRelease>", lambda event: self._validate_tfa_code_entry(code_entry))
+
 
         def verify_and_enable():
             code = code_entry.get().strip()
@@ -3166,6 +3169,19 @@ class ModernPasswordManagerGUI:
             font=ctk.CTkFont(size=14, weight="bold")
         )
         verify_button.pack(side="left")
+
+    def _validate_tfa_code_entry(self, entry_widget):
+        current_value = entry_widget.get()
+        # Remove non-digit characters
+        new_value = re.sub(r'\D', '', current_value)
+        # Truncate to 6 digits
+        if len(new_value) > 6:
+            new_value = new_value[:6]
+        
+        # Update the entry widget only if the value has changed
+        if new_value != current_value:
+            entry_widget.delete(0, tk.END)
+            entry_widget.insert(0, new_value)
 
     def disable_tfa_dialog(self):
         dialog = ThemedToplevel(self.root)
