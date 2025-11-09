@@ -3053,7 +3053,7 @@ class ModernPasswordManagerGUI:
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("enable_tfa_dialog_title"))
         dialog.geometry("380x550")
-        dialog.resizable(False, False)
+        #dialog.resizable(False, False)
         dialog.grab_set()
 
         main_frame = ctk.CTkFrame(dialog)
@@ -3063,8 +3063,10 @@ class ModernPasswordManagerGUI:
                      font=ctk.CTkFont(size=16, weight="bold")).pack(pady=10)
 
         secret = self.tfa_manager.generate_secret()
-        uri = self.tfa_manager.get_provisioning_uri(secret, account_name, full_name)
-        qr_image_data = self.tfa_manager.generate_qr_code(uri)
+        # The public URL for the icon to be displayed in the authenticator app.
+        icon_url = "https://eagleshadow.great-site.net/aboutus/main.png"
+        uri = self.tfa_manager.get_provisioning_uri(secret, account_name, full_name, image_url=icon_url)
+        qr_image_data = self.tfa_manager.generate_qr_code(uri, logo_path="icons/main.png")
         qr_image = Image.open(qr_image_data)
         qr_photo = ImageTk.PhotoImage(qr_image)
 
