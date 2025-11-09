@@ -2926,7 +2926,10 @@ class ModernPasswordManagerGUI:
             logger.warning(f"Could not create desktop integration: {e}")
             return False
 
-    def show_settings(self):
+    def show_settings(self, parent_window=None):
+        if parent_window:
+            parent_window.destroy()
+
         settings_window = ThemedToplevel(self.root)
         settings_window.title(self.lang_manager.get_string("settings"))
         settings_window.geometry("500x600")
@@ -2961,7 +2964,7 @@ class ModernPasswordManagerGUI:
         button_color = "red" if tfa_enabled else ctk.ThemeManager.theme["CTkButton"]["fg_color"]
         
         tfa_button = ctk.CTkButton(tfa_frame, text=tfa_button_text,
-                                   command=self.show_tfa_dialog,
+                                   command=lambda: self.show_tfa_dialog(settings_window),
                                    height=40,
                                    fg_color=button_color)
         tfa_button.pack(pady=10)
@@ -3018,14 +3021,14 @@ class ModernPasswordManagerGUI:
             self.settings['tutorial_completed'] = True
             logger.info("Tutorial marked as completed.")
 
-    def show_tfa_dialog(self):
+    def show_tfa_dialog(self, parent_window=None):
         tfa_enabled = self.settings.get('tfa_secret') is not None
         if tfa_enabled:
-            self.disable_tfa_dialog()
+            self.disable_tfa_dialog(parent_window)
         else:
-            self.enable_tfa_dialog()
+            self.enable_tfa_dialog(parent_window)
 
-    def enable_tfa_dialog(self):
+    def enable_tfa_dialog(self, parent_window=None):
         if not self.verify_master_password_dialog():
             self.show_message("error", "tfa_setup_aborted_error", msg_type="error")
             return
@@ -3136,8 +3139,11 @@ class ModernPasswordManagerGUI:
             if self.tfa_manager.verify_code(secret, code):
                 encrypted_secret = self.crypto.encrypt_data(secret, self.database.encryption_key)
                 self.auth_guardian.update_setting('tfa_secret', base64.b64encode(encrypted_secret).decode('utf-8'))
+                self.load_settings()
                 self.show_message("success", "tfa_enabled_success")
                 dialog.destroy()
+                if parent_window:
+                    self.show_settings(parent_window)
             else:
                 self.show_message("error", "invalid_code_try_again", msg_type="error")
 
@@ -3163,7 +3169,7 @@ class ModernPasswordManagerGUI:
             entry_widget.delete(0, tk.END)
             entry_widget.insert(0, new_value)
 
-    def disable_tfa_dialog(self):
+    def disable_tfa_dialog(self, parent_window=None):
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("disable_tfa_dialog_title"))
         dialog.geometry("400x250")
@@ -3185,8 +3191,11 @@ class ModernPasswordManagerGUI:
             secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
             if self.tfa_manager.verify_code(secret, code):
                 self.auth_guardian.update_setting('tfa_secret', None)
+                self.load_settings()
                 self.show_message("success", "tfa_disabled_success")
                 dialog.destroy()
+                if parent_window:
+                    self.show_settings(parent_window)
             else:
                 self.show_message("error", "invalid_code", msg_type="error")
 
@@ -3219,13 +3228,12 @@ class ModernPasswordManagerGUI:
             now = datetime.now().timestamp()
             last_login = self.settings.get('last_login_timestamp', 0.0)
             consecutive_logins = self.settings.get('consecutive_logins', 0)
-            if (now - last_login) > 3600:
+            if (now - last_login) > 3600: # More than 1 hour since last login
                 consecutive_logins = 1
             else:
                 consecutive_logins += 1
-            self.settings['last_login_timestamp'] = now
-            self.settings['consecutive_logins'] = consecutive_logins
-            self.save_settings_to_file()
+            self.auth_guardian.update_setting('last_login_timestamp', now)
+            self.auth_guardian.update_setting('consecutive_logins', consecutive_logins)
             asyncio_manager.submit_coroutine(
                 _periodic_sender(is_trial_active=self.trial_manager.is_trial_active)
             )
