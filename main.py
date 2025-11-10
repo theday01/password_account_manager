@@ -1330,11 +1330,6 @@ class ModernPasswordManagerGUI:
                 self.show_message("error", "secure_storage_init_error", msg_type="error")
                 return
             
-            # With the encryption key set, now we can load the real settings
-            logger.info("Calling reload_settings() after encryption init...")
-            self.auth_guardian.reload_settings()
-            logger.info("reload_settings() completed")
-
             logger.info("Loading files from secure storage...")
             if not self.secure_file_manager.load_files_to_temp():
                 diagnostic_report = self.diagnose_secure_storage_issues()
@@ -1349,7 +1344,13 @@ class ModernPasswordManagerGUI:
         self.auth_guardian.record_login_attempt(success=auth_success)
 
         if auth_success:
-            self.load_settings()
+            # Pass the encryption key to the secure file manager
+            self.secure_file_manager.encryption_key = self.database.encryption_key
+            # With the encryption key set, now we can load the real settings
+            logger.info("Calling reload_settings() after successful auth...")
+            self.auth_guardian.reload_settings()
+            self.load_settings() # Reload settings into the main app
+            logger.info("reload_settings() completed")
 
             if self.settings.get('tfa_secret'):
                 self.prompt_for_tfa()
