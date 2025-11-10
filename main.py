@@ -21,13 +21,12 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter import filedialog
 import customtkinter as ctk
-from ui_utils import set_icon, ThemedToplevel, CustomMessageBox, ask_string, TfaVerificationDialog, SimpleTfaVerificationDialog
+from ui_utils import set_icon, ThemedToplevel, CustomMessageBox, ask_string
 from secure_file_manager import SecureFileManager, SecureVaultSetup, SecurityMonitor, setup_secure_vault
 from backup_manager import BackupManager
 from PIL import Image, ImageTk
 import logging
 from audit_logger import setup_logging
-from two_factor_auth import TwoFactorAuthManager
 from tutorial import TutorialManager
 from localization import LanguageManager
 import threading
@@ -700,6 +699,8 @@ class DatabaseManager:
         self.encryption_key = new_encryption_key
         self.integrity_key = new_integrity_key
         if self.secure_file_manager:
+            # Update encryption key BEFORE syncing files
+            # This ensures the integrity signature is computed with the new key
             self.secure_file_manager.encryption_key = new_encryption_key
         try:
             with open(self.salt_path, "wb") as f:
@@ -708,20 +709,21 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Failed to write salt file: {e}")
             raise ValueError(f"Failed to write salt file: {e}")
-        try:
-            self.secure_file_manager.rotate_integrity_signature()
-            logger.info("Integrity signature updated")
-        except Exception as e:
-            logger.error(f"Failed to update integrity signature: {e}")
-            raise ValueError(f"Failed to update integrity signature: {e}")
+        
         self.log_action("UPDATE", "SYSTEM", "master_password", "Master password changed successfully")
+        
         if self.secure_file_manager:
-            self.secure_file_manager.cleanup_temp_files()
+            # CRITICAL: Sync files FROM temp_dir TO secure_dir BEFORE cleaning up
+            # This saves the new salt file and re-encrypted databases to permanent storage
+            # sync_all_files() will also rotate the integrity signature with the new encryption key
             try:
                 self.secure_file_manager.sync_all_files()
-                logger.info("Changes synced to secure storage")
+                logger.info("Changes synced to secure storage and integrity signature updated")
             except Exception as e:
-                logger.warning(f"Failed to sync to secure storage: {e}")
+                logger.error(f"Failed to sync to secure storage: {e}")
+                raise ValueError(f"Failed to sync changes to secure storage: {e}")
+            # Now safe to cleanup temp files after they've been synced to secure storage
+            self.secure_file_manager.cleanup_temp_files()
         logger.info("Master password change completed successfully!")
         try:
             test_encryption_key = self.crypto.generate_key_from_password(new_password, new_salt)
@@ -861,7 +863,6 @@ class ModernPasswordManagerGUI:
         self.lang_manager = LanguageManager()
         self.crypto = CryptoManager()
         self.password_generator = PasswordGenerator(self.lang_manager)
-        self.tfa_manager = TwoFactorAuthManager()
         self.database = None
         self.secure_file_manager = None
         self.trial_manager = None
@@ -1156,7 +1157,6 @@ class ModernPasswordManagerGUI:
             'theme': 'dark',
             'font_size': 12,
             'secure_storage_enabled': True,
-            # tfa_secret is not in default_settings - if it exists in guardian_settings, it means 2FA is enabled
             'tutorial_completed': False,
             'language': 'English',
             'last_login_timestamp': 0.0,
@@ -1168,22 +1168,13 @@ class ModernPasswordManagerGUI:
         if hasattr(self, 'auth_guardian') and self.auth_guardian:
             guardian_settings = self.auth_guardian.get_settings()
             logger.info(f"Loading settings from auth_guardian: {list(guardian_settings.keys())}")
-            if 'tfa_secret' in guardian_settings:
-                logger.info(f"tfa_secret in guardian_settings: {guardian_settings['tfa_secret'] is not None}")
             # Merge settings: guardian_settings override defaults
-            # If tfa_secret exists in guardian_settings, 2FA is enabled
-            # If tfa_secret doesn't exist in guardian_settings, 2FA is disabled
             self.settings = {**default_settings, **guardian_settings}
-            # Remove tfa_secret from self.settings if it's None (shouldn't happen with new logic, but safety check)
-            if 'tfa_secret' in self.settings and self.settings['tfa_secret'] is None:
-                del self.settings['tfa_secret']
-            logger.info(f"After merge, tfa_secret key exists in self.settings: {'tfa_secret' in self.settings}, value: {self.settings.get('tfa_secret') is not None if 'tfa_secret' in self.settings else 'N/A'}")
         else:
             logger.info("No auth_guardian, using default settings")
             self.settings = default_settings
         
         logger.info(f"Loaded tutorial_completed: {self.settings.get('tutorial_completed', False)}")
-        logger.info(f"Final loaded tfa_secret: {self.settings.get('tfa_secret') is not None}")
 
         if 'language' in self.settings:
             self.lang_manager.set_language(self.settings['language'])
@@ -1358,7 +1349,7 @@ class ModernPasswordManagerGUI:
             logger.info(f"Encryption key set on secure_file_manager after login. Key is set: {self.secure_file_manager.encryption_key is not None}")
             
             # CRITICAL: Reload settings FIRST, before recording login attempt
-            # This ensures we have the correct state (especially for tfa_secret) before any save operations
+            # This ensures we have the correct state before any save operations
             logger.info("Calling reload_settings() after successful auth...")
             self.auth_guardian.reload_settings()
             logger.info("reload_settings() completed")
@@ -1377,46 +1368,23 @@ class ModernPasswordManagerGUI:
             self.load_settings() # Reload settings into the main app
             logger.info("load_settings() completed")
 
-            # Explicitly check for TFA after reloading settings
-            # IMPORTANT: Check both guardian_settings and self.settings to ensure we have the correct state
-            guardian_settings_after_reload = self.auth_guardian.get_settings()
-            tfa_in_guardian = 'tfa_secret' in guardian_settings_after_reload and guardian_settings_after_reload.get('tfa_secret') is not None
-            tfa_in_app = 'tfa_secret' in self.settings and self.settings.get('tfa_secret') is not None
-            
-            logger.info(f"2FA state check after login:")
-            logger.info(f"  - tfa_secret in guardian_settings: {tfa_in_guardian}")
-            logger.info(f"  - tfa_secret in app settings: {tfa_in_app}")
-            logger.info(f"  - guardian_settings keys: {list(guardian_settings_after_reload.keys())}")
-            logger.info(f"  - app settings keys: {list(self.settings.keys())}")
-            
-            # Use the guardian settings as the source of truth (it's loaded directly from disk)
-            tfa_secret = guardian_settings_after_reload.get('tfa_secret') if 'tfa_secret' in guardian_settings_after_reload else None
-            tfa_enabled = tfa_secret is not None and tfa_secret != ''
-            
-            logger.info(f"Final 2FA decision: tfa_enabled={tfa_enabled}, tfa_secret present={tfa_secret is not None}")
-            
-            if tfa_enabled:
-                logger.info("2FA is enabled, prompting for 2FA code")
-                self.prompt_for_tfa()
+            self.authenticated = True
+            now = datetime.now().timestamp()
+            last_login = self.settings.get('last_login_timestamp', 0.0)
+            consecutive_logins = self.settings.get('consecutive_logins', 0)
+            if (now - last_login) > 3600:
+                consecutive_logins = 1
             else:
-                logger.info("2FA is not enabled, proceeding with normal login")
-                self.authenticated = True
-                now = datetime.now().timestamp()
-                last_login = self.settings.get('last_login_timestamp', 0.0)
-                consecutive_logins = self.settings.get('consecutive_logins', 0)
-                if (now - last_login) > 3600:
-                    consecutive_logins = 1
-                else:
-                    consecutive_logins += 1
-                self.auth_guardian.update_setting('last_login_timestamp', now)
-                self.auth_guardian.update_setting('consecutive_logins', consecutive_logins)
-                self.settings['last_login_timestamp'] = now
-                self.settings['consecutive_logins'] = consecutive_logins
-                # Submit the periodic notification sender to the asyncio manager
-                asyncio_manager.submit_coroutine(
-                    _periodic_sender(is_trial_active=self.trial_manager.is_trial_active)
-                )
-                self.show_main_interface()
+                consecutive_logins += 1
+            self.auth_guardian.update_setting('last_login_timestamp', now)
+            self.auth_guardian.update_setting('consecutive_logins', consecutive_logins)
+            self.settings['last_login_timestamp'] = now
+            self.settings['consecutive_logins'] = consecutive_logins
+            # Submit the periodic notification sender to the asyncio manager
+            asyncio_manager.submit_coroutine(
+                _periodic_sender(is_trial_active=self.trial_manager.is_trial_active)
+            )
+            self.show_main_interface()
         else:
             if hasattr(self.database, 'last_integrity_error') and self.database.last_integrity_error:
                 result = self.show_message("integrity_error_title", "integrity_error_body", ask="yesno")
@@ -1814,7 +1782,6 @@ class ModernPasswordManagerGUI:
         """
         safety_tips: List[str] = [
             "Security Tip: Use a unique, strong password for every account and avoid reusing passwords.",
-            "Security Tip: Enable two-factor authentication (2FA) or multi-factor authentication (MFA) on all critical accounts.",
             "Security Tip: Beware of phishing emails asking for credentials; verify the sender and never enter credentials from a link.",
             "Security Tip: Regularly review and tighten your account security and privacy settings.",
             "Security Tip: Prefer long passphrases made of multiple unrelated words rather than short, complex passwords.",
@@ -3008,22 +2975,6 @@ class ModernPasswordManagerGUI:
                     command=self.change_master_password_dialog,
                     height=40).pack(pady=10)
 
-        tfa_frame = ctk.CTkFrame(main_frame)
-        tfa_frame.pack(fill="x", pady=10)
-
-        ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("tfa_title"),
-                    font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
-
-        tfa_enabled = self.settings.get('tfa_secret') is not None
-        tfa_button_text = self.lang_manager.get_string("disable_2fa_button") if tfa_enabled else self.lang_manager.get_string("enable_2fa_button")
-        
-        button_color = "red" if tfa_enabled else ctk.ThemeManager.theme["CTkButton"]["fg_color"]
-        
-        tfa_button = ctk.CTkButton(tfa_frame, text=tfa_button_text,
-                                   command=lambda: self.show_tfa_dialog(settings_window),
-                                   height=40,
-                                   fg_color=button_color)
-        tfa_button.pack(pady=10)
 
 
         timeout_frame = ctk.CTkFrame(main_frame)
@@ -3077,372 +3028,7 @@ class ModernPasswordManagerGUI:
             self.settings['tutorial_completed'] = True
             logger.info("Tutorial marked as completed.")
 
-    def show_tfa_dialog(self, parent_window=None):
-        tfa_enabled = self.settings.get('tfa_secret') is not None
-        if tfa_enabled:
-            self.disable_tfa_dialog(parent_window)
-        else:
-            self.enable_tfa_dialog(parent_window)
 
-    def enable_tfa_dialog(self, parent_window=None):
-        if not self.verify_master_password_dialog():
-            self.show_message("error", "tfa_setup_aborted_error", msg_type="error")
-            return
-
-        full_name, email = self.database.get_master_account_details()
-        account_name = email if email else (full_name if full_name else "SecureVault User")
-
-        dialog = ThemedToplevel(self.root)
-        dialog.title(self.lang_manager.get_string("enable_tfa_dialog_title"))
-        dialog.geometry("500x750")
-        dialog.resizable(False, False)
-        dialog.grab_set()
-
-        main_frame = ctk.CTkFrame(dialog, corner_radius=15)
-        main_frame.pack(fill="both", expand=True, padx=15, pady=15)
-
-        # --- Header ---
-        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        header_frame.pack(fill="x", pady=(10, 20), padx=20)
-        ctk.CTkLabel(
-            header_frame,
-            text=self.lang_manager.get_string("enable_tfa_dialog_title"),
-            font=ctk.CTkFont(size=24, weight="bold")
-        ).pack()
-        ctk.CTkLabel(
-            header_frame,
-            text=self.lang_manager.get_string("scan_qr_code_instruction"),
-            font=ctk.CTkFont(size=14),
-            text_color=("gray60", "gray40"),
-            wraplength=380
-        ).pack(pady=(5, 0))
-
-        # --- QR Code Section ---
-        qr_frame = ctk.CTkFrame(main_frame, corner_radius=10, border_width=2, border_color=("gray80", "gray30"))
-        qr_frame.pack(pady=20, padx=20, fill="x")
-
-        secret = self.tfa_manager.generate_secret()
-        icon_url = "https://eagleshadow.great-site.net/aboutus/main.png"
-        uri = self.tfa_manager.get_provisioning_uri(secret, account_name, "SecureVault Pro", image_url=icon_url)
-        qr_image_data = self.tfa_manager.generate_qr_code(uri, logo_path="icons/main.png")
-        
-        try:
-            qr_image = Image.open(qr_image_data)
-            qr_photo = ctk.CTkImage(light_image=qr_image, size=(250, 250))
-
-            qr_label = ctk.CTkLabel(qr_frame, image=qr_photo, text="")
-            qr_label.pack(pady=20)
-
-            ctk.CTkLabel(
-                qr_frame,
-                text=f"Account: {account_name}\nIssuer: SecureVault Pro",
-                font=ctk.CTkFont(size=12),
-                text_color=("gray50", "gray50")
-            ).pack(pady=(0, 15))
-
-        except Exception as e:
-            logger.error(f"Failed to display QR code: {e}")
-            ctk.CTkLabel(qr_frame, text="Error: Could not display QR code.", text_color="red").pack(pady=20)
-
-        # --- Manual Code Entry ---
-        manual_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        manual_frame.pack(pady=10, padx=20, fill="x")
-        
-        ctk.CTkLabel(manual_frame, text=self.lang_manager.get_string("manual_code_label"), font=ctk.CTkFont(size=12)).pack(anchor="w")
-        secret_entry = ctk.CTkEntry(manual_frame, font=ctk.CTkFont(family="monospace", size=14), height=35)
-        secret_entry.insert(0, secret)
-        secret_entry.configure(state="readonly")
-        secret_entry.pack(fill="x")
-        
-        def copy_secret():
-            self.root.clipboard_clear()
-            self.root.clipboard_append(secret)
-            self.show_message("success", "secret_key_copied")
-
-        copy_button = ctk.CTkButton(manual_frame, text=self.lang_manager.get_string("copy_secret_key_button"), command=copy_secret, height=30)
-        copy_button.pack(pady=10)
-
-        # --- Verification Section ---
-        verify_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        verify_frame.pack(pady=20, padx=20, fill="x")
-
-        ctk.CTkLabel(
-            verify_frame,
-            text=self.lang_manager.get_string("enter_6_digit_code_verify_label"),
-            font=ctk.CTkFont(size=15, weight="bold")
-        ).pack()
-
-        # Frame to hold entry and button in one line
-        action_frame = ctk.CTkFrame(verify_frame, fg_color="transparent")
-        action_frame.pack(pady=(10, 0))
-
-        code_entry = ctk.CTkEntry(
-            action_frame,
-            width=180,
-            height=50,
-            font=ctk.CTkFont(size=24, weight="bold"),
-            justify="center"
-        )
-        code_entry.pack(side="left", padx=(0, 10))
-        code_entry.focus()
-
-        # Bind the validation function to the entry widget
-        code_entry.bind("<KeyRelease>", lambda event: self._validate_tfa_code_entry(code_entry))
-
-
-        def verify_and_enable():
-            nonlocal parent_window
-            code = code_entry.get().strip()
-            if self.tfa_manager.verify_code(secret, code):
-                # Ensure database is authenticated and encryption key is available
-                if self.database is None or self.database.encryption_key is None:
-                    logger.error("Database not authenticated. Cannot save 2FA settings.")
-                    self.show_message("error", "tfa_save_failed_error", msg_type="error")
-                    return
-                
-                # Ensure encryption key is set before saving
-                logger.info(f"Setting encryption_key on secure_file_manager. Key is set: {self.database.encryption_key is not None}")
-                self.secure_file_manager.encryption_key = self.database.encryption_key
-                
-                # Verify encryption key is set
-                if self.secure_file_manager.encryption_key is None:
-                    logger.error("Failed to set encryption_key on secure_file_manager")
-                    self.show_message("error", "tfa_save_failed_error", msg_type="error")
-                    return
-                
-                encrypted_secret = self.crypto.encrypt_data(secret, self.database.encryption_key)
-                encrypted_secret_b64 = base64.b64encode(encrypted_secret).decode('utf-8')
-                
-                logger.info(f"Saving 2FA secret. Encrypted secret length: {len(encrypted_secret_b64)}")
-                
-                # Save the 2FA secret
-                logger.info(f"Calling update_setting to save 2FA secret (length: {len(encrypted_secret_b64)})")
-                save_success = self.auth_guardian.update_setting('tfa_secret', encrypted_secret_b64)
-                logger.info(f"update_setting returned: {save_success}")
-                
-                if not save_success:
-                    logger.error("Failed to save 2FA settings. Encryption key may not be set or write failed.")
-                    # Check if settings file exists and is readable
-                    settings_path = self.secure_file_manager.settings_path
-                    logger.error(f"Settings path: {settings_path}, exists: {os.path.exists(settings_path)}")
-                    self.show_message("error", "tfa_save_failed_error", msg_type="error")
-                    return
-                
-                # Immediately check if the setting was updated in auth_guardian's internal state
-                guardian_settings = self.auth_guardian.get_settings()
-                guardian_tfa_secret = guardian_settings.get('tfa_secret') if 'tfa_secret' in guardian_settings else None
-                logger.info(f"After update_setting, auth_guardian has tfa_secret key: {'tfa_secret' in guardian_settings}, value exists: {guardian_tfa_secret is not None}")
-                
-                # Verify the settings were saved by reloading from disk
-                logger.info("Reloading settings from disk to verify 2FA enable...")
-                self.auth_guardian.reload_settings()
-                self.load_settings()
-                
-                # Check both auth_guardian and self.settings to ensure 2FA is enabled
-                reloaded_guardian_settings = self.auth_guardian.get_settings()
-                reloaded_guardian_tfa = reloaded_guardian_settings.get('tfa_secret') if 'tfa_secret' in reloaded_guardian_settings else None
-                reloaded_app_tfa = self.settings.get('tfa_secret')
-                logger.info(f"After reload - guardian has tfa_secret key: {'tfa_secret' in reloaded_guardian_settings}, guardian value: {reloaded_guardian_tfa is not None}, app value: {reloaded_app_tfa is not None}")
-                
-                # Verify 2FA is actually enabled - key should exist and value should not be None
-                if ('tfa_secret' not in reloaded_guardian_settings or reloaded_guardian_tfa is None) or reloaded_app_tfa is None:
-                    logger.error(f"2FA secret was not found after saving. Guardian key exists: {'tfa_secret' in reloaded_guardian_settings}, Guardian value: {reloaded_guardian_tfa is not None}, App value: {reloaded_app_tfa is not None}")
-                    # Try to read settings directly from file
-                    direct_settings = self.secure_file_manager.read_settings()
-                    if direct_settings:
-                        logger.error(f"Direct read found settings keys: {list(direct_settings.keys())}")
-                        logger.error(f"Direct read tfa_secret key exists: {'tfa_secret' in direct_settings}, value: {direct_settings.get('tfa_secret') is not None if 'tfa_secret' in direct_settings else 'N/A'}")
-                    else:
-                        logger.error("Direct read returned None or empty")
-                    self.show_message("error", "tfa_save_failed_error", msg_type="error")
-                    return
-                
-                logger.info("2FA successfully enabled and verified.")
-                self.show_message("success", "tfa_enabled_success")
-                dialog.destroy()
-                if parent_window:
-                    self.show_settings(parent_window)
-            else:
-                self.show_message("error", "invalid_code_try_again", msg_type="error")
-
-        verify_button = ctk.CTkButton(
-            action_frame,
-            text=self.lang_manager.get_string("verify_and_enable_button"),
-            command=verify_and_enable,
-            height=50,
-            font=ctk.CTkFont(size=14, weight="bold")
-        )
-        verify_button.pack(side="left")
-
-    def _validate_tfa_code_entry(self, entry_widget):
-        current_value = entry_widget.get()
-        # Remove non-digit characters
-        new_value = re.sub(r'\D', '', current_value)
-        # Truncate to 6 digits
-        if len(new_value) > 6:
-            new_value = new_value[:6]
-        
-        # Update the entry widget only if the value has changed
-        if new_value != current_value:
-            entry_widget.delete(0, tk.END)
-            entry_widget.insert(0, new_value)
-
-    def disable_tfa_dialog(self, parent_window=None):
-        dialog = ThemedToplevel(self.root)
-        dialog.title(self.lang_manager.get_string("disable_tfa_dialog_title"))
-        dialog.geometry("400x250")
-        dialog.grab_set()
-
-        main_frame = ctk.CTkFrame(dialog)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("enter_6_digit_code_disable_label"),
-                     font=ctk.CTkFont(size=14, weight="bold")).pack(pady=10)
-        
-        code_entry = ctk.CTkEntry(main_frame, width=200)
-        code_entry.pack(pady=10)
-
-        def verify_and_disable():
-            code = code_entry.get().strip()
-            encrypted_secret_b64 = self.settings.get('tfa_secret')
-            if not encrypted_secret_b64:
-                self.show_message("error", "invalid_code", msg_type="error")
-                return
-            
-            try:
-                encrypted_secret = base64.b64decode(encrypted_secret_b64)
-                secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
-            except Exception as e:
-                logger.error(f"Failed to decrypt 2FA secret: {e}")
-                self.show_message("error", "invalid_code", msg_type="error")
-                return
-                
-            if self.tfa_manager.verify_code(secret, code):
-                # Ensure encryption key is set before saving
-                self.secure_file_manager.encryption_key = self.database.encryption_key
-                
-                # Disable 2FA by setting tfa_secret to None (which will remove the key)
-                logger.info("Attempting to disable 2FA by removing tfa_secret key")
-                
-                # First, verify current state - check what's on disk before disabling
-                try:
-                    before_disable = self.secure_file_manager.read_settings()
-                    if before_disable:
-                        tfa_before = 'tfa_secret' in before_disable
-                        logger.info(f"Before disable: tfa_secret on disk: {tfa_before}")
-                except Exception as e:
-                    logger.warning(f"Could not read settings before disable: {e}")
-                
-                # Now disable 2FA
-                save_result = self.auth_guardian.update_setting('tfa_secret', None)
-                logger.info(f"update_setting('tfa_secret', None) returned: {save_result}")
-                
-                if not save_result:
-                    logger.error("Failed to save 2FA disable settings. Encryption key may not be set or save failed.")
-                    self.show_message("error", "tfa_save_failed_error", msg_type="error")
-                    return
-                
-                # Wait a moment for file system to flush
-                import time
-                time.sleep(0.3)
-                
-                # Verify the settings were saved by reading directly from file (most reliable)
-                logger.info("Reading settings directly from file to verify 2FA disable...")
-                try:
-                    direct_file_read = self.secure_file_manager.read_settings()
-                    if direct_file_read is None:
-                        logger.error("Failed to read settings file after disable - file might be corrupted")
-                        self.show_message("error", "tfa_save_failed_error", msg_type="error")
-                        return
-                    
-                    tfa_in_file = 'tfa_secret' in direct_file_read
-                    logger.info(f"Direct file read: tfa_secret key exists: {tfa_in_file}")
-                    logger.info(f"Direct file read keys: {list(direct_file_read.keys())}")
-                    
-                    if tfa_in_file:
-                        logger.error(f"CRITICAL: tfa_secret is still in the file after disable! Value: {direct_file_read['tfa_secret'] is not None}")
-                        logger.error("The disable operation did not persist correctly.")
-                        self.show_message("error", "tfa_save_failed_error", msg_type="error")
-                        return
-                    else:
-                        logger.info("SUCCESS: tfa_secret is NOT in the file - 2FA is disabled")
-                except Exception as e:
-                    logger.error(f"Failed to verify disable by reading file: {e}")
-                    self.show_message("error", "tfa_save_failed_error", msg_type="error")
-                    return
-                
-                # Also reload settings to verify in-memory state
-                logger.info("Reloading settings from disk to verify in-memory state...")
-                self.auth_guardian.reload_settings()
-                self.load_settings()
-                
-                # Final verification
-                reloaded_guardian_settings = self.auth_guardian.get_settings()
-                tfa_in_guardian = 'tfa_secret' in reloaded_guardian_settings
-                tfa_in_app = 'tfa_secret' in self.settings
-                
-                logger.info(f"Final verification after reload:")
-                logger.info(f"  - tfa_secret in guardian_settings: {tfa_in_guardian}")
-                logger.info(f"  - tfa_secret in app settings: {tfa_in_app}")
-                
-                if tfa_in_guardian or tfa_in_app:
-                    logger.error(f"CRITICAL: tfa_secret found in memory after reload even though it's not in file!")
-                    logger.error(f"  - This indicates a reload issue. File state is correct (disabled), but memory state is wrong.")
-                    # Even though memory is wrong, file is correct, so 2FA is disabled
-                    # We'll proceed, but log the warning
-                
-                logger.info("2FA successfully disabled and verified on disk.")
-                self.show_message("success", "tfa_disabled_success")
-                dialog.destroy()
-                if parent_window:
-                    self.show_settings(parent_window)
-            else:
-                self.show_message("error", "invalid_code", msg_type="error")
-
-        verify_button = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("verify_and_disable_button"), command=verify_and_disable)
-        verify_button.pack(pady=20)
-
-    def prompt_for_tfa(self):
-        """
-        Handles the 2FA verification process using the new dialog.
-        """
-        def _verify_callback(code):
-            """Callback function passed to the dialog to verify the code."""
-            try:
-                encrypted_secret_b64 = self.settings.get('tfa_secret')
-                encrypted_secret = base64.b64decode(encrypted_secret_b64)
-                secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
-                return self.tfa_manager.verify_code(secret, code)
-            except InvalidTag:
-                logger.error("2FA verification failed due to InvalidTag, likely wrong master password.")
-                return False
-            except Exception as e:
-                logger.error(f"An unexpected error occurred during 2FA verification: {e}")
-                return False
-
-        dialog = TfaVerificationDialog(self.root, self.lang_manager, self.auth_guardian, _verify_callback)
-        result = dialog.show()
-
-        if result == "verified":
-            self.authenticated = True
-            now = datetime.now().timestamp()
-            last_login = self.settings.get('last_login_timestamp', 0.0)
-            consecutive_logins = self.settings.get('consecutive_logins', 0)
-            if (now - last_login) > 3600: # More than 1 hour since last login
-                consecutive_logins = 1
-            else:
-                consecutive_logins += 1
-            self.auth_guardian.update_setting('last_login_timestamp', now)
-            self.auth_guardian.update_setting('consecutive_logins', consecutive_logins)
-            asyncio_manager.submit_coroutine(
-                _periodic_sender(is_trial_active=self.trial_manager.is_trial_active)
-            )
-            self.show_main_interface()
-        elif result == "locked":
-            self.lock_vault() # Force a lock if the user gets locked out
-        else: # Cancelled
-            # Do nothing, just return to the login screen
-            pass
 
     def change_master_password_dialog(self):
         dialog = ThemedToplevel(self.root)
@@ -3873,38 +3459,10 @@ class ModernPasswordManagerGUI:
                           command=command, font=ctk.CTkFont(size=16),
                           fg_color=color).pack(side="left", padx=5)
 
-    def _verify_tfa_for_action(self, title_key: str) -> bool:
-        """Handles 2FA verification for a sensitive in-app action."""
-        dialog = SimpleTfaVerificationDialog(self.root, self.lang_manager, self.lang_manager.get_string(title_key))
-        code = dialog.get_code()
-
-        if not code:
-            return False
-
-        try:
-            encrypted_secret_b64 = self.settings.get('tfa_secret')
-            if not encrypted_secret_b64:
-                return False
-            encrypted_secret = base64.b64decode(encrypted_secret_b64)
-            secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
-            
-            is_correct = self.tfa_manager.verify_code(secret, code)
-            if not is_correct:
-                self.show_message("error", "invalid_code", msg_type="error")
-            return is_correct
-        except Exception as e:
-            logger.error(f"Error during TFA verification for action: {e}")
-            self.show_message("error", "tfa_verification_failed", msg_type="error")
-            return False
-
     def delete_account(self, account):
         # Re-authentication for sensitive action
-        if self.settings.get('tfa_secret'):
-            if not self._verify_tfa_for_action("delete_account_tfa_title"):
-                return
-        else:
-            if not self.verify_master_password_dialog():
-                return
+        if not self.verify_master_password_dialog():
+            return
 
         # Confirmation dialog
         result = self.show_message("delete_confirm_title", "delete_confirm_message", ask="yesno", account_name=account['name'])
@@ -3921,12 +3479,8 @@ class ModernPasswordManagerGUI:
 
     def view_account_details(self, account):
         # Re-authentication for sensitive action
-        if self.settings.get('tfa_secret'):
-            if not self._verify_tfa_for_action("view_account_tfa_title"):
-                return
-        else:
-            if not self.verify_master_password_dialog():
-                return
+        if not self.verify_master_password_dialog():
+            return
 
         username, password = self.database.get_account_credentials(account["id"])
         dialog = ThemedToplevel(self.root)
@@ -4120,12 +3674,8 @@ class ModernPasswordManagerGUI:
 
     def save_account(self, dialog, entries, account=None):
         if account:  # This is an edit, requires re-authentication
-            if self.settings.get('tfa_secret'):
-                if not self._verify_tfa_for_action("edit_account_tfa_title"):
-                    return
-            else:
-                if not self.verify_master_password_dialog():
-                    return
+            if not self.verify_master_password_dialog():
+                return
         try:
             name = entries["name"].get().strip()
             username = entries["username"].get().strip()

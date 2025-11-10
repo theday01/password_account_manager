@@ -602,10 +602,6 @@ class SecureFileManager:
                 
                 settings = json.loads(decrypted_json.decode('utf-8'))
                 LOG.info(f"Successfully decrypted settings. Keys: {list(settings.keys())}")
-                if 'tfa_secret' in settings:
-                    LOG.info(f"tfa_secret found in decrypted settings (2FA enabled): {settings['tfa_secret'] is not None}")
-                else:
-                    LOG.info("tfa_secret not found in decrypted settings (2FA disabled)")
                 return settings
             
             except (EncryptionWarning, InvalidTag) as e:
@@ -656,10 +652,6 @@ class SecureFileManager:
         # If an encryption key is available, encrypt the settings.
         try:
             LOG.info(f"Writing encrypted settings to {self.settings_path}. Settings keys: {list(settings.keys())}")
-            if 'tfa_secret' in settings:
-                LOG.info(f"tfa_secret is in settings (2FA enabled): {settings['tfa_secret'] is not None}")
-            else:
-                LOG.info("tfa_secret is not in settings (2FA disabled)")
             
             settings_json = json.dumps(settings, indent=4).encode('utf-8')
             

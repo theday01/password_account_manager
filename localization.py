@@ -163,31 +163,8 @@ LANGUAGES = {
         "security_settings_title": "Security Settings",
         "master_password_label": "Master Password",
         "change_master_password_button": "Change Master Password",
-        "tfa_title": "Two-Factor Authentication",
-        "disable_2fa_button": "Disable 2FA",
-        "enable_2fa_button": "Enable 2FA",
         "auto_logout_title": "Automatic Logout",
         "auto_logout_message": "For your security, the application will automatically \n lock and close after 2 minutes of inactivity",
-        "enable_tfa_dialog_title": "Enable Two-Factor Authentication",
-        "scan_qr_code_label": "Scan QR Code with your Authenticator App",
-        "scan_qr_code_instruction": "Scan the QR code below with your authenticator app (e.g., Google Authenticator, Authy).",
-        "manual_code_label": "Or, enter this secret key manually:",
-        "copy_secret_key_button": "📋 Copy Secret Key",
-        "secret_key_copied": "Secret key copied to clipboard!",
-        "enter_6_digit_code_verify_label": "Enter the 6-digit code to verify:",
-        "verify_and_enable_button": "Verify & Enable",
-        "tfa_enabled_success": "2FA enabled successfully!",
-        "tfa_save_failed_error": "Failed to save 2FA settings. Please try again.",
-        "invalid_code_try_again": "Invalid code. Please try again.",
-        "disable_tfa_dialog_title": "Disable Two-Factor Authentication",
-        "enter_6_digit_code_disable_label": "Enter a 6-digit code to disable 2FA:",
-        "verify_and_disable_button": "Verify and Disable",
-        "tfa_disabled_success": "2FA disabled successfully!",
-        "invalid_code": "Invalid code.",
-        "tfa_dialog_title": "Two-Factor Authentication",
-        "enter_2fa_code_label": "Enter your 6-digit 2FA code:",
-        "verify_button": "Verify",
-        "invalid_2fa_code": "Invalid 2FA code.",
         "change_master_password_dialog_title": "Change Master Password",
         "change_master_password_icon_title": "🔒 Change Master Password",
         "current_password_label": "Current Password:",
@@ -223,7 +200,6 @@ This design ensures that even if someone gains access to your computer's files, 
 ### Security Best Practices
 
 *   **Use a Strong Master Password:** Make it long, complex, and something you have never used anywhere else.
-*   **Enable 2FA:** This provides a critical second layer of defense.
 *   **Keep Backup Codes Safe:** Write down your backup codes and store them in a secure physical location, separate from your computer and your backup files.
 *   **Create Regular Backups:** Store your backup files in a safe place, such as an external hard drive or a secure cloud storage service.
 
@@ -354,7 +330,6 @@ You can view, edit, or delete your accounts at any time from the main list.""",
 
 • **Use a Strong Master Password:** Make it long, complex, and unique.
 • **Generate Strong Passwords:** Use the password generator for all your accounts. Avoid using simple or easily guessable passwords.
-• **Enable Two-Factor Authentication (2FA):** For an extra layer of security, enable 2FA in the settings.
 • **Create Regular Backups:** Regularly back up your vault and store the backup file in a safe, separate location.""",
         "tutorial_step_6_title": "All Done!",
         "tutorial_step_6_text": "You're now ready to use SecureVault Pro to manage your passwords and enhance your online security.",
@@ -365,9 +340,7 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "next_button": "Next",
         "finish_button": "Finish",
         "skip_button": "Skip",
-        "tfa_details_error": "Could not retrieve your details for 2FA setup. Please try again or contact support if the issue persists.",
-        "tfa_setup_aborted_error": "2FA setup aborted. Master password verification failed.",
-        "email_updated_success_message": "Your email has been updated. Please proceed with 2FA setup.",
+        "email_updated_success_message": "Your email has been updated successfully.",
         "email_update_failed_error": "Failed to update your email. Error: {error}",
         "invalid_email_format_error": "Invalid email format. Please enter a valid email address.",
         "security_questions_title": "Security Questions",
@@ -422,16 +395,6 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "welcome_feature_3_title": "🛡️ Stay Safe",
         "welcome_feature_3_desc": "Use our security report to find and fix weak or reused passwords.",
         "get_started_button": "Let's Get Started",
-        "tfa_verification_title": "2FA Verification",
-        "tfa_enter_code_label": "Enter Verification Code",
-        "tfa_prompt_message": "Open your authenticator app and enter the 6-digit code.",
-        "tfa_invalid_code_format": "Please enter a 6-digit code.",
-        "tfa_incorrect_code_attempts_left": "Incorrect code. {count} attempts remaining.",
-        "tfa_locked_out_message": "Too many attempts. Locked for {minutes:02d}:{seconds:02d}.",
-        "tfa_verification_failed": "2FA verification failed due to an unexpected error.",
-        "delete_account_tfa_title": "Delete Account - 2FA",
-        "view_account_tfa_title": "View Account - 2FA",
-        "edit_account_tfa_title": "Edit Account - 2FA",
     }
 }
 
