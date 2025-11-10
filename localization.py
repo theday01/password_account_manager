@@ -177,6 +177,7 @@ LANGUAGES = {
         "enter_6_digit_code_verify_label": "Enter the 6-digit code to verify:",
         "verify_and_enable_button": "Verify & Enable",
         "tfa_enabled_success": "2FA enabled successfully!",
+        "tfa_save_failed_error": "Failed to save 2FA settings. Please try again.",
         "invalid_code_try_again": "Invalid code. Please try again.",
         "disable_tfa_dialog_title": "Disable Two-Factor Authentication",
         "enter_6_digit_code_disable_label": "Enter a 6-digit code to disable 2FA:",

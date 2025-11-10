@@ -1156,7 +1156,7 @@ class ModernPasswordManagerGUI:
             'theme': 'dark',
             'font_size': 12,
             'secure_storage_enabled': True,
-            'tfa_secret': None,
+            'tfa_secret': None,  # Default to None, but will be overridden if present in guardian_settings
             'tutorial_completed': False,
             'language': 'English',
             'last_login_timestamp': 0.0,
@@ -1168,12 +1168,19 @@ class ModernPasswordManagerGUI:
         if hasattr(self, 'auth_guardian') and self.auth_guardian:
             guardian_settings = self.auth_guardian.get_settings()
             logger.info(f"Loading settings from auth_guardian: {list(guardian_settings.keys())}")
+            if 'tfa_secret' in guardian_settings:
+                logger.info(f"tfa_secret in guardian_settings: {guardian_settings['tfa_secret'] is not None}")
+            # Merge settings: guardian_settings override defaults
+            # This ensures that if tfa_secret is None in guardian_settings, it stays None
+            # But if it has a value, it's preserved
             self.settings = {**default_settings, **guardian_settings}
+            logger.info(f"After merge, tfa_secret in self.settings: {self.settings.get('tfa_secret') is not None}")
         else:
             logger.info("No auth_guardian, using default settings")
             self.settings = default_settings
         
         logger.info(f"Loaded tutorial_completed: {self.settings.get('tutorial_completed', False)}")
+        logger.info(f"Final loaded tfa_secret: {self.settings.get('tfa_secret') is not None}")
 
         if 'language' in self.settings:
             self.lang_manager.set_language(self.settings['language'])
@@ -1341,23 +1348,37 @@ class ModernPasswordManagerGUI:
         db_path = "manageyouraccount"
         self.database = DatabaseManager(db_path, self.crypto, self.secure_file_manager)
         auth_success = self.database.authenticate(master_password)
+        
+        if auth_success:
+            # IMPORTANT: Set encryption key BEFORE record_login_attempt so _save_state() can read existing settings
+            # This preserves settings like tfa_secret that were saved previously
+            self.secure_file_manager.encryption_key = self.database.encryption_key
+            logger.info(f"Encryption key set on secure_file_manager after login. Key is set: {self.secure_file_manager.encryption_key is not None}")
+        
+        # Record login attempt (now encryption key is set, so _save_state() can preserve existing settings)
         self.auth_guardian.record_login_attempt(success=auth_success)
 
         if auth_success:
-            # Pass the encryption key to the secure file manager
-            self.secure_file_manager.encryption_key = self.database.encryption_key
+            
             # With the encryption key set, now we can load the real settings
             logger.info("Calling reload_settings() after successful auth...")
             self.auth_guardian.reload_settings()
-            self.load_settings() # Reload settings into the main app
             logger.info("reload_settings() completed")
+            
+            self.load_settings() # Reload settings into the main app
+            logger.info("load_settings() completed")
 
             # Explicitly check for TFA after reloading settings
-            tfa_enabled = self.settings.get('tfa_secret') is not None
+            tfa_secret = self.settings.get('tfa_secret')
+            tfa_enabled = tfa_secret is not None and tfa_secret != ''
+            logger.info(f"2FA check after login: tfa_secret present={tfa_secret is not None}, tfa_secret value length={len(str(tfa_secret)) if tfa_secret else 0}, tfa_enabled={tfa_enabled}")
+            logger.info(f"All settings keys after login: {list(self.settings.keys())}")
             
             if tfa_enabled:
+                logger.info("2FA is enabled, prompting for 2FA code")
                 self.prompt_for_tfa()
             else:
+                logger.info("2FA is not enabled, proceeding with normal login")
                 self.authenticated = True
                 now = datetime.now().timestamp()
                 last_login = self.settings.get('last_login_timestamp', 0.0)
@@ -1471,16 +1492,25 @@ class ModernPasswordManagerGUI:
                 return False
 
             try:
+                # Ensure database is initialized
+                if self.database is None:
+                    db_path = "manageyouraccount"
+                    self.database = DatabaseManager(db_path, self.crypto, self.secure_file_manager)
+                
                 auth_success = self.database.authenticate(result["password"])
                 self.auth_guardian.record_login_attempt(auth_success)
                 if auth_success:
+                    # Set encryption key on secure_file_manager so settings can be read/written
+                    self.secure_file_manager.encryption_key = self.database.encryption_key
+                    logger.info("Encryption key set on secure_file_manager after authentication in verify_master_password_dialog")
                     return True
                 else:
                     self.show_message("error", "invalid_master_password", msg_type="error")
                     if self.auth_guardian.is_locked_out():
                         self.lock_vault()  # Force lock and show screen
                         return False
-            except Exception:
+            except Exception as e:
+                logger.error(f"Authentication error in verify_master_password_dialog: {e}")
                 self.show_message("error", "auth_failed", msg_type="error")
                 return False
 
@@ -3143,10 +3173,60 @@ class ModernPasswordManagerGUI:
             nonlocal parent_window
             code = code_entry.get().strip()
             if self.tfa_manager.verify_code(secret, code):
+                # Ensure database is authenticated and encryption key is available
+                if self.database is None or self.database.encryption_key is None:
+                    logger.error("Database not authenticated. Cannot save 2FA settings.")
+                    self.show_message("error", "tfa_save_failed_error", msg_type="error")
+                    return
+                
+                # Ensure encryption key is set before saving
+                logger.info(f"Setting encryption_key on secure_file_manager. Key is set: {self.database.encryption_key is not None}")
                 self.secure_file_manager.encryption_key = self.database.encryption_key
+                
+                # Verify encryption key is set
+                if self.secure_file_manager.encryption_key is None:
+                    logger.error("Failed to set encryption_key on secure_file_manager")
+                    self.show_message("error", "tfa_save_failed_error", msg_type="error")
+                    return
+                
                 encrypted_secret = self.crypto.encrypt_data(secret, self.database.encryption_key)
-                self.auth_guardian.update_setting('tfa_secret', base64.b64encode(encrypted_secret).decode('utf-8'))
+                encrypted_secret_b64 = base64.b64encode(encrypted_secret).decode('utf-8')
+                
+                logger.info(f"Saving 2FA secret. Encrypted secret length: {len(encrypted_secret_b64)}")
+                
+                # Save the 2FA secret
+                save_success = self.auth_guardian.update_setting('tfa_secret', encrypted_secret_b64)
+                logger.info(f"update_setting returned: {save_success}")
+                
+                if not save_success:
+                    logger.error("Failed to save 2FA settings. Encryption key may not be set or write failed.")
+                    # Check if settings file exists and is readable
+                    settings_path = self.secure_file_manager.settings_path
+                    logger.error(f"Settings path: {settings_path}, exists: {os.path.exists(settings_path)}")
+                    self.show_message("error", "tfa_save_failed_error", msg_type="error")
+                    return
+                
+                # Verify the settings were saved by reloading from disk
+                logger.info("Reloading settings to verify save...")
+                self.auth_guardian.reload_settings()
                 self.load_settings()
+                
+                # Verify 2FA is actually enabled
+                saved_tfa_secret = self.settings.get('tfa_secret')
+                logger.info(f"2FA secret after reload: {saved_tfa_secret is not None}")
+                if saved_tfa_secret is None:
+                    logger.error("2FA secret was not found after saving. Settings may not have been persisted.")
+                    # Try to read settings directly from file
+                    direct_settings = self.secure_file_manager.read_settings()
+                    if direct_settings:
+                        logger.error(f"Direct read found settings keys: {list(direct_settings.keys())}")
+                        logger.error(f"Direct read tfa_secret: {direct_settings.get('tfa_secret') is not None}")
+                    else:
+                        logger.error("Direct read returned None or empty")
+                    self.show_message("error", "tfa_save_failed_error", msg_type="error")
+                    return
+                
+                logger.info("2FA successfully enabled and verified.")
                 self.show_message("success", "tfa_enabled_success")
                 dialog.destroy()
                 if parent_window:
@@ -3194,11 +3274,39 @@ class ModernPasswordManagerGUI:
         def verify_and_disable():
             code = code_entry.get().strip()
             encrypted_secret_b64 = self.settings.get('tfa_secret')
-            encrypted_secret = base64.b64decode(encrypted_secret_b64)
-            secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
+            if not encrypted_secret_b64:
+                self.show_message("error", "invalid_code", msg_type="error")
+                return
+            
+            try:
+                encrypted_secret = base64.b64decode(encrypted_secret_b64)
+                secret = self.crypto.decrypt_data(encrypted_secret, self.database.encryption_key)
+            except Exception as e:
+                logger.error(f"Failed to decrypt 2FA secret: {e}")
+                self.show_message("error", "invalid_code", msg_type="error")
+                return
+                
             if self.tfa_manager.verify_code(secret, code):
-                self.auth_guardian.update_setting('tfa_secret', None)
+                # Ensure encryption key is set before saving
+                self.secure_file_manager.encryption_key = self.database.encryption_key
+                
+                # Save the 2FA secret as None to disable it
+                if not self.auth_guardian.update_setting('tfa_secret', None):
+                    logger.error("Failed to save 2FA disable settings. Encryption key may not be set.")
+                    self.show_message("error", "tfa_save_failed_error", msg_type="error")
+                    return
+                
+                # Verify the settings were saved by reloading from disk
+                self.auth_guardian.reload_settings()
                 self.load_settings()
+                
+                # Verify 2FA is actually disabled
+                if self.settings.get('tfa_secret') is not None:
+                    logger.error("2FA secret was still present after disabling. Settings may not have been persisted.")
+                    self.show_message("error", "tfa_save_failed_error", msg_type="error")
+                    return
+                
+                logger.info("2FA successfully disabled and verified.")
                 self.show_message("success", "tfa_disabled_success")
                 dialog.destroy()
                 if parent_window:

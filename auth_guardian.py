@@ -1,6 +1,7 @@
 import time
 import logging
 from datetime import datetime, timedelta
+from cryptography.exceptions import InvalidTag
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +53,13 @@ class AuthGuardian:
         Args:
             key (str): The key of the setting to update.
             value: The new value for the setting.
+        
+        Returns:
+            bool: True if the setting was successfully saved, False otherwise.
         """
         logger.info(f"Updating setting '{key}' and persisting changes.")
         self._settings[key] = value
-        self._save_state()
+        return self._save_state()
 
     def _validate_state(self):
         """Sanity check and cleanup of the loaded state."""
@@ -78,22 +82,69 @@ class AuthGuardian:
         self._save_state()
 
     def _save_state(self):
-        """Saves the current state back to the settings file."""
-        # Master password state
-        self._settings['guardian_failed_attempts'] = self.failed_attempts
-        self._settings['guardian_consecutive_lockouts'] = self.consecutive_lockouts
-        self._settings['guardian_lockout_end_time'] = self.lockout_end_time.isoformat() if self.lockout_end_time else None
+        """Saves the current state back to the settings file.
+        This method preserves all existing settings (like tfa_secret) and only updates guardian-specific state.
+        
+        Returns:
+            bool: True if settings were successfully saved, False otherwise.
+        """
+        # First, try to load existing settings from disk to preserve them (like tfa_secret)
+        # Only do this if encryption key is available (vault is unlocked)
+        existing_settings = {}
+        if self._settings_manager.encryption_key:
+            try:
+                existing_settings = self._settings_manager.read_settings()
+                if existing_settings is None:
+                    existing_settings = {}
+                    logger.info("No existing settings file found, starting with empty dict")
+                else:
+                    logger.info(f"Loaded existing settings before save. Keys: {list(existing_settings.keys())}")
+                    if 'tfa_secret' in existing_settings:
+                        logger.info(f"Preserving tfa_secret in settings save: {existing_settings['tfa_secret'] is not None}")
+            except InvalidTag as e:
+                logger.error(f"Failed to decrypt existing settings (InvalidTag) - file may be encrypted with different key: {e}")
+                # If decryption fails, we can't read existing settings, so preserve what's in self._settings
+                # This shouldn't happen in normal operation, but we handle it gracefully
+                existing_settings = self._settings.copy()
+                logger.warning("Using current _settings as fallback due to decryption failure")
+            except Exception as e:
+                logger.warning(f"Could not load existing settings before save: {e}")
+                # If we can't read existing settings, we'll try to use what's in self._settings
+                existing_settings = self._settings.copy()
+        else:
+            # No encryption key, can't read existing settings, use current _settings
+            logger.info("No encryption key available, cannot read existing settings")
+            existing_settings = self._settings.copy()
+        
+        # Merge existing settings with current _settings (current takes precedence for guardian state)
+        # This ensures we preserve all existing settings like tfa_secret
+        settings_to_save = {**existing_settings, **self._settings}
+        
+        # Update guardian-specific state (these always override any existing values)
+        settings_to_save['guardian_failed_attempts'] = self.failed_attempts
+        settings_to_save['guardian_consecutive_lockouts'] = self.consecutive_lockouts
+        settings_to_save['guardian_lockout_end_time'] = self.lockout_end_time.isoformat() if self.lockout_end_time else None
         
         # 2FA state
-        self._settings['guardian_tfa_failed_attempts'] = self.tfa_failed_attempts
-        self._settings['guardian_consecutive_tfa_lockouts'] = self.consecutive_tfa_lockouts
-        self._settings['guardian_tfa_lockout_end_time'] = self.tfa_lockout_end_time.isoformat() if self.tfa_lockout_end_time else None
+        settings_to_save['guardian_tfa_failed_attempts'] = self.tfa_failed_attempts
+        settings_to_save['guardian_consecutive_tfa_lockouts'] = self.consecutive_tfa_lockouts
+        settings_to_save['guardian_tfa_lockout_end_time'] = self.tfa_lockout_end_time.isoformat() if self.tfa_lockout_end_time else None
+        
+        # Update self._settings to match what we're saving (for consistency)
+        self._settings.update(settings_to_save)
         
         try:
-            if not self._settings_manager.write_settings(self._settings):
+            success = self._settings_manager.write_settings(settings_to_save)
+            if not success:
                 logger.warning("Failed to save guardian state, most likely because the vault is locked.")
+                return False
+            logger.info(f"Successfully saved settings. Keys: {list(settings_to_save.keys())}")
+            if 'tfa_secret' in settings_to_save:
+                logger.info(f"tfa_secret preserved in saved settings: {settings_to_save['tfa_secret'] is not None}")
+            return True
         except Exception as e:
             logger.error(f"An unexpected error occurred while saving guardian state: {e}")
+            return False
 
     def record_login_attempt(self, success: bool):
         """
@@ -225,6 +276,10 @@ class AuthGuardian:
         """Reloads settings from the settings manager."""
         new_settings = self._settings_manager.read_settings() or {}
         logger.info(f"Reloading settings, read_settings returned: {list(new_settings.keys())}")
+        if 'tfa_secret' in new_settings:
+            logger.info(f"2FA secret found in reloaded settings: {new_settings['tfa_secret'] is not None}")
+        else:
+            logger.warning("2FA secret NOT found in reloaded settings")
         self._settings.clear()
         self._settings.update(new_settings)
         
@@ -242,3 +297,5 @@ class AuthGuardian:
 
         self._validate_state()
         logger.info(f"After reload, _settings has: {list(self._settings.keys())}")
+        if 'tfa_secret' in self._settings:
+            logger.info(f"2FA secret in _settings after reload: {self._settings['tfa_secret'] is not None}")

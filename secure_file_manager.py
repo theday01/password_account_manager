@@ -566,11 +566,13 @@ class SecureFileManager:
     def read_settings(self) -> Optional[Dict]:
         """Read, decrypt, and parse settings from the secure settings file."""
         if not os.path.exists(self.settings_path):
+            LOG.info(f"Settings file does not exist: {self.settings_path}")
             return None
 
         try:
             with open(self.settings_path, 'rb') as f:
                 raw_data = f.read()
+            LOG.info(f"Read {len(raw_data)} bytes from settings file")
         except IOError:
             LOG.exception("Failed to read secure settings file.")
             return None
@@ -582,6 +584,7 @@ class SecureFileManager:
                 LOG.warning("Settings file is encrypted, but no encryption key is available (this is expected on startup).")
                 return None
             
+            LOG.info("Decrypting encrypted settings file...")
             try:
                 # Strip header and decode from base64
                 encoded_data = raw_data[len(magic_header):]
@@ -597,25 +600,33 @@ class SecureFileManager:
                 decryptor = cipher.decryptor()
                 decrypted_json = decryptor.update(ciphertext) + decryptor.finalize()
                 
-                return json.loads(decrypted_json.decode('utf-8'))
+                settings = json.loads(decrypted_json.decode('utf-8'))
+                LOG.info(f"Successfully decrypted settings. Keys: {list(settings.keys())}")
+                if 'tfa_secret' in settings:
+                    LOG.info(f"tfa_secret found in decrypted settings: {settings['tfa_secret'] is not None}")
+                return settings
             
-            except (EncryptionWarning, InvalidTag):
+            except (EncryptionWarning, InvalidTag) as e:
+                LOG.error(f"Failed to decrypt settings file - InvalidTag or EncryptionWarning: {e}")
                 # This is not an error, but a state where the settings are not available.
                 # The caller should handle this case.
                 return None
             except (ValueError, IndexError) as e:
                 LOG.exception(f"Failed to decrypt settings file. It may be corrupt or the key is wrong: {e}")
                 return None # Hard fail if decryption fails on an encrypted file
-            except Exception:
-                LOG.exception("An unexpected error occurred during settings decryption.")
+            except Exception as e:
+                LOG.exception(f"An unexpected error occurred during settings decryption: {e}")
                 return None
 
         else:
             # No header, assume legacy plaintext file
+            LOG.info("Reading plaintext settings file")
             try:
-                return json.loads(raw_data.decode('utf-8'))
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                LOG.exception("Failed to parse settings file as JSON.")
+                settings = json.loads(raw_data.decode('utf-8'))
+                LOG.info(f"Successfully parsed plaintext settings. Keys: {list(settings.keys())}")
+                return settings
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                LOG.exception(f"Failed to parse settings file as JSON: {e}")
                 return None
 
     def write_settings(self, settings: Dict, *, allow_plaintext: bool = False) -> bool:
@@ -634,6 +645,7 @@ class SecureFileManager:
                 settings_json = json.dumps(settings, indent=4).encode('utf-8')
                 _atomic_write(self.settings_path, settings_json)
                 self.rotate_integrity_signature()
+                LOG.info(f"Settings written to {self.settings_path} (plaintext)")
                 return True
             except Exception:
                 LOG.exception("Failed to write plaintext settings.")
@@ -641,6 +653,10 @@ class SecureFileManager:
 
         # If an encryption key is available, encrypt the settings.
         try:
+            LOG.info(f"Writing encrypted settings to {self.settings_path}. Settings keys: {list(settings.keys())}")
+            if 'tfa_secret' in settings:
+                LOG.info(f"tfa_secret is in settings: {settings['tfa_secret'] is not None}")
+            
             settings_json = json.dumps(settings, indent=4).encode('utf-8')
             
             iv = os.urandom(16)
@@ -656,9 +672,17 @@ class SecureFileManager:
             
             _atomic_write(self.settings_path, final_data)
             self.rotate_integrity_signature()
-            return True
-        except Exception:
-            LOG.exception("Failed to encrypt and write settings.")
+            
+            # Verify the file was written
+            if os.path.exists(self.settings_path):
+                file_size = os.path.getsize(self.settings_path)
+                LOG.info(f"Settings file written successfully. Size: {file_size} bytes")
+                return True
+            else:
+                LOG.error("Settings file was not created after write operation")
+                return False
+        except Exception as e:
+            LOG.exception(f"Failed to encrypt and write settings: {e}")
             return False
 
 
