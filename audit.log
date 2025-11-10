@@ -412,3 +412,414 @@
 2025-11-09 23:23:15,402 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
 2025-11-09 23:23:15,404 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
 2025-11-09 23:23:15,405 - notification_manager - INFO - Trial mode active - backup notifications disabled
+2025-11-10 10:22:46,991 - root - INFO - Logging has been set up.
+2025-11-10 10:22:46,991 - __main__ - INFO - Starting SecureVault Pro...
+2025-11-10 10:22:47,705 - asyncio_manager - INFO - Asyncio event loop started in background thread.
+2025-11-10 10:22:47,975 - __main__ - INFO - Application initialized successfully
+2025-11-10 10:22:51,635 - __main__ - INFO - Initializing secure file management system...
+2025-11-10 10:22:51,637 - __main__ - INFO - Secure file manager initialized
+2025-11-10 10:22:52,231 - secure_file_manager - WARNING - Settings file is encrypted, but no encryption key is available (this is expected on startup).
+2025-11-10 10:22:52,736 - root - INFO - --- Starting Trial Status Check ---
+2025-11-10 10:22:52,789 - root - INFO - Guardian Anchor check returned: status=OK_RESTORED_FROM_BACKUP, data={'install_ts': '2025-11-09T21:43:01.416654', 'machine_fp': '57760c5575fad941f37d490b1cd91368b4d441c49745fb8b3e0734efe5118ed6', 'shutdown_status': 'RUNNING'}
+2025-11-10 10:22:52,790 - root - INFO - Installation timestamp: 2025-11-09 21:43:01.416654
+2025-11-10 10:22:52,791 - root - INFO - Current UTC time: 2025-11-10 09:22:52.790644
+2025-11-10 10:22:52,791 - root - INFO - Time elapsed since installation: 11:39:51.373990
+2025-11-10 10:22:52,791 - root - INFO - Trial period: 8 days, 0:00:00
+2025-11-10 10:22:52,793 - root - INFO - Guardian Observer check returned: OK_UNEXPECTED_SHUTDOWN
+2025-11-10 10:22:52,794 - root - INFO - Trial is active. Minutes remaining: 10820.14. Status: TRIAL
+2025-11-10 10:22:52,794 - __main__ - INFO - Trial status at startup: TRIAL
+2025-11-10 10:22:53,307 - secure_file_manager - WARNING - Settings file is encrypted, but no encryption key is available (this is expected on startup).
+2025-11-10 10:22:53,308 - secure_file_manager - WARNING - No encryption key available. Writing settings in plaintext is disallowed by default.
+2025-11-10 10:22:53,308 - auth_guardian - WARNING - Failed to save guardian state, most likely because the vault is locked.
+2025-11-10 10:22:53,309 - __main__ - INFO - Loading settings from auth_guardian: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time']
+2025-11-10 10:22:53,309 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-10 10:23:30,157 - __main__ - INFO - Initializing encryption...
+2025-11-10 10:23:30,159 - secure_file_manager - INFO - Initializing encryption...
+2025-11-10 10:23:30,160 - secure_file_manager - INFO - Salt loaded from secure_vault\salt_file
+2025-11-10 10:23:30,161 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-11-10 10:23:30,290 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-11-10 10:23:30,292 - __main__ - INFO - Loading files from secure storage...
+2025-11-10 10:23:30,292 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-11-10 10:23:30,297 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_l23gd7u_
+2025-11-10 10:23:30,304 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-11-10 10:23:30,310 - __main__ - INFO - Attempting authentication...
+2025-11-10 10:23:30,311 - __main__ - INFO - Salt path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_l23gd7u_\salt_file
+2025-11-10 10:23:30,312 - __main__ - INFO - Metadata DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_l23gd7u_\metadata.db
+2025-11-10 10:23:30,312 - __main__ - INFO - Sensitive DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_l23gd7u_\sensitive.db
+2025-11-10 10:23:30,313 - __main__ - INFO - Integrity path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_l23gd7u_\integrity_file
+2025-11-10 10:23:30,325 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-11-10 10:23:30,457 - __main__ - INFO - Encryption keys generated
+2025-11-10 10:23:30,458 - secure_file_manager - INFO - Verifying integrity...
+2025-11-10 10:23:30,461 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-10 10:23:30,461 - secure_file_manager - INFO - Integrity verification result: FAILED
+2025-11-10 10:23:30,462 - __main__ - INFO - Database integrity check: FAILED
+2025-11-10 10:23:30,462 - __main__ - ERROR - Database integrity check failed
+2025-11-10 10:23:30,462 - __main__ - INFO - Attempting integrity recovery...
+2025-11-10 10:23:30,463 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:23:30,465 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:23:30,467 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:23:30,472 - __main__ - INFO - Integrity signature regenerated, retrying verification...
+2025-11-10 10:23:30,474 - secure_file_manager - INFO - Verifying integrity...
+2025-11-10 10:23:30,485 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-10 10:23:30,490 - secure_file_manager - INFO - Integrity verification result: OK
+2025-11-10 10:23:30,490 - __main__ - INFO - Integrity recovery successful
+2025-11-10 10:23:30,507 - __main__ - INFO - Test decryption and password verification successful
+2025-11-10 10:23:30,512 - __main__ - INFO - Authentication successful!
+2025-11-10 10:23:30,515 - auth_guardian - INFO - Successful master password login recorded. Resetting guardian state.
+2025-11-10 10:23:30,518 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:23:30,536 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:23:30,584 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:23:30,591 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:23:30,716 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:23:30,743 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:23:30,783 - __main__ - INFO - Calling reload_settings() after successful auth...
+2025-11-10 10:23:30,784 - auth_guardian - INFO - Reloading settings, read_settings returned: []
+2025-11-10 10:23:30,792 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:23:30,811 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:23:30,856 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:23:30,888 - auth_guardian - INFO - After reload, _settings has: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time']
+2025-11-10 10:23:30,889 - __main__ - INFO - Loading settings from auth_guardian: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time']
+2025-11-10 10:23:30,890 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-10 10:23:30,898 - __main__ - INFO - reload_settings() completed
+2025-11-10 10:23:30,923 - auth_guardian - INFO - Updating setting 'last_login_timestamp' and persisting changes.
+2025-11-10 10:23:30,941 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:23:30,957 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:23:30,961 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:23:30,964 - auth_guardian - INFO - Updating setting 'consecutive_logins' and persisting changes.
+2025-11-10 10:23:30,966 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:23:30,986 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:23:31,030 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:23:31,073 - notification_manager - INFO - Trial mode active - backup notifications disabled
+2025-11-10 10:23:37,219 - __main__ - INFO - Attempting authentication...
+2025-11-10 10:23:37,223 - __main__ - INFO - Salt path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_l23gd7u_\salt_file
+2025-11-10 10:23:37,224 - __main__ - INFO - Metadata DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_l23gd7u_\metadata.db
+2025-11-10 10:23:37,225 - __main__ - INFO - Sensitive DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_l23gd7u_\sensitive.db
+2025-11-10 10:23:37,225 - __main__ - INFO - Integrity path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_l23gd7u_\integrity_file
+2025-11-10 10:23:37,226 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-11-10 10:23:37,350 - __main__ - INFO - Encryption keys generated
+2025-11-10 10:23:37,351 - secure_file_manager - INFO - Verifying integrity...
+2025-11-10 10:23:37,363 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-10 10:23:37,364 - secure_file_manager - INFO - Integrity verification result: OK
+2025-11-10 10:23:37,364 - __main__ - INFO - Database integrity check: PASSED
+2025-11-10 10:23:37,367 - __main__ - INFO - Test decryption and password verification successful
+2025-11-10 10:23:37,367 - __main__ - INFO - Authentication successful!
+2025-11-10 10:23:37,367 - auth_guardian - INFO - Successful master password login recorded. Resetting guardian state.
+2025-11-10 10:23:37,369 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:23:37,384 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:23:37,386 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:23:37,389 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:23:37,402 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:23:37,404 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:24:59,889 - auth_guardian - INFO - Updating setting 'tfa_secret' and persisting changes.
+2025-11-10 10:24:59,893 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:24:59,918 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:24:59,922 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:24:59,923 - __main__ - INFO - Loading settings from auth_guardian: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins', 'tfa_secret']
+2025-11-10 10:24:59,924 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-10 10:25:05,911 - __main__ - INFO - Syncing files to secure storage before lock...
+2025-11-10 10:25:05,911 - secure_file_manager - INFO - Verifying integrity...
+2025-11-10 10:25:05,927 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-10 10:25:05,928 - secure_file_manager - INFO - Integrity verification result: OK
+2025-11-10 10:25:05,928 - secure_file_manager - INFO - Cleaning up temporary files...
+2025-11-10 10:25:05,929 - secure_file_manager - INFO - Removing temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_l23gd7u_
+2025-11-10 10:25:05,934 - secure_file_manager - INFO - Temporary files cleaned up successfully.
+2025-11-10 10:25:05,935 - __main__ - INFO - Temporary files cleaned up
+2025-11-10 10:25:06,150 - __main__ - INFO - Vault locked successfully
+2025-11-10 10:25:08,152 - __main__ - INFO - Performing final sync and cleanup...
+2025-11-10 10:25:08,160 - secure_file_manager - INFO - Cleaning up temporary files...
+2025-11-10 10:25:08,161 - secure_file_manager - INFO - Temporary files cleaned up successfully.
+2025-11-10 10:25:08,161 - __main__ - INFO - Secure cleanup completed
+2025-11-10 10:25:15,147 - root - INFO - Logging has been set up.
+2025-11-10 10:25:15,147 - __main__ - INFO - Starting SecureVault Pro...
+2025-11-10 10:25:15,328 - asyncio_manager - INFO - Asyncio event loop started in background thread.
+2025-11-10 10:25:15,494 - __main__ - INFO - Application initialized successfully
+2025-11-10 10:25:19,169 - __main__ - INFO - Initializing secure file management system...
+2025-11-10 10:25:19,174 - __main__ - INFO - Secure file manager initialized
+2025-11-10 10:25:19,719 - secure_file_manager - WARNING - Settings file is encrypted, but no encryption key is available (this is expected on startup).
+2025-11-10 10:25:20,206 - root - INFO - --- Starting Trial Status Check ---
+2025-11-10 10:25:20,241 - root - INFO - Guardian Anchor check returned: status=OK_EXISTS, data={'install_ts': '2025-11-09T21:43:01.416654', 'machine_fp': '57760c5575fad941f37d490b1cd91368b4d441c49745fb8b3e0734efe5118ed6', 'shutdown_status': 'RUNNING'}
+2025-11-10 10:25:20,242 - root - INFO - Installation timestamp: 2025-11-09 21:43:01.416654
+2025-11-10 10:25:20,242 - root - INFO - Current UTC time: 2025-11-10 09:25:20.242378
+2025-11-10 10:25:20,242 - root - INFO - Time elapsed since installation: 11:42:18.825724
+2025-11-10 10:25:20,243 - root - INFO - Trial period: 8 days, 0:00:00
+2025-11-10 10:25:20,244 - root - INFO - Guardian Observer check returned: OK_UNEXPECTED_SHUTDOWN
+2025-11-10 10:25:20,245 - root - INFO - Trial is active. Minutes remaining: 10817.69. Status: TRIAL
+2025-11-10 10:25:20,246 - __main__ - INFO - Trial status at startup: TRIAL
+2025-11-10 10:25:20,730 - secure_file_manager - WARNING - Settings file is encrypted, but no encryption key is available (this is expected on startup).
+2025-11-10 10:25:20,730 - secure_file_manager - WARNING - No encryption key available. Writing settings in plaintext is disallowed by default.
+2025-11-10 10:25:20,730 - auth_guardian - WARNING - Failed to save guardian state, most likely because the vault is locked.
+2025-11-10 10:25:20,731 - __main__ - INFO - Loading settings from auth_guardian: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time']
+2025-11-10 10:25:20,731 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-10 10:25:23,731 - __main__ - INFO - Initializing encryption...
+2025-11-10 10:25:23,732 - secure_file_manager - INFO - Initializing encryption...
+2025-11-10 10:25:23,732 - secure_file_manager - INFO - Salt loaded from secure_vault\salt_file
+2025-11-10 10:25:23,734 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-11-10 10:25:23,868 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-11-10 10:25:23,869 - __main__ - INFO - Loading files from secure storage...
+2025-11-10 10:25:23,870 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-11-10 10:25:23,873 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_dxdq1cra
+2025-11-10 10:25:23,878 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-11-10 10:25:23,879 - __main__ - INFO - Attempting authentication...
+2025-11-10 10:25:23,879 - __main__ - INFO - Salt path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_dxdq1cra\salt_file
+2025-11-10 10:25:23,880 - __main__ - INFO - Metadata DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_dxdq1cra\metadata.db
+2025-11-10 10:25:23,881 - __main__ - INFO - Sensitive DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_dxdq1cra\sensitive.db
+2025-11-10 10:25:23,882 - __main__ - INFO - Integrity path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_dxdq1cra\integrity_file
+2025-11-10 10:25:23,889 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-11-10 10:25:24,013 - __main__ - INFO - Encryption keys generated
+2025-11-10 10:25:24,014 - secure_file_manager - INFO - Verifying integrity...
+2025-11-10 10:25:24,018 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-10 10:25:24,018 - secure_file_manager - INFO - Integrity verification result: FAILED
+2025-11-10 10:25:24,019 - __main__ - INFO - Database integrity check: FAILED
+2025-11-10 10:25:24,019 - __main__ - ERROR - Database integrity check failed
+2025-11-10 10:25:24,021 - __main__ - INFO - Attempting integrity recovery...
+2025-11-10 10:25:24,021 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:25:24,023 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:25:24,025 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:25:24,025 - __main__ - INFO - Integrity signature regenerated, retrying verification...
+2025-11-10 10:25:24,026 - secure_file_manager - INFO - Verifying integrity...
+2025-11-10 10:25:24,038 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-10 10:25:24,038 - secure_file_manager - INFO - Integrity verification result: OK
+2025-11-10 10:25:24,039 - __main__ - INFO - Integrity recovery successful
+2025-11-10 10:25:24,044 - __main__ - INFO - Test decryption and password verification successful
+2025-11-10 10:25:24,044 - __main__ - INFO - Authentication successful!
+2025-11-10 10:25:24,044 - auth_guardian - INFO - Successful master password login recorded. Resetting guardian state.
+2025-11-10 10:25:24,047 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:25:24,060 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:25:24,062 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:25:24,064 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:25:24,078 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:25:24,080 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:25:24,080 - __main__ - INFO - Calling reload_settings() after successful auth...
+2025-11-10 10:25:24,081 - auth_guardian - INFO - Reloading settings, read_settings returned: []
+2025-11-10 10:25:24,083 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:25:24,099 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:25:24,103 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:25:24,105 - auth_guardian - INFO - After reload, _settings has: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time']
+2025-11-10 10:25:24,152 - __main__ - INFO - Loading settings from auth_guardian: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time']
+2025-11-10 10:25:24,153 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-10 10:25:24,154 - __main__ - INFO - reload_settings() completed
+2025-11-10 10:25:24,156 - auth_guardian - INFO - Updating setting 'last_login_timestamp' and persisting changes.
+2025-11-10 10:25:24,159 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:25:24,174 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:25:24,197 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:25:24,207 - auth_guardian - INFO - Updating setting 'consecutive_logins' and persisting changes.
+2025-11-10 10:25:24,209 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:25:24,242 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:25:24,244 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:25:24,245 - notification_manager - INFO - Trial mode active - backup notifications disabled
+2025-11-10 10:25:57,242 - __main__ - INFO - Performing final sync and cleanup...
+2025-11-10 10:25:57,245 - secure_file_manager - INFO - Syncing all files...
+2025-11-10 10:25:57,245 - secure_file_manager - INFO - Syncing from temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_dxdq1cra
+2025-11-10 10:25:57,257 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 10:25:57,263 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 10:25:57,269 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 10:25:57,274 - secure_file_manager - INFO - Sync from temp directory completed.
+2025-11-10 10:25:57,275 - secure_file_manager - INFO - Cleaning up temporary files...
+2025-11-10 10:25:57,276 - secure_file_manager - INFO - Removing temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_dxdq1cra
+2025-11-10 10:25:57,301 - secure_file_manager - INFO - Temporary files cleaned up successfully.
+2025-11-10 10:25:57,308 - __main__ - INFO - Secure cleanup completed
+2025-11-10 11:35:13,081 - root - INFO - Logging has been set up.
+2025-11-10 11:35:13,081 - __main__ - INFO - Starting SecureVault Pro...
+2025-11-10 11:35:13,268 - asyncio_manager - INFO - Asyncio event loop started in background thread.
+2025-11-10 11:35:13,399 - __main__ - INFO - Application initialized successfully
+2025-11-10 11:35:17,170 - __main__ - INFO - Initializing secure file management system...
+2025-11-10 11:35:17,195 - __main__ - INFO - Secure file manager initialized
+2025-11-10 11:35:17,790 - secure_file_manager - WARNING - Settings file is encrypted, but no encryption key is available (this is expected on startup).
+2025-11-10 11:35:18,315 - root - INFO - --- Starting Trial Status Check ---
+2025-11-10 11:35:18,352 - root - INFO - Guardian Anchor check returned: status=OK_RESTORED_FROM_BACKUP, data={'install_ts': '2025-11-09T21:43:01.416654', 'machine_fp': '57760c5575fad941f37d490b1cd91368b4d441c49745fb8b3e0734efe5118ed6', 'shutdown_status': 'RUNNING'}
+2025-11-10 11:35:18,354 - root - INFO - Installation timestamp: 2025-11-09 21:43:01.416654
+2025-11-10 11:35:18,354 - root - INFO - Current UTC time: 2025-11-10 10:35:18.353946
+2025-11-10 11:35:18,354 - root - INFO - Time elapsed since installation: 12:52:16.937292
+2025-11-10 11:35:18,355 - root - INFO - Trial period: 8 days, 0:00:00
+2025-11-10 11:35:18,358 - root - INFO - Guardian Observer check returned: OK_UNEXPECTED_SHUTDOWN
+2025-11-10 11:35:18,358 - root - INFO - Trial is active. Minutes remaining: 10747.72. Status: TRIAL
+2025-11-10 11:35:18,359 - __main__ - INFO - Trial status at startup: TRIAL
+2025-11-10 11:35:18,885 - secure_file_manager - WARNING - Settings file is encrypted, but no encryption key is available (this is expected on startup).
+2025-11-10 11:35:18,888 - secure_file_manager - WARNING - No encryption key available. Writing settings in plaintext is disallowed by default.
+2025-11-10 11:35:18,888 - auth_guardian - WARNING - Failed to save guardian state, most likely because the vault is locked.
+2025-11-10 11:35:18,889 - __main__ - INFO - Loading settings from auth_guardian: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time']
+2025-11-10 11:35:18,890 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-10 11:35:21,746 - __main__ - INFO - Initializing encryption...
+2025-11-10 11:35:21,746 - secure_file_manager - INFO - Initializing encryption...
+2025-11-10 11:35:21,747 - secure_file_manager - INFO - Salt loaded from secure_vault\salt_file
+2025-11-10 11:35:21,747 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-11-10 11:35:21,882 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-11-10 11:35:21,882 - __main__ - INFO - Loading files from secure storage...
+2025-11-10 11:35:21,882 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-11-10 11:35:21,884 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_77ktkpjx
+2025-11-10 11:35:21,890 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-11-10 11:35:21,892 - __main__ - INFO - Attempting authentication...
+2025-11-10 11:35:21,893 - __main__ - INFO - Salt path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_77ktkpjx\salt_file
+2025-11-10 11:35:21,893 - __main__ - INFO - Metadata DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_77ktkpjx\metadata.db
+2025-11-10 11:35:21,894 - __main__ - INFO - Sensitive DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_77ktkpjx\sensitive.db
+2025-11-10 11:35:21,894 - __main__ - INFO - Integrity path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_77ktkpjx\integrity_file
+2025-11-10 11:35:21,896 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-11-10 11:35:22,022 - __main__ - INFO - Encryption keys generated
+2025-11-10 11:35:22,023 - secure_file_manager - INFO - Verifying integrity...
+2025-11-10 11:35:22,026 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-10 11:35:22,026 - secure_file_manager - INFO - Integrity verification result: FAILED
+2025-11-10 11:35:22,027 - __main__ - INFO - Database integrity check: FAILED
+2025-11-10 11:35:22,027 - __main__ - ERROR - Database integrity check failed
+2025-11-10 11:35:22,027 - __main__ - INFO - Attempting integrity recovery...
+2025-11-10 11:35:22,027 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:35:22,029 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:35:22,031 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:35:22,031 - __main__ - INFO - Integrity signature regenerated, retrying verification...
+2025-11-10 11:35:22,032 - secure_file_manager - INFO - Verifying integrity...
+2025-11-10 11:35:22,035 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-10 11:35:22,045 - secure_file_manager - INFO - Integrity verification result: OK
+2025-11-10 11:35:22,046 - __main__ - INFO - Integrity recovery successful
+2025-11-10 11:35:22,050 - __main__ - INFO - Test decryption and password verification successful
+2025-11-10 11:35:22,050 - __main__ - INFO - Authentication successful!
+2025-11-10 11:35:22,050 - auth_guardian - INFO - Successful master password login recorded. Resetting guardian state.
+2025-11-10 11:35:22,053 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:35:22,071 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:35:22,073 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:35:22,080 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:35:22,092 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:35:22,094 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:35:22,094 - __main__ - INFO - Calling reload_settings() after successful auth...
+2025-11-10 11:35:22,095 - auth_guardian - INFO - Reloading settings, read_settings returned: []
+2025-11-10 11:35:22,097 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:35:22,109 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:35:22,111 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:35:22,112 - auth_guardian - INFO - After reload, _settings has: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time']
+2025-11-10 11:35:22,113 - __main__ - INFO - Loading settings from auth_guardian: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time']
+2025-11-10 11:35:22,113 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-10 11:35:22,114 - __main__ - INFO - reload_settings() completed
+2025-11-10 11:35:22,114 - auth_guardian - INFO - Updating setting 'last_login_timestamp' and persisting changes.
+2025-11-10 11:35:22,116 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:35:22,129 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:35:22,131 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:35:22,131 - auth_guardian - INFO - Updating setting 'consecutive_logins' and persisting changes.
+2025-11-10 11:35:22,133 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:35:22,146 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:35:22,147 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:35:22,148 - notification_manager - INFO - Trial mode active - backup notifications disabled
+2025-11-10 11:35:28,634 - __main__ - INFO - Attempting authentication...
+2025-11-10 11:35:28,635 - __main__ - INFO - Salt path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_77ktkpjx\salt_file
+2025-11-10 11:35:28,638 - __main__ - INFO - Metadata DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_77ktkpjx\metadata.db
+2025-11-10 11:35:28,639 - __main__ - INFO - Sensitive DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_77ktkpjx\sensitive.db
+2025-11-10 11:35:28,640 - __main__ - INFO - Integrity path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_77ktkpjx\integrity_file
+2025-11-10 11:35:28,641 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-11-10 11:35:28,767 - __main__ - INFO - Encryption keys generated
+2025-11-10 11:35:28,768 - secure_file_manager - INFO - Verifying integrity...
+2025-11-10 11:35:28,779 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-10 11:35:28,779 - secure_file_manager - INFO - Integrity verification result: OK
+2025-11-10 11:35:28,779 - __main__ - INFO - Database integrity check: PASSED
+2025-11-10 11:35:28,782 - __main__ - INFO - Test decryption and password verification successful
+2025-11-10 11:35:28,783 - __main__ - INFO - Authentication successful!
+2025-11-10 11:35:28,783 - auth_guardian - INFO - Successful master password login recorded. Resetting guardian state.
+2025-11-10 11:35:28,785 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:35:28,797 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:35:28,799 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:35:28,801 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:35:28,816 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:35:28,818 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:36:15,037 - auth_guardian - INFO - Updating setting 'tfa_secret' and persisting changes.
+2025-11-10 11:36:15,042 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:36:15,070 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:36:15,072 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:36:15,073 - __main__ - INFO - Loading settings from auth_guardian: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins', 'tfa_secret']
+2025-11-10 11:36:15,074 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-10 11:36:20,981 - __main__ - INFO - Performing final sync and cleanup...
+2025-11-10 11:36:21,027 - secure_file_manager - INFO - Syncing all files...
+2025-11-10 11:36:21,063 - secure_file_manager - INFO - Syncing from temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_77ktkpjx
+2025-11-10 11:36:21,124 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:36:21,131 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:36:21,144 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:36:21,145 - secure_file_manager - INFO - Sync from temp directory completed.
+2025-11-10 11:36:21,145 - secure_file_manager - INFO - Cleaning up temporary files...
+2025-11-10 11:36:21,145 - secure_file_manager - INFO - Removing temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_77ktkpjx
+2025-11-10 11:36:21,147 - secure_file_manager - INFO - Temporary files cleaned up successfully.
+2025-11-10 11:36:21,157 - __main__ - INFO - Secure cleanup completed
+2025-11-10 11:36:33,641 - root - INFO - Logging has been set up.
+2025-11-10 11:36:33,641 - __main__ - INFO - Starting SecureVault Pro...
+2025-11-10 11:36:33,793 - asyncio_manager - INFO - Asyncio event loop started in background thread.
+2025-11-10 11:36:33,908 - __main__ - INFO - Application initialized successfully
+2025-11-10 11:36:37,615 - __main__ - INFO - Initializing secure file management system...
+2025-11-10 11:36:37,622 - __main__ - INFO - Secure file manager initialized
+2025-11-10 11:36:38,188 - secure_file_manager - WARNING - Settings file is encrypted, but no encryption key is available (this is expected on startup).
+2025-11-10 11:36:38,697 - root - INFO - --- Starting Trial Status Check ---
+2025-11-10 11:36:38,737 - root - INFO - Guardian Anchor check returned: status=OK_EXISTS, data={'install_ts': '2025-11-09T21:43:01.416654', 'machine_fp': '57760c5575fad941f37d490b1cd91368b4d441c49745fb8b3e0734efe5118ed6', 'shutdown_status': 'RUNNING'}
+2025-11-10 11:36:38,738 - root - INFO - Installation timestamp: 2025-11-09 21:43:01.416654
+2025-11-10 11:36:38,739 - root - INFO - Current UTC time: 2025-11-10 10:36:38.738678
+2025-11-10 11:36:38,739 - root - INFO - Time elapsed since installation: 12:53:37.322024
+2025-11-10 11:36:38,739 - root - INFO - Trial period: 8 days, 0:00:00
+2025-11-10 11:36:38,741 - root - INFO - Guardian Observer check returned: OK_UNEXPECTED_SHUTDOWN
+2025-11-10 11:36:38,742 - root - INFO - Trial is active. Minutes remaining: 10746.38. Status: TRIAL
+2025-11-10 11:36:38,743 - __main__ - INFO - Trial status at startup: TRIAL
+2025-11-10 11:36:39,262 - secure_file_manager - WARNING - Settings file is encrypted, but no encryption key is available (this is expected on startup).
+2025-11-10 11:36:39,262 - secure_file_manager - WARNING - No encryption key available. Writing settings in plaintext is disallowed by default.
+2025-11-10 11:36:39,263 - auth_guardian - WARNING - Failed to save guardian state, most likely because the vault is locked.
+2025-11-10 11:36:39,263 - __main__ - INFO - Loading settings from auth_guardian: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time']
+2025-11-10 11:36:39,263 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-10 11:36:46,032 - __main__ - INFO - Initializing encryption...
+2025-11-10 11:36:46,034 - secure_file_manager - INFO - Initializing encryption...
+2025-11-10 11:36:46,037 - secure_file_manager - INFO - Salt loaded from secure_vault\salt_file
+2025-11-10 11:36:46,037 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-11-10 11:36:46,170 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-11-10 11:36:46,171 - __main__ - INFO - Loading files from secure storage...
+2025-11-10 11:36:46,171 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-11-10 11:36:46,173 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_2_9flldj
+2025-11-10 11:36:46,178 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-11-10 11:36:46,179 - __main__ - INFO - Attempting authentication...
+2025-11-10 11:36:46,179 - __main__ - INFO - Salt path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_2_9flldj\salt_file
+2025-11-10 11:36:46,180 - __main__ - INFO - Metadata DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_2_9flldj\metadata.db
+2025-11-10 11:36:46,180 - __main__ - INFO - Sensitive DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_2_9flldj\sensitive.db
+2025-11-10 11:36:46,181 - __main__ - INFO - Integrity path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_2_9flldj\integrity_file
+2025-11-10 11:36:46,183 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-11-10 11:36:46,317 - __main__ - INFO - Encryption keys generated
+2025-11-10 11:36:46,318 - secure_file_manager - INFO - Verifying integrity...
+2025-11-10 11:36:46,324 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-10 11:36:46,324 - secure_file_manager - INFO - Integrity verification result: FAILED
+2025-11-10 11:36:46,324 - __main__ - INFO - Database integrity check: FAILED
+2025-11-10 11:36:46,325 - __main__ - ERROR - Database integrity check failed
+2025-11-10 11:36:46,325 - __main__ - INFO - Attempting integrity recovery...
+2025-11-10 11:36:46,325 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:36:46,327 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:36:46,329 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:36:46,332 - __main__ - INFO - Integrity signature regenerated, retrying verification...
+2025-11-10 11:36:46,332 - secure_file_manager - INFO - Verifying integrity...
+2025-11-10 11:36:46,338 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-10 11:36:46,339 - secure_file_manager - INFO - Integrity verification result: OK
+2025-11-10 11:36:46,339 - __main__ - INFO - Integrity recovery successful
+2025-11-10 11:36:46,344 - __main__ - INFO - Test decryption and password verification successful
+2025-11-10 11:36:46,344 - __main__ - INFO - Authentication successful!
+2025-11-10 11:36:46,345 - auth_guardian - INFO - Successful master password login recorded. Resetting guardian state.
+2025-11-10 11:36:46,347 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:36:46,361 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:36:46,363 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:36:46,365 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:36:46,380 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:36:46,381 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:36:46,382 - __main__ - INFO - Calling reload_settings() after successful auth...
+2025-11-10 11:36:46,386 - auth_guardian - INFO - Reloading settings, read_settings returned: []
+2025-11-10 11:36:46,388 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:36:46,402 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:36:46,406 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:36:46,409 - auth_guardian - INFO - After reload, _settings has: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time']
+2025-11-10 11:36:46,412 - __main__ - INFO - Loading settings from auth_guardian: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time']
+2025-11-10 11:36:46,412 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-10 11:36:46,413 - __main__ - INFO - reload_settings() completed
+2025-11-10 11:36:46,413 - auth_guardian - INFO - Updating setting 'last_login_timestamp' and persisting changes.
+2025-11-10 11:36:46,415 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:36:46,428 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:36:46,430 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:36:46,430 - auth_guardian - INFO - Updating setting 'consecutive_logins' and persisting changes.
+2025-11-10 11:36:46,432 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:36:46,455 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:36:46,457 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:36:46,458 - notification_manager - INFO - Trial mode active - backup notifications disabled
+2025-11-10 11:37:00,724 - __main__ - INFO - Generated a new password of length 16.
+2025-11-10 11:37:41,198 - __main__ - INFO - Performing final sync and cleanup...
+2025-11-10 11:37:41,204 - secure_file_manager - INFO - Syncing all files...
+2025-11-10 11:37:41,204 - secure_file_manager - INFO - Syncing from temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_2_9flldj
+2025-11-10 11:37:41,209 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-10 11:37:41,264 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-10 11:37:41,308 - secure_file_manager - INFO - Integrity signature written to secure_vault\integrity_file
+2025-11-10 11:37:41,321 - secure_file_manager - INFO - Sync from temp directory completed.
+2025-11-10 11:37:41,325 - secure_file_manager - INFO - Cleaning up temporary files...
+2025-11-10 11:37:41,325 - secure_file_manager - INFO - Removing temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_2_9flldj
+2025-11-10 11:37:41,330 - secure_file_manager - INFO - Temporary files cleaned up successfully.
+2025-11-10 11:37:41,337 - __main__ - INFO - Secure cleanup completed

@@ -3136,8 +3136,10 @@ class ModernPasswordManagerGUI:
 
 
         def verify_and_enable():
+            nonlocal parent_window
             code = code_entry.get().strip()
             if self.tfa_manager.verify_code(secret, code):
+                self.secure_file_manager.encryption_key = self.database.encryption_key
                 encrypted_secret = self.crypto.encrypt_data(secret, self.database.encryption_key)
                 self.auth_guardian.update_setting('tfa_secret', base64.b64encode(encrypted_secret).decode('utf-8'))
                 self.load_settings()
