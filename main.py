@@ -1368,6 +1368,12 @@ class ModernPasswordManagerGUI:
             self.load_settings() # Reload settings into the main app
             logger.info("load_settings() completed")
 
+            # Check if 2FA is enabled and require verification
+            if hasattr(self, 'auth_guardian') and self.auth_guardian and self.auth_guardian.is_tfa_enabled():
+                if not self.verify_2fa_during_login():
+                    # 2FA verification failed or was cancelled
+                    return
+            
             self.authenticated = True
             now = datetime.now().timestamp()
             last_login = self.settings.get('last_login_timestamp', 0.0)
@@ -2955,7 +2961,7 @@ class ModernPasswordManagerGUI:
 
         settings_window = ThemedToplevel(self.root)
         settings_window.title(self.lang_manager.get_string("settings"))
-        settings_window.geometry("500x600")
+        settings_window.geometry("550x750")
         settings_window.grab_set()
         settings_window.resizable(False, False)
         
@@ -2975,7 +2981,30 @@ class ModernPasswordManagerGUI:
                     command=self.change_master_password_dialog,
                     height=40).pack(pady=10)
 
+        # Two-Factor Authentication Section
+        tfa_frame = ctk.CTkFrame(main_frame)
+        tfa_frame.pack(fill="x", pady=10)
 
+        ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("two_factor_auth_title"), 
+                    font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
+
+        ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("two_factor_auth_description"),
+                    font=ctk.CTkFont(size=12), wraplength=600, justify="left").pack(pady=5, padx=10)
+
+        # Show 2FA status
+        if hasattr(self, 'auth_guardian') and self.auth_guardian and self.auth_guardian.is_tfa_enabled():
+            status_label = ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("two_factor_auth_enabled"),
+                        font=ctk.CTkFont(size=14, weight="bold"), text_color="#00FF00")
+            status_label.pack(pady=5)
+            ctk.CTkButton(tfa_frame, text=self.lang_manager.get_string("disable_2fa_button"),
+                        command=self.disable_2fa_dialog, height=40, fg_color="#FF4444",
+                        hover_color="#CC0000").pack(pady=10)
+        else:
+            status_label = ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("two_factor_auth_disabled"),
+                        font=ctk.CTkFont(size=14), text_color="#FFAA00")
+            status_label.pack(pady=5)
+            ctk.CTkButton(tfa_frame, text=self.lang_manager.get_string("enable_2fa_button"),
+                        command=self.enable_2fa_dialog, height=40).pack(pady=10)
 
         timeout_frame = ctk.CTkFrame(main_frame)
         timeout_frame.pack(fill="x", pady=10)
@@ -3164,6 +3193,306 @@ class ModernPasswordManagerGUI:
         change_btn.pack(side="right", padx=15)
         
         current_entry.focus()
+
+    def enable_2fa_dialog(self):
+        """Dialog to enable Two-Factor Authentication."""
+        try:
+            # Try to import qrcode
+            try:
+                import qrcode
+                QRCODE_AVAILABLE = True
+            except ImportError:
+                QRCODE_AVAILABLE = False
+            
+            if not hasattr(self, 'auth_guardian') or not self.auth_guardian:
+                self.show_message("error", "2fa_not_configured", msg_type="error")
+                return
+            
+            # Check if pyotp is available
+            from auth_guardian import PYOTP_AVAILABLE
+            if not PYOTP_AVAILABLE:
+                self.show_message("error", "2fa_library_missing", msg_type="error")
+                return
+            
+            if not QRCODE_AVAILABLE:
+                self.show_message("error", "2fa_library_missing", msg_type="error")
+                return
+            
+            # Generate a new TOTP secret
+            secret = self.auth_guardian.generate_tfa_secret()
+            
+            # Create setup dialog
+            setup_dialog = ThemedToplevel(self.root)
+            setup_dialog.title(self.lang_manager.get_string("2fa_setup_title"))
+            setup_dialog.geometry("500x700")
+            setup_dialog.grab_set()
+            setup_dialog.resizable(False, False)
+            
+            main_frame = ctk.CTkFrame(setup_dialog)
+            main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+            
+            ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("2fa_setup_title"),
+                        font=ctk.CTkFont(size=20, weight="bold")).pack(pady=10)
+            
+            # Instructions
+            instructions = ctk.CTkTextbox(main_frame, height=100, wrap="word")
+            instructions.pack(pady=10, padx=10, fill="x")
+            instructions.insert("1.0", self.lang_manager.get_string("2fa_setup_instructions"))
+            instructions.configure(state="disabled")
+            
+            # Generate QR code
+            try:
+                import pyotp
+                # Generate provisioning URI directly
+                totp = pyotp.TOTP(secret)
+                provisioning_uri = totp.provisioning_uri(
+                    name="SecureVault Pro",
+                    issuer_name="SecureVault"
+                )
+                
+                qr = qrcode.QRCode(version=1, box_size=8, border=4)
+                qr.add_data(provisioning_uri)
+                qr.make(fit=True)
+                qr_img = qr.make_image(fill_color="black", back_color="white")
+                
+                # Resize QR code for display
+                qr_img = qr_img.resize((250, 250), Image.Resampling.LANCZOS)
+                qr_photo = ImageTk.PhotoImage(qr_img)
+                
+                qr_label = ctk.CTkLabel(main_frame, image=qr_photo, text="")
+                qr_label.image = qr_photo  # Keep a reference
+                qr_label.pack(pady=10)
+            except Exception as e:
+                logger.error(f"Failed to generate QR code: {e}")
+                ctk.CTkLabel(main_frame, text=f"Error generating QR code: {e}",
+                           text_color="#FF4444").pack(pady=10)
+                setup_dialog.destroy()
+                return
+            
+            # Verification code entry
+            code_frame = ctk.CTkFrame(main_frame)
+            code_frame.pack(pady=10, fill="x", padx=20)
+            
+            ctk.CTkLabel(code_frame, text=self.lang_manager.get_string("2fa_verification_code_label"),
+                        font=ctk.CTkFont(size=14)).pack(pady=5)
+            
+            code_entry = ctk.CTkEntry(code_frame, placeholder_text=self.lang_manager.get_string("2fa_verification_code_placeholder"),
+                                     width=200, font=ctk.CTkFont(size=16))
+            code_entry.pack(pady=5)
+            
+            status_label = ctk.CTkLabel(code_frame, text="", font=ctk.CTkFont(size=12))
+            status_label.pack(pady=5)
+            
+            def verify_and_enable():
+                code = code_entry.get().strip()
+                if not code or len(code) != 6 or not code.isdigit():
+                    status_label.configure(text="Please enter a valid 6-digit code", text_color="#FF4444")
+                    code_entry.focus()
+                    return
+                
+                try:
+                    # Verify the code using pyotp directly (secret is already in _settings for URI generation)
+                    import pyotp
+                    totp = pyotp.TOTP(secret)
+                    is_valid = totp.verify(code, valid_window=1)
+                    
+                    if is_valid:
+                        # Permanently enable 2FA
+                        if self.auth_guardian.enable_tfa(secret):
+                            # Generate backup codes
+                            backup_codes = self.auth_guardian.generate_backup_codes()
+                            setup_dialog.destroy()
+                            self.show_backup_codes_dialog(backup_codes)
+                            # Refresh settings window if it exists
+                            try:
+                                self.show_settings()
+                            except:
+                                pass
+                        else:
+                            status_label.configure(text=self.lang_manager.get_string("2fa_setup_failed"), text_color="#FF4444")
+                    else:
+                        status_label.configure(text=self.lang_manager.get_string("2fa_invalid_code"), text_color="#FF4444")
+                        code_entry.focus()
+                        code_entry.select_range(0, tk.END)
+                except Exception as e:
+                    logger.error(f"Error verifying 2FA code: {e}")
+                    status_label.configure(text=f"Error: {str(e)}", text_color="#FF4444")
+            
+            verify_btn = ctk.CTkButton(code_frame, text=self.lang_manager.get_string("2fa_verify_button"),
+                                      command=verify_and_enable, height=40)
+            verify_btn.pack(pady=10)
+            
+            cancel_btn = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("cancel_button"),
+                                      command=setup_dialog.destroy, height=35, fg_color="gray")
+            cancel_btn.pack(pady=5)
+            
+            code_entry.focus()
+            code_entry.bind("<Return>", lambda e: verify_and_enable())
+            
+        except Exception as e:
+            logger.error(f"Error in enable_2fa_dialog: {e}")
+            self.show_message("error", f"Error setting up 2FA: {str(e)}", msg_type="error")
+    
+    def show_backup_codes_dialog(self, backup_codes):
+        """Show backup codes to the user."""
+        dialog = ThemedToplevel(self.root)
+        dialog.title(self.lang_manager.get_string("2fa_backup_codes_title"))
+        dialog.geometry("500x600")
+        dialog.grab_set()
+        dialog.resizable(False, False)
+        
+        main_frame = ctk.CTkFrame(dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("2fa_backup_codes_title"),
+                    font=ctk.CTkFont(size=20, weight="bold")).pack(pady=10)
+        
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("2fa_backup_codes_description"),
+                    font=ctk.CTkFont(size=12), wraplength=450, justify="left").pack(pady=10)
+        
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("2fa_backup_codes_warning"),
+                    font=ctk.CTkFont(size=12, weight="bold"), text_color="#FFAA00",
+                    wraplength=450, justify="left").pack(pady=5)
+        
+        # Display backup codes
+        codes_frame = ctk.CTkFrame(main_frame)
+        codes_frame.pack(pady=10, fill="both", expand=True, padx=10)
+        
+        codes_text = ctk.CTkTextbox(codes_frame, height=200, font=ctk.CTkFont(size=14, family="monospace"))
+        codes_text.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        codes_display = "\n".join([f"{i+1}. {code}" for i, code in enumerate(backup_codes)])
+        codes_text.insert("1.0", codes_display)
+        codes_text.configure(state="disabled")
+        
+        def on_close():
+            dialog.destroy()
+            self.show_message("success", "2fa_setup_success", msg_type="info")
+        
+        close_btn = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("2fa_backup_codes_saved"),
+                                  command=on_close, height=40)
+        close_btn.pack(pady=10)
+    
+    def disable_2fa_dialog(self):
+        """Dialog to disable Two-Factor Authentication."""
+        if not hasattr(self, 'auth_guardian') or not self.auth_guardian:
+            return
+        
+        if not self.auth_guardian.is_tfa_enabled():
+            self.show_message("info", "2fa_not_configured", msg_type="info")
+            return
+        
+        result = messagebox.askyesno(
+            self.lang_manager.get_string("2fa_disable_confirm_title"),
+            self.lang_manager.get_string("2fa_disable_confirm_message"),
+            parent=self.root
+        )
+        
+        if result:
+            try:
+                if self.auth_guardian.disable_tfa():
+                    self.show_message("success", "2fa_disabled_success", msg_type="info")
+                    self.show_settings()  # Refresh settings window
+                else:
+                    self.show_message("error", "Failed to disable 2FA", msg_type="error")
+            except Exception as e:
+                logger.error(f"Error disabling 2FA: {e}")
+                self.show_message("error", f"Error disabling 2FA: {str(e)}", msg_type="error")
+    
+    def verify_2fa_during_login(self) -> bool:
+        """Show 2FA verification dialog during login. Returns True if verified, False otherwise."""
+        if not hasattr(self, 'auth_guardian') or not self.auth_guardian:
+            return True
+        
+        if not self.auth_guardian.is_tfa_enabled():
+            return True
+        
+        # Check for lockout
+        if self.auth_guardian.is_tfa_locked_out():
+            lockout_time = self.auth_guardian.get_remaining_tfa_lockout_time()
+            minutes = lockout_time // 60
+            self.show_message("error", self.lang_manager.get_string("2fa_login_locked_out", minutes=minutes), msg_type="error")
+            return False
+        
+        # Create 2FA verification dialog
+        verify_dialog = ThemedToplevel(self.root)
+        verify_dialog.title(self.lang_manager.get_string("2fa_login_required"))
+        verify_dialog.geometry("450x350")
+        verify_dialog.grab_set()
+        verify_dialog.resizable(False, False)
+        
+        main_frame = ctk.CTkFrame(verify_dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("2fa_login_required"),
+                    font=ctk.CTkFont(size=20, weight="bold")).pack(pady=10)
+        
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("2fa_login_code_label"),
+                    font=ctk.CTkFont(size=14)).pack(pady=10)
+        
+        code_entry = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("2fa_login_code_placeholder"),
+                                 width=200, font=ctk.CTkFont(size=16))
+        code_entry.pack(pady=5)
+        
+        status_label = ctk.CTkLabel(main_frame, text="", font=ctk.CTkFont(size=12))
+        status_label.pack(pady=5)
+        
+        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("2fa_login_backup_code_label"),
+                    font=ctk.CTkFont(size=12), text_color="#AAAAAA").pack(pady=5)
+        
+        backup_entry = ctk.CTkEntry(main_frame, placeholder_text="Backup code",
+                                   width=200, font=ctk.CTkFont(size=14))
+        backup_entry.pack(pady=5)
+        
+        verified = [False]
+        
+        def verify_code():
+            code = code_entry.get().strip()
+            backup_code = backup_entry.get().strip()
+            
+            # Try TOTP code first, then backup code
+            if code and len(code) == 6 and code.isdigit():
+                if self.auth_guardian.verify_tfa_code(code):
+                    verified[0] = True
+                    verify_dialog.destroy()
+                    return
+                else:
+                    status_label.configure(text=self.lang_manager.get_string("2fa_login_invalid_code"), text_color="#FF4444")
+                    code_entry.focus()
+                    code_entry.select_range(0, tk.END)
+            
+            # Try backup code
+            elif backup_code:
+                if self.auth_guardian.verify_tfa_code(backup_code):
+                    verified[0] = True
+                    verify_dialog.destroy()
+                    return
+                else:
+                    status_label.configure(text=self.lang_manager.get_string("2fa_login_invalid_code"), text_color="#FF4444")
+                    backup_entry.focus()
+                    backup_entry.select_range(0, tk.END)
+            else:
+                status_label.configure(text="Please enter a 6-digit code or backup code", text_color="#FF4444")
+        
+        verify_btn = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("2fa_login_verify_button"),
+                                  command=verify_code, height=40)
+        verify_btn.pack(pady=15)
+        
+        code_entry.focus()
+        code_entry.bind("<Return>", lambda e: verify_code())
+        backup_entry.bind("<Return>", lambda e: verify_code())
+        
+        # Handle window close event
+        def on_closing():
+            verified[0] = False
+            verify_dialog.destroy()
+        
+        verify_dialog.protocol("WM_DELETE_WINDOW", on_closing)
+        
+        # Wait for dialog to close
+        verify_dialog.wait_window()
+        
+        return verified[0]
 
     def restart_program(self):
         import sys
@@ -4215,7 +4544,7 @@ def main():
     except Exception as e:
         logger.error(f"Failed to start application: {e}")
         logger.info("Please ensure all required dependencies are installed:")
-        logger.info("pip install customtkinter cryptography pillow desktop_notifier")
+        logger.info("pip install customtkinter cryptography pillow desktop_notifier pyotp qrcode[pil]")
         try:
             import tkinter.messagebox as msgbox
             msgbox.showerror("Startup Error",
