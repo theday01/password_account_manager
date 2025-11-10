@@ -2812,6 +2812,7 @@ class ModernPasswordManagerGUI:
                     logger.error("Integrity check failed during vault lock")
                     self.show_message("Security Warning", "File integrity check failed.", msg_type="warning")
                 
+                self.secure_file_manager.sync_all_files()
                 self.secure_file_manager.cleanup_temp_files()
                 logger.info("Temporary files cleaned up")
             self.authenticated = False
@@ -2852,7 +2853,7 @@ class ModernPasswordManagerGUI:
                 logger.info("Performing final sync and cleanup...")
                 try:
                     if self.authenticated:
-                        pass
+                        self.secure_file_manager.sync_all_files()
                     self.secure_file_manager.cleanup_temp_files()
                     logger.info("Secure cleanup completed")
                 except Exception as e:
