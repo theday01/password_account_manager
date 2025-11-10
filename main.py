@@ -2579,7 +2579,7 @@ class ModernPasswordManagerGUI:
         # Add programmer credits at the bottom of the sidebar
         credits_label = ctk.CTkLabel(
             self.sidebar,
-            text="This program was designed by Hamza Saadi of EAGLESHADOW @2025",
+            text="This program was developed by Hamza Saadi from EAGLESHADOW ©2025",
             font=ctk.CTkFont(size=10),
             text_color="gray",
             wraplength=250
@@ -2961,7 +2961,7 @@ class ModernPasswordManagerGUI:
 
         settings_window = ThemedToplevel(self.root)
         settings_window.title(self.lang_manager.get_string("settings"))
-        settings_window.geometry("550x750")
+        settings_window.geometry("600x580")
         settings_window.grab_set()
         settings_window.resizable(False, False)
         
@@ -3688,7 +3688,7 @@ class ModernPasswordManagerGUI:
 
         card_fg_color = None
         if account_id in reminded_accounts:
-            card_fg_color = "yellow"
+            card_fg_color = "#470500"
 
         card = ctk.CTkFrame(self.passwords_container, corner_radius=10, fg_color=card_fg_color)
         card.pack(fill="x", padx=10, pady=8)

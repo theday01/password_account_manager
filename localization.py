@@ -164,7 +164,7 @@ LANGUAGES = {
         "master_password_label": "Master Password",
         "change_master_password_button": "Change Master Password",
         "auto_logout_title": "Automatic Logout",
-        "auto_logout_message": "For your security, the application will automatically \n lock and close after 2 minutes of inactivity",
+        "auto_logout_message": "For your security, the application will automatically \n lock and close after 15 minutes of inactivity",
         "change_master_password_dialog_title": "Change Master Password",
         "change_master_password_icon_title": "🔒 Change Master Password",
         "current_password_label": "Current Password:",

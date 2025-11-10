@@ -1,9 +1,4 @@
 
-في كلمة المرور لاول مرة 
-اجعل المستخدم يدخل اجباريا 16 رمز من بينهم ارقام وحروف كبيرة وصغيرة ورموز
-
-
-
 الإسم الكامل و البريد الإلكتروني ، الذي يدخله المستخدم في اول تسجيل بالبرنامج
 لا يتم اضافته في برنامج افتراضيا عندما يقوم المستخدم بتفعيل
 otp
@@ -28,9 +23,3 @@ remove copy and paste password from the clipboard to avoid tampering
 
 
 123456789hamzaSAADI@A
-
-1
-            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(330, 80))
-
-2
-            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(170, 45))
