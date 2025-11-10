@@ -1352,7 +1352,10 @@ class ModernPasswordManagerGUI:
             self.load_settings() # Reload settings into the main app
             logger.info("reload_settings() completed")
 
-            if self.settings.get('tfa_secret'):
+            # Explicitly check for TFA after reloading settings
+            tfa_enabled = self.settings.get('tfa_secret') is not None
+            
+            if tfa_enabled:
                 self.prompt_for_tfa()
             else:
                 self.authenticated = True
