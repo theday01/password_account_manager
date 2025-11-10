@@ -422,9 +422,25 @@ class SecureFileManager:
                 shutil.rmtree(self.temp_dir, ignore_errors=True)
             self.temp_dir = tempfile.mkdtemp(prefix="sv_tmp_")
             LOG.info(f"Created new temp directory: {self.temp_dir}")
-            for p in [self.metadata_db, self.sensitive_db, self.salt_path, self.signature_path, self.settings_path]:
-                if os.path.exists(p):
-                    shutil.copy2(p, os.path.join(self.temp_dir, os.path.basename(p)))
+            
+            # Copy all files from secure_dir to temp_dir
+            # This ensures we get all files including any WAL files or other database-related files
+            if os.path.exists(self.secure_dir):
+                for name in os.listdir(self.secure_dir):
+                    src = os.path.join(self.secure_dir, name)
+                    if os.path.isfile(src):
+                        dst = os.path.join(self.temp_dir, name)
+                        try:
+                            shutil.copy2(src, dst)
+                            LOG.debug(f"Copied {name} to temp directory")
+                        except Exception as e:
+                            LOG.warning(f"Failed to copy {name} to temp directory: {e}")
+            else:
+                # Fallback: copy specific files if secure_dir doesn't exist yet
+                for p in [self.metadata_db, self.sensitive_db, self.salt_path, self.signature_path, self.settings_path]:
+                    if os.path.exists(p):
+                        shutil.copy2(p, os.path.join(self.temp_dir, os.path.basename(p)))
+            
             LOG.info("Files loaded to temp directory successfully.")
             return True
         except Exception:
@@ -451,13 +467,22 @@ class SecureFileManager:
         """Push files into secure_dir. Priority: temp_dir -> secure_dir, else copy from cwd if newer.
 
         Uses copy2 to preserve metadata and does not delete other files in secure_dir.
+        This method copies all files from temp_dir to secure_dir, including database files and any WAL files.
         """
         LOG.info("Syncing all files...")
         try:
             if self.temp_dir and os.path.exists(self.temp_dir):
                 LOG.info(f"Syncing from temp directory: {self.temp_dir}")
+                # Copy all files from temp_dir to secure_dir
+                # This includes database files, WAL files, and all other vault files
                 for name in os.listdir(self.temp_dir):
-                    shutil.copy2(os.path.join(self.temp_dir, name), os.path.join(self.secure_dir, name))
+                    src = os.path.join(self.temp_dir, name)
+                    dst = os.path.join(self.secure_dir, name)
+                    try:
+                        shutil.copy2(src, dst)
+                        LOG.debug(f"Copied {name} to secure storage")
+                    except Exception as e:
+                        LOG.warning(f"Failed to copy {name}: {e}")
                 # re-rotate signature after pushing
                 self.rotate_integrity_signature()
                 LOG.info("Sync from temp directory completed.")

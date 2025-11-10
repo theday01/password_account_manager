@@ -286,6 +286,42 @@ class DatabaseManager:
         self.integrity_key = None
         self.encryption_key = None
         self.last_integrity_error = False
+    
+    def _checkpoint_databases(self):
+        """Checkpoint WAL files to ensure all changes are written to the main database files.
+        This ensures that when files are synced, all changes are in the main database files,
+        not just in WAL files. This is important for data persistence.
+        """
+        try:
+            # Small delay to ensure file system has flushed any pending writes
+            import time
+            time.sleep(0.1)
+            
+            # Checkpoint metadata database
+            if os.path.exists(self.metadata_db):
+                try:
+                    metadata_conn = sqlite3.connect(self.metadata_db)
+                    # Checkpoint WAL to main database file
+                    # PASSIVE is safe and non-blocking
+                    metadata_conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
+                    metadata_conn.close()
+                except Exception as e:
+                    logger.debug(f"Metadata DB checkpoint: {e}")
+            
+            # Checkpoint sensitive database
+            if os.path.exists(self.sensitive_db):
+                try:
+                    sensitive_conn = sqlite3.connect(self.sensitive_db)
+                    # Checkpoint WAL to main database file
+                    sensitive_conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
+                    sensitive_conn.close()
+                except Exception as e:
+                    logger.debug(f"Sensitive DB checkpoint: {e}")
+            
+            logger.debug("Database checkpoints completed")
+        except Exception as e:
+            logger.warning(f"Failed to checkpoint databases: {e}")
+            # Don't fail the operation if checkpoint fails - the commit should have written the data
         
     def initialize_database(self, master_password: str, email: str, full_name: str):
         logger.info("Starting database initialization...")
@@ -529,6 +565,15 @@ class DatabaseManager:
                 json.dumps(account.tags), account.security_level.value
             ))
             metadata_conn.commit()
+            
+            # Verify the account was saved before proceeding
+            verify_cursor = metadata_conn.execute("SELECT id FROM accounts WHERE id = ?", (account.id,))
+            if not verify_cursor.fetchone():
+                metadata_conn.close()
+                raise ValueError(f"Account was not saved to database")
+            metadata_conn.close()
+            metadata_conn = None
+            
             sensitive_conn = sqlite3.connect(self.sensitive_db)
             encrypted_username = self.crypto.encrypt_data(username, self.encryption_key)
             encrypted_password = self.crypto.encrypt_data(password, self.encryption_key)
@@ -537,17 +582,43 @@ class DatabaseManager:
                 VALUES (?, ?, ?)
             """, (account.id, encrypted_username, encrypted_password))
             sensitive_conn.commit()
-
-            # Close connections to ensure data is flushed to disk before rotating signature
-            if metadata_conn:
-                metadata_conn.close()
-                metadata_conn = None
-            if sensitive_conn:
+            
+            # Verify credentials were saved
+            verify_cursor = sensitive_conn.execute("SELECT account_id FROM credentials WHERE account_id = ?", (account.id,))
+            if not verify_cursor.fetchone():
                 sensitive_conn.close()
-                sensitive_conn = None
+                raise ValueError(f"Credentials were not saved to database")
+            sensitive_conn.close()
+            sensitive_conn = None
             
             self.log_action("CREATE", "ACCOUNT", account.id, f"Created account: {account.name}")
-            self.secure_file_manager.rotate_integrity_signature()
+            
+            if self.secure_file_manager:
+                # Ensure all database changes are flushed to disk before syncing
+                # This is critical for data persistence
+                self._checkpoint_databases()
+                
+                # Verify files exist before syncing
+                if not os.path.exists(self.metadata_db) or not os.path.exists(self.sensitive_db):
+                    logger.error(f"Database files not found after account creation. Metadata: {os.path.exists(self.metadata_db)}, Sensitive: {os.path.exists(self.sensitive_db)}")
+                    raise ValueError("Database files not found after account creation")
+                
+                self.secure_file_manager.rotate_integrity_signature()
+                # Sync files to secure storage to persist changes
+                # This is critical - without this, changes are lost on restart
+                try:
+                    logger.info(f"Syncing account '{account.name}' to secure storage...")
+                    sync_success = self.secure_file_manager.sync_all_files()
+                    if not sync_success:
+                        logger.error("Failed to sync account changes to secure storage - sync_all_files returned False")
+                        raise ValueError("Failed to sync account changes to secure storage")
+                    logger.info(f"Account '{account.name}' synced to secure storage successfully")
+                except Exception as e:
+                    logger.error(f"Failed to sync account changes to secure storage: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    raise ValueError(f"Failed to sync account changes to secure storage: {e}")
+            
             logger.info(f"Account '{account.name}' created successfully with ID: {account.id}")
             
         except sqlite3.IntegrityError as e:
@@ -632,7 +703,17 @@ class DatabaseManager:
         sensitive_conn.commit()
         sensitive_conn.close()
         self.log_action("UPDATE", "ACCOUNT", account_id, f"Updated account: {name}")
-        self.secure_file_manager.rotate_integrity_signature()
+        if self.secure_file_manager:
+            # Ensure all database changes are flushed to disk before syncing
+            self._checkpoint_databases()
+            self.secure_file_manager.rotate_integrity_signature()
+            # Sync files to secure storage to persist changes
+            try:
+                self.secure_file_manager.sync_all_files()
+                logger.info("Account update synced to secure storage")
+            except Exception as e:
+                logger.error(f"Failed to sync account update to secure storage: {e}")
+                # Don't fail the operation if sync fails, but log the error
 
     def update_master_account_email(self, email: str):
         metadata_conn = sqlite3.connect(self.metadata_db)
@@ -640,7 +721,17 @@ class DatabaseManager:
         metadata_conn.commit()
         metadata_conn.close()
         self.log_action("UPDATE", "ACCOUNT", "master_account", f"Updated master account email to {email}")
-        self.secure_file_manager.rotate_integrity_signature()
+        if self.secure_file_manager:
+            # Ensure all database changes are flushed to disk before syncing
+            self._checkpoint_databases()
+            self.secure_file_manager.rotate_integrity_signature()
+            # Sync files to secure storage to persist changes
+            try:
+                self.secure_file_manager.sync_all_files()
+                logger.info("Master account email update synced to secure storage")
+            except Exception as e:
+                logger.error(f"Failed to sync master account email update to secure storage: {e}")
+                # Don't fail the operation if sync fails, but log the error
     
     def delete_account(self, account_id: str):
         metadata_conn = sqlite3.connect(self.metadata_db)
@@ -655,7 +746,17 @@ class DatabaseManager:
         sensitive_conn.commit()
         sensitive_conn.close()
         self.log_action("DELETE", "ACCOUNT", account_id, f"Deleted account: {account_name}")
-        self.secure_file_manager.rotate_integrity_signature()
+        if self.secure_file_manager:
+            # Ensure all database changes are flushed to disk before syncing
+            self._checkpoint_databases()
+            self.secure_file_manager.rotate_integrity_signature()
+            # Sync files to secure storage to persist changes
+            try:
+                self.secure_file_manager.sync_all_files()
+                logger.info("Account deletion synced to secure storage")
+            except Exception as e:
+                logger.error(f"Failed to sync account deletion to secure storage: {e}")
+                # Don't fail the operation if sync fails, but log the error
     
     def change_master_password(self, current_password: str, new_password: str):
         if not self.authenticate(current_password):
@@ -1981,6 +2082,16 @@ class ModernPasswordManagerGUI:
                 self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
             if hasattr(self, 'tamper_manager'):
                 self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
+            # Sync files to secure storage before closing
+            if self.secure_file_manager and self.authenticated and self.database:
+                try:
+                    logger.info("Syncing files to secure storage before closing...")
+                    # Ensure all database changes are flushed to disk
+                    self.database._checkpoint_databases()
+                    self.secure_file_manager.sync_all_files()
+                    logger.info("Files synced successfully")
+                except Exception as e:
+                    logger.error(f"Failed to sync files before closing: {e}")
             self.root.destroy()
         
         self.root.protocol("WM_DELETE_WINDOW", on_closing)
@@ -2836,6 +2947,9 @@ class ModernPasswordManagerGUI:
                     logger.error("Integrity check failed during vault lock")
                     self.show_message("Security Warning", "File integrity check failed.", msg_type="warning")
                 
+                # Ensure all database changes are flushed to disk before syncing
+                if self.database:
+                    self.database._checkpoint_databases()
                 self.secure_file_manager.sync_all_files()
                 self.secure_file_manager.cleanup_temp_files()
                 logger.info("Temporary files cleaned up")
@@ -3224,7 +3338,7 @@ class ModernPasswordManagerGUI:
             # Create setup dialog
             setup_dialog = ThemedToplevel(self.root)
             setup_dialog.title(self.lang_manager.get_string("2fa_setup_title"))
-            setup_dialog.geometry("500x700")
+            setup_dialog.geometry("500x750")
             setup_dialog.grab_set()
             setup_dialog.resizable(False, False)
             
@@ -3247,7 +3361,7 @@ class ModernPasswordManagerGUI:
                 totp = pyotp.TOTP(secret)
                 provisioning_uri = totp.provisioning_uri(
                     name="SecureVault Pro",
-                    issuer_name="SecureVault"
+                    issuer_name="SecureVault PRO"
                 )
                 
                 qr = qrcode.QRCode(version=1, box_size=8, border=4)
@@ -4478,7 +4592,9 @@ class ModernPasswordManagerGUI:
             if self.secure_file_manager:
                 logger.info("Performing final sync and cleanup...")
                 try:
-                    if self.authenticated:
+                    if self.authenticated and self.database:
+                        # Ensure all database changes are flushed to disk
+                        self.database._checkpoint_databases()
                         self.secure_file_manager.sync_all_files()
                     self.secure_file_manager.cleanup_temp_files()
                     logger.info("Secure cleanup completed")
