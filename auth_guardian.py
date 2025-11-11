@@ -258,14 +258,18 @@ class AuthGuardian:
             raise ValueError("pyotp library is not available. Please install it: pip install pyotp")
         return pyotp.random_base32()
     
-    def get_tfa_provisioning_uri(self, account_name: str = "SecureVault Pro", issuer_name: str = "SecureVault") -> str:
+    def get_tfa_provisioning_uri(self, account_name: str = None, issuer_name: str = "SecureVault") -> str:
         """Get the provisioning URI for the TOTP secret (for QR code generation)."""
         if not PYOTP_AVAILABLE:
             raise ValueError("pyotp library is not available")
         if not self.is_tfa_enabled():
             raise ValueError("2FA is not enabled")
         totp = pyotp.TOTP(self._settings['tfa_secret'])
-        return totp.provisioning_uri(name=account_name, issuer_name=issuer_name)
+        
+        # Use the provided account_name, but fall back to the default "SecureVault Pro" if it's None or empty.
+        effective_account_name = account_name if account_name else "SecureVault Pro"
+        
+        return totp.provisioning_uri(name=effective_account_name, issuer_name=issuer_name)
     
     def enable_tfa(self, secret: str) -> bool:
         """Enable 2FA with the given secret."""
