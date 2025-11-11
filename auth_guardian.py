@@ -269,24 +269,36 @@ class AuthGuardian:
         # Use the provided account_name, but fall back to the default "SecureVault Pro" if it's None or empty.
         effective_account_name = account_name if account_name else "SecureVault Pro"
         
-        # Try to load and encode the local icon
+        # Try to load and encode the security-themed icon
         import os
-        icon_path = os.path.join("icons", "2fa_icon.png")
+        icon_path = os.path.join("icons", "security_shield.png")  # Changed to security-themed icon
+        
+        # Fallback to other security-themed icons if the primary one doesn't exist
+        fallback_icons = [
+            "icons/security_shield.png",
+            "icons/security_icon.png", 
+            "icons/safe_icon.png",
+            "icons/lock_icon.png",
+            "icons/shield_icon.png"
+        ]
+        
         image_param = None
         
-        if os.path.exists(icon_path):
-            try:
-                with open(icon_path, 'rb') as f:
-                    icon_data = f.read()
-                # Convert to base64 data URI
-                import base64
-                icon_base64 = base64.b64encode(icon_data).decode('utf-8')
-                image_param = f"data:image/png;base64,{icon_base64}"
-                logger.info("Successfully loaded local 2FA icon")
-            except Exception as e:
-                logger.warning(f"Failed to load local 2FA icon: {e}")
-        else:
-            logger.warning(f"2FA icon not found at {icon_path}")
+        for icon_file in fallback_icons:
+            if os.path.exists(icon_file):
+                try:
+                    with open(icon_file, 'rb') as f:
+                        icon_data = f.read()
+                    # Convert to base64 data URI
+                    icon_base64 = base64.b64encode(icon_data).decode('utf-8')
+                    image_param = f"data:image/png;base64,{icon_base64}"
+                    logger.info(f"Successfully loaded security icon: {icon_file}")
+                    break
+                except Exception as e:
+                    logger.warning(f"Failed to load security icon {icon_file}: {e}")
+        
+        if not image_param:
+            logger.warning("No security-themed icon found for 2FA QR code")
         
         return totp.provisioning_uri(name=effective_account_name, issuer_name=issuer_name, image=image_param)    
         

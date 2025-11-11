@@ -3362,34 +3362,43 @@ class ModernPasswordManagerGUI:
                 # Generate provisioning URI directly
                 email = self.database.get_master_account_email()
                 totp = pyotp.TOTP(secret)
-                
-                # Try to load and encode the local icon
-                icon_path = os.path.join("icons", "2fa_icon.png")
-                image_param = None
-                
-                if os.path.exists(icon_path):
-                    try:
-                        with open(icon_path, 'rb') as f:
-                            icon_data = f.read()
-                        # Convert to base64 data URI
-                        icon_base64 = base64.b64encode(icon_data).decode('utf-8')
-                        image_param = f"data:image/png;base64,{icon_base64}"
-                        logger.info("Successfully loaded local 2FA icon for QR code")
-                    except Exception as e:
-                        logger.warning(f"Failed to load local 2FA icon: {e}")
-                else:
-                    logger.warning(f"2FA icon not found at {icon_path}")
-                
-                provisioning_uri = totp.provisioning_uri(
-                    name=email if email else "SecureVault Pro",
+
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                icon_path = os.path.join(current_dir, "icons", "2fa_icon.png")
+
+                provisioning_uri = self.auth_guardian.get_tfa_provisioning_uri(
+                    account_name=email if email else "SecureVault Pro",
                     issuer_name="SecureVault PRO",
-                    image=image_param
+                    icon_path=icon_path
                 )
-                                
-                qr = qrcode.QRCode(version=1, box_size=8, border=4)
+
+                qr = qrcode.QRCode(
+                    version=1,
+                    error_correction=qrcode.constants.ERROR_CORRECT_H,
+                    box_size=8,
+                    border=4,
+                )
                 qr.add_data(provisioning_uri)
                 qr.make(fit=True)
-                qr_img = qr.make_image(fill_color="black", back_color="white")
+                qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+
+                # Overlay the icon
+                icon_path = os.path.join("icons", "2fa_icon.png")
+                if os.path.exists(icon_path):
+                    try:
+                        icon = Image.open(icon_path).convert("RGBA")
+                        qr_w, qr_h = qr_img.size
+                        icon_w, icon_h = icon.size
+                        max_size = qr_w // 4
+                        icon.thumbnail((max_size, max_size))
+                        
+                        paste_x = (qr_w - icon.width) // 2
+                        paste_y = (qr_h - icon.height) // 2
+                        
+                        qr_img.paste(icon, (paste_x, paste_y), icon)
+                        logger.info("Successfully overlaid local icon onto QR code")
+                    except Exception as e:
+                        logger.warning(f"Failed to overlay local icon: {e}")
                 
                 # Resize QR code for display
                 qr_img = qr_img.resize((250, 250), Image.Resampling.LANCZOS)
