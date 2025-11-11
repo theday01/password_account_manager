@@ -3361,12 +3361,12 @@ class ModernPasswordManagerGUI:
                 # Generate provisioning URI directly
                 email = self.database.get_master_account_email()
                 totp = pyotp.TOTP(secret)
-                image_url = "https://icon-files.lineicons.com/cdn/free/money-currency/rounded/outlined/shield-dollar.png"
+                image_url = "https://i.imgur.com/bY0tD2j.png"
                 provisioning_uri = totp.provisioning_uri(
                     name=email if email else "SecureVault Pro",
-                    issuer_name="SecureVault PRO"
+                    issuer_name="SecureVault PRO",
+                    image=image_url
                 )
-                provisioning_uri += f"&image={urllib.parse.quote(image_url)}"
                 
                 qr = qrcode.QRCode(version=1, box_size=8, border=4)
                 qr.add_data(provisioning_uri)
