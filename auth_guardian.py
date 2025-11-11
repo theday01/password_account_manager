@@ -269,8 +269,27 @@ class AuthGuardian:
         # Use the provided account_name, but fall back to the default "SecureVault Pro" if it's None or empty.
         effective_account_name = account_name if account_name else "SecureVault Pro"
         
-        return totp.provisioning_uri(name=effective_account_name, issuer_name=issuer_name)
-    
+        # Try to load and encode the local icon
+        import os
+        icon_path = os.path.join("icons", "2fa_icon.png")
+        image_param = None
+        
+        if os.path.exists(icon_path):
+            try:
+                with open(icon_path, 'rb') as f:
+                    icon_data = f.read()
+                # Convert to base64 data URI
+                import base64
+                icon_base64 = base64.b64encode(icon_data).decode('utf-8')
+                image_param = f"data:image/png;base64,{icon_base64}"
+                logger.info("Successfully loaded local 2FA icon")
+            except Exception as e:
+                logger.warning(f"Failed to load local 2FA icon: {e}")
+        else:
+            logger.warning(f"2FA icon not found at {icon_path}")
+        
+        return totp.provisioning_uri(name=effective_account_name, issuer_name=issuer_name, image=image_param)    
+        
     def enable_tfa(self, secret: str) -> bool:
         """Enable 2FA with the given secret."""
         if not PYOTP_AVAILABLE:

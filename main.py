@@ -3358,16 +3358,34 @@ class ModernPasswordManagerGUI:
             try:
                 import pyotp
                 import urllib.parse
+                import base64
                 # Generate provisioning URI directly
                 email = self.database.get_master_account_email()
                 totp = pyotp.TOTP(secret)
-                image_url = "https://i.imgur.com/bY0tD2j.png"
+                
+                # Try to load and encode the local icon
+                icon_path = os.path.join("icons", "2fa_icon.png")
+                image_param = None
+                
+                if os.path.exists(icon_path):
+                    try:
+                        with open(icon_path, 'rb') as f:
+                            icon_data = f.read()
+                        # Convert to base64 data URI
+                        icon_base64 = base64.b64encode(icon_data).decode('utf-8')
+                        image_param = f"data:image/png;base64,{icon_base64}"
+                        logger.info("Successfully loaded local 2FA icon for QR code")
+                    except Exception as e:
+                        logger.warning(f"Failed to load local 2FA icon: {e}")
+                else:
+                    logger.warning(f"2FA icon not found at {icon_path}")
+                
                 provisioning_uri = totp.provisioning_uri(
                     name=email if email else "SecureVault Pro",
                     issuer_name="SecureVault PRO",
-                    image=image_url
+                    image=image_param
                 )
-                
+                                
                 qr = qrcode.QRCode(version=1, box_size=8, border=4)
                 qr.add_data(provisioning_uri)
                 qr.make(fit=True)
