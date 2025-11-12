@@ -414,6 +414,7 @@ class SecureFileManager:
         """Copy vault files to a new temp dir for safe inspection or restoration.
 
         This is atomic: a new temp dir is created and set to self.temp_dir. Previous temp_dir is removed.
+        Updates internal paths to point to temp directory versions after successful copy.
         """
         LOG.info("Loading files to temporary directory...")
         try:
@@ -441,6 +442,15 @@ class SecureFileManager:
                     if os.path.exists(p):
                         shutil.copy2(p, os.path.join(self.temp_dir, os.path.basename(p)))
             
+            # CRITICAL: Update all path references to point to temp directory versions
+            # This ensures that reads/writes happen to the temp copies, not the secure vault originals
+            self.metadata_db = os.path.join(self.temp_dir, "metadata.db")
+            self.sensitive_db = os.path.join(self.temp_dir, "sensitive.db")
+            self.salt_path = os.path.join(self.temp_dir, "salt_file")
+            self.signature_path = os.path.join(self.temp_dir, "integrity_file")
+            self.settings_path = os.path.join(self.temp_dir, "settings.json")
+            LOG.info(f"Updated paths to point to temp directory. settings_path now: {self.settings_path}")
+            
             LOG.info("Files loaded to temp directory successfully.")
             return True
         except Exception:
@@ -457,6 +467,16 @@ class SecureFileManager:
                 LOG.info(f"Removing temp directory: {self.temp_dir}")
                 shutil.rmtree(self.temp_dir, ignore_errors=True)
             self.temp_dir = None
+            
+            # CRITICAL: Restore original paths pointing back to secure_dir
+            # This ensures subsequent operations use the persistent secure vault locations
+            self.metadata_db = os.path.join(self.secure_dir, "metadata.db")
+            self.sensitive_db = os.path.join(self.secure_dir, "sensitive.db")
+            self.salt_path = os.path.join(self.secure_dir, "salt_file")
+            self.signature_path = os.path.join(self.secure_dir, "integrity_file")
+            self.settings_path = os.path.join(self.secure_dir, "settings.json")
+            LOG.info(f"Restored paths to secure directory. settings_path now: {self.settings_path}")
+            
             LOG.info("Temporary files cleaned up successfully.")
             return True
         except Exception:

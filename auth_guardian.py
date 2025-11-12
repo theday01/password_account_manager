@@ -56,7 +56,15 @@ class AuthGuardian:
             settings_manager: An object (like SecureFileManager) that can read/write settings.
         """
         self._settings_manager = settings_manager
-        raw_settings = self._settings_manager.read_settings() or {}
+        
+        # Try to read settings, but only if encryption key is available
+        # If no encryption key, start with empty dict and load after authentication
+        if self._settings_manager and hasattr(self._settings_manager, 'encryption_key') and self._settings_manager.encryption_key:
+            raw_settings = self._settings_manager.read_settings() or {}
+            logger.info(f"AuthGuardian init: Settings loaded with encryption key. Keys: {list(raw_settings.keys())}")
+        else:
+            raw_settings = {}
+            logger.info("AuthGuardian init: No encryption key available, starting with empty settings. Will reload after authentication.")
         
         # Load settings (2FA secret is now allowed)
         self._settings = raw_settings.copy()
@@ -295,10 +303,11 @@ class AuthGuardian:
             logger.debug("PIL not available. Cannot generate icon data URI for 2FA provisioning.")
             return ""
         
-        # Try to find and load the security icon
+        # Try to find and load a lock or vault-themed icon
         icon_candidates = [
-            "icons/security.png",
+            "icons/load.png",  # Vault/lock icon
             "icons/2fa_icon.png",
+            "icons/security.png",
             "icons/main.png",
         ]
         
@@ -341,8 +350,8 @@ class AuthGuardian:
             img.save(buffer, format='PNG', optimize=True)
             png_data = buffer.getvalue()
             
-            # If icon is still too large (>2000 bytes), return empty
-            if len(png_data) > 2000:
+            # If icon is still too large (>1200 bytes), return empty to keep URI compact
+            if len(png_data) > 1200:
                 logger.debug(f"Icon data too large ({len(png_data)} bytes) - skipping to keep URI compact")
                 return ""
             
@@ -357,11 +366,11 @@ class AuthGuardian:
             logger.debug(f"Failed to generate icon data URI for 2FA provisioning: {e}")
             return ""
     
-    def get_tfa_provisioning_uri(self, account_name: str = None, issuer_name: str = "SecureVault", secret: str = None) -> str:
+    def get_tfa_provisioning_uri(self, account_name: str = None, issuer_name: str = "Vault", secret: str = None) -> str:
         """Get the provisioning URI for the TOTP secret (for QR code generation).
         
-        Tries to include a small optimized security icon for Google Authenticator.
-        If icon data makes URI too large (>2953 chars for QR v40), returns URI without icon.
+        The issuer_name is displayed in 2FA apps. Using generic names works best across all apps.
+        Note: Google Authenticator doesn't support custom icons - it uses predefined icons for known services.
         """
         if not PYOTP_AVAILABLE:
             raise ValueError("pyotp library is not available")
@@ -378,28 +387,7 @@ class AuthGuardian:
         # Generate the base provisioning URI
         uri = totp.provisioning_uri(name=effective_account_name, issuer_name=issuer_name)
         
-        # Maximum URI length for QR version 40 (highest capacity)
-        # QR v40 can hold ~7089 alphanumeric chars, we use 2953 as safe limit
-        MAX_URI_LENGTH = 2953
-        
-        # Try to add the optimized icon (very small 32x32 to minimize URI size)
-        # Only add if it keeps URI within safe limits for QR scanning
-        if len(uri) < MAX_URI_LENGTH - 1000:  # Leave 1000 chars buffer for icon
-            try:
-                icon_uri = self._get_icon_data_uri(max_size=32)  # Even smaller: 32x32
-                if icon_uri:
-                    test_uri = uri + f"&image={icon_uri}"
-                    # Only add icon if final URI stays within limits
-                    if len(test_uri) <= MAX_URI_LENGTH:
-                        uri = test_uri
-                        logger.debug(f"Icon added to URI (length: {len(uri)} chars)")
-                    else:
-                        logger.debug(f"Icon skipped - would exceed max URI length ({len(test_uri)} > {MAX_URI_LENGTH})")
-            except Exception as e:
-                logger.debug(f"Could not add icon to provisioning URI: {e}. Continuing without icon.")
-        else:
-            logger.debug(f"Base URI too long ({len(uri)} chars) - skipping icon to ensure QR scannability")
-        
+        logger.debug(f"Generated provisioning URI for {effective_account_name} - length: {len(uri)} chars")
         return uri
 
     def generate_tfa_qr_with_logo(self, account_name: str = None, issuer_name: str = "SecureVault",
@@ -436,6 +424,16 @@ class AuthGuardian:
         totp = pyotp.TOTP(totp_secret)
         uri = totp.provisioning_uri(name=effective_account_name, issuer_name=issuer_name)
 
+        # Maximum URI length for QR version 40 (highest capacity)
+        # QR v40 can hold ~7089 alphanumeric chars, we use 2953 as safe limit to ensure scannability
+        MAX_URI_LENGTH = 2953
+        
+        # If URI is too long, don't add to QR - just use the plain URI
+        if len(uri) > MAX_URI_LENGTH:
+            logger.warning(f"Provisioning URI too long ({len(uri)} chars) for QR code. Using shorter format without extras.")
+            # Recreate with minimal issuer name to reduce size
+            uri = totp.provisioning_uri(name=effective_account_name, issuer_name="SV")
+
         # Create QR code
         qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=4)
         qr.add_data(uri)
@@ -445,10 +443,11 @@ class AuthGuardian:
 
         # Determine logo path defaults
         if not logo_path:
-            # Prefer a security-themed icon if present
+            # Prefer a lock/vault-themed icon if present
             possible = [
-                'icons/security.png',
+                'icons/load.png',
                 'icons/2fa_icon.png',
+                'icons/security.png',
                 'icons/mainlogo.png'
             ]
             found = None
@@ -652,6 +651,8 @@ class AuthGuardian:
         """Reloads settings from the settings manager."""
         new_settings = self._settings_manager.read_settings() or {}
         logger.info(f"Reloading settings, read_settings returned: {list(new_settings.keys())}")
+        logger.info(f"tfa_secret present in reloaded settings: {'tfa_secret' in new_settings}")
+        logger.info(f"tfa_enabled_at present in reloaded settings: {'tfa_enabled_at' in new_settings}")
         
         # Clear settings and reload
         self._settings.clear()
@@ -673,3 +674,5 @@ class AuthGuardian:
         # This prevents unnecessary saves that might cause issues
         self._validate_state(save_state=False)
         logger.info(f"After reload, _settings has: {list(self._settings.keys())}")
+        logger.info(f"After reload, is_tfa_enabled(): {self.is_tfa_enabled()}")
+

@@ -1470,10 +1470,19 @@ class ModernPasswordManagerGUI:
             logger.info("load_settings() completed")
 
             # Check if 2FA is enabled and require verification
-            if hasattr(self, 'auth_guardian') and self.auth_guardian and self.auth_guardian.is_tfa_enabled():
-                if not self.verify_2fa_during_login():
-                    # 2FA verification failed or was cancelled
-                    return
+            logger.info(f"Checking 2FA status: hasattr(auth_guardian)={hasattr(self, 'auth_guardian')}, auth_guardian exists={self.auth_guardian is not None if hasattr(self, 'auth_guardian') else False}")
+            if hasattr(self, 'auth_guardian') and self.auth_guardian:
+                is_2fa_enabled = self.auth_guardian.is_tfa_enabled()
+                logger.info(f"2FA is_tfa_enabled() returned: {is_2fa_enabled}")
+                if is_2fa_enabled:
+                    logger.info("2FA is enabled, showing 2FA verification dialog...")
+                    if not self.verify_2fa_during_login():
+                        # 2FA verification failed or was cancelled
+                        logger.warning("2FA verification failed or was cancelled")
+                        return
+                    logger.info("2FA verification successful")
+                else:
+                    logger.info("2FA is not enabled, skipping 2FA verification")
             
             self.authenticated = True
             now = datetime.now().timestamp()
@@ -3079,6 +3088,9 @@ class ModernPasswordManagerGUI:
         settings_window.grab_set()
         settings_window.resizable(False, False)
         
+        # Store reference to settings window for closing on successful changes
+        self.settings_window = settings_window
+        
         main_frame = ctk.CTkFrame(settings_window)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
@@ -3267,6 +3279,29 @@ class ModernPasswordManagerGUI:
                     dialog.update()
                 except:
                     pass
+                
+                # CRITICAL: Update auth_guardian's encryption key with the new key
+                # This ensures 2FA and other settings remain encrypted correctly after password change
+                if hasattr(self, 'auth_guardian') and self.auth_guardian and self.database.encryption_key:
+                    logger.info("Updating auth_guardian encryption key after password change...")
+                    self.auth_guardian._settings_manager.encryption_key = self.database.encryption_key
+                    # Force a save of settings with the new encryption key to ensure they're properly persisted
+                    if self.auth_guardian._save_state():
+                        logger.info("Auth guardian settings saved with new encryption key")
+                        # Sync settings to secure storage immediately to ensure they persist
+                        if self.secure_file_manager:
+                            logger.info("Syncing updated settings to secure storage...")
+                            if self.secure_file_manager.sync_all_files():
+                                logger.info("Settings synced to secure storage successfully")
+                            else:
+                                logger.warning("Failed to sync settings to secure storage")
+                    else:
+                        logger.warning("Failed to save auth guardian settings with new encryption key")
+                
+                # Close settings window if open
+                if hasattr(self, 'settings_window') and self.settings_window and self.settings_window.winfo_exists():
+                    self.settings_window.destroy()
+                
                 restart_result = self.show_message("password_changed_success_title", "password_changed_success_message")
                 dialog.destroy()
                 self.restart_program()
@@ -3338,21 +3373,62 @@ class ModernPasswordManagerGUI:
             # Create setup dialog
             setup_dialog = ThemedToplevel(self.root)
             setup_dialog.title(self.lang_manager.get_string("2fa_setup_title"))
-            setup_dialog.geometry("500x750")
+            setup_dialog.geometry("600x900")
             setup_dialog.grab_set()
             setup_dialog.resizable(False, False)
             
-            main_frame = ctk.CTkFrame(setup_dialog)
+            # Main container with gradient background effect
+            main_container = ctk.CTkFrame(setup_dialog, fg_color="transparent")
+            main_container.pack(fill="both", expand=True)
+            
+            # Header frame with enhanced styling
+            header_frame = ctk.CTkFrame(main_container, fg_color=("#2E3440", "#1E1E1E"), height=80)
+            header_frame.pack(fill="x", padx=0, pady=0)
+            header_frame.pack_propagate(False)
+            
+            # Header content
+            header_content = ctk.CTkFrame(header_frame, fg_color="transparent")
+            header_content.pack(fill="both", expand=True, padx=20, pady=15)
+            
+            # Title with icon
+            title_frame = ctk.CTkFrame(header_content, fg_color="transparent")
+            title_frame.pack(anchor="w", fill="x")
+            
+            ctk.CTkLabel(title_frame, text="🔐", font=ctk.CTkFont(size=28)).pack(side="left", padx=(0, 10))
+            ctk.CTkLabel(title_frame, text=self.lang_manager.get_string("2fa_setup_title"),
+                        font=ctk.CTkFont(size=22, weight="bold")).pack(side="left", anchor="w")
+            
+            ctk.CTkLabel(header_content, text="Add an extra layer of security to your account",
+                        font=ctk.CTkFont(size=12), text_color="#B0B0B0").pack(anchor="w", pady=(5, 0))
+            
+            # Main content frame
+            main_frame = ctk.CTkFrame(main_container, fg_color="transparent")
             main_frame.pack(fill="both", expand=True, padx=20, pady=20)
             
-            ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("2fa_setup_title"),
-                        font=ctk.CTkFont(size=20, weight="bold")).pack(pady=10)
+            # Step indicator
+            step_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+            step_frame.pack(fill="x", pady=(0, 15))
             
-            # Instructions
-            instructions = ctk.CTkTextbox(main_frame, height=100, wrap="word")
-            instructions.pack(pady=10, padx=10, fill="x")
-            instructions.insert("1.0", self.lang_manager.get_string("2fa_setup_instructions"))
-            instructions.configure(state="disabled")
+            # Step 1
+            step1_frame = ctk.CTkFrame(step_frame, fg_color="transparent")
+            step1_frame.pack(anchor="w", pady=0)
+            ctk.CTkLabel(step1_frame, text="Step 1: Scan the QR Code", font=ctk.CTkFont(size=14, weight="bold"),
+                        text_color="#4CAF50").pack(anchor="w")
+            
+            # Instructions box
+            instructions_box = ctk.CTkFrame(main_frame, fg_color=("#F5F5F5", "#2E2E2E"), border_width=1, border_color="#444444")
+            instructions_box.pack(fill="x", pady=(0, 15), padx=10)
+            
+            instructions_content = ctk.CTkLabel(
+                instructions_box,
+                text="1. Install an authenticator app (Google Authenticator, Microsoft Authenticator, or Authy)\n"
+                     "2. Open the app and scan the QR code below\n"
+                     "3. Enter the 6-digit code shown in your app to verify",
+                font=ctk.CTkFont(size=12),
+                justify="left",
+                text_color="#333333" if self.root._get_appearance_mode() == "Light" else "#CCCCCC"
+            )
+            instructions_content.pack(anchor="w", padx=15, pady=12)
             
             # Generate QR code
             try:
@@ -3401,75 +3477,133 @@ class ModernPasswordManagerGUI:
                         logger.warning(f"Failed to overlay local icon: {e}")
                 
                 # Resize QR code for display
-                qr_img = qr_img.resize((250, 250), Image.Resampling.LANCZOS)
-                qr_photo = ImageTk.PhotoImage(qr_img)
+                qr_img = qr_img.resize((280, 280), Image.Resampling.LANCZOS)
+                qr_ctk_image = ctk.CTkImage(light_image=qr_img, size=(280, 280))
                 
-                qr_label = ctk.CTkLabel(main_frame, image=qr_photo, text="")
-                qr_label.image = qr_photo  # Keep a reference
-                qr_label.pack(pady=10)
+                # QR Code container with border
+                qr_container = ctk.CTkFrame(main_frame, fg_color="white", border_width=2, border_color="#CCCCCC", corner_radius=10)
+                qr_container.pack(pady=15, padx=10)
+                
+                qr_label = ctk.CTkLabel(qr_container, image=qr_ctk_image, text="", bg_color="white")
+                qr_label.image = qr_ctk_image  # Keep a reference
+                qr_label.pack(padx=10, pady=10)
             except Exception as e:
                 logger.error(f"Failed to generate QR code: {e}")
-                ctk.CTkLabel(main_frame, text=f"Error generating QR code: {e}",
-                           text_color="#FF4444").pack(pady=10)
+                error_frame = ctk.CTkFrame(main_frame, fg_color=("#FFE0E0", "#5E2E2E"), border_width=1, border_color="#FF4444")
+                error_frame.pack(pady=10, fill="x")
+                ctk.CTkLabel(error_frame, text=f"❌ Error generating QR code: {e}",
+                           text_color="#FF4444", wraplength=400).pack(padx=10, pady=10)
                 setup_dialog.destroy()
                 return
             
+            # Step 2: Verification
+            step2_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+            step2_frame.pack(anchor="w", pady=0)
+            ctk.CTkLabel(step2_frame, text="Step 2: Enter Verification Code", font=ctk.CTkFont(size=14, weight="bold"),
+                        text_color="#2196F3").pack(anchor="w")
+            
             # Verification code entry
-            code_frame = ctk.CTkFrame(main_frame)
-            code_frame.pack(pady=10, fill="x", padx=20)
+            code_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+            code_frame.pack(pady=15, fill="x", padx=10)
             
             ctk.CTkLabel(code_frame, text=self.lang_manager.get_string("2fa_verification_code_label"),
-                        font=ctk.CTkFont(size=14)).pack(pady=5)
+                        font=ctk.CTkFont(size=13, weight="bold")).pack(anchor="w", pady=(0, 0))
             
-            code_entry = ctk.CTkEntry(code_frame, placeholder_text=self.lang_manager.get_string("2fa_verification_code_placeholder"),
-                                     width=200, font=ctk.CTkFont(size=16))
-            code_entry.pack(pady=5)
+            # Code entry with better styling
+            code_entry_frame = ctk.CTkFrame(code_frame, fg_color="transparent")
+            code_entry_frame.pack(fill="x")
             
-            status_label = ctk.CTkLabel(code_frame, text="", font=ctk.CTkFont(size=12))
+            code_entry = ctk.CTkEntry(
+                code_entry_frame,
+                placeholder_text=self.lang_manager.get_string("2fa_verification_code_placeholder"),
+                width=200,
+                font=ctk.CTkFont(size=18, family="monospace"),
+                justify="center",
+                border_width=2,
+                border_color="#2196F3"
+            )
+            code_entry.pack(pady=5, padx=10)
+            code_entry.bind("<KeyRelease>", lambda e: code_entry.configure(
+                border_color="#FF6B6B" if code_entry.get() and not code_entry.get().isdigit() 
+                else "#4CAF50" if len(code_entry.get()) == 6 and code_entry.get().isdigit()
+                else "#2196F3"
+            ))
+            
+            # Status/help message
+            status_label = ctk.CTkLabel(code_frame, text="⏳ Waiting for code input...", 
+                                       font=ctk.CTkFont(size=11), text_color="#9E9E9E")
             status_label.pack(pady=5)
             
             def verify_and_enable():
                 code = code_entry.get().strip()
                 if not code or len(code) != 6 or not code.isdigit():
-                    status_label.configure(text="Please enter a valid 6-digit code", text_color="#FF4444")
+                    status_label.configure(text="❌ Please enter a valid 6-digit code", text_color="#FF4444")
                     code_entry.focus()
                     return
                 
                 try:
+                    status_label.configure(text="⏳ Verifying code...", text_color="#2196F3")
+                    status_label.update()
+                    verify_btn.configure(state="disabled")
+                    
                     # Verify the code using pyotp directly (secret is already in _settings for URI generation)
                     import pyotp
                     totp = pyotp.TOTP(secret)
                     is_valid = totp.verify(code, valid_window=1)
                     
                     if is_valid:
+                        status_label.configure(text="✅ Code verified successfully!", text_color="#4CAF50")
                         # Permanently enable 2FA
                         if self.auth_guardian.enable_tfa(secret):
                             # Generate backup codes
                             backup_codes = self.auth_guardian.generate_backup_codes()
-                            setup_dialog.destroy()
-                            self.show_backup_codes_dialog(backup_codes)
-                            # Refresh settings window if it exists
-                            try:
-                                self.show_settings()
-                            except:
-                                pass
+                            status_label.configure(text="✅ 2FA enabled! Loading backup codes...", text_color="#4CAF50")
+                            
+                            # Close settings window if open
+                            if hasattr(self, 'settings_window') and self.settings_window and self.settings_window.winfo_exists():
+                                self.settings_window.destroy()
+                            
+                            setup_dialog.after(800, lambda: (setup_dialog.destroy(), self.show_backup_codes_dialog(backup_codes)))
                         else:
-                            status_label.configure(text=self.lang_manager.get_string("2fa_setup_failed"), text_color="#FF4444")
+                            status_label.configure(text="❌ Failed to enable 2FA", text_color="#FF4444")
+                            verify_btn.configure(state="normal")
                     else:
-                        status_label.configure(text=self.lang_manager.get_string("2fa_invalid_code"), text_color="#FF4444")
+                        status_label.configure(text="❌ Invalid code. Please check and try again.", text_color="#FF4444")
                         code_entry.focus()
                         code_entry.select_range(0, tk.END)
+                        verify_btn.configure(state="normal")
                 except Exception as e:
                     logger.error(f"Error verifying 2FA code: {e}")
-                    status_label.configure(text=f"Error: {str(e)}", text_color="#FF4444")
+                    status_label.configure(text=f"❌ Error: {str(e)[:50]}", text_color="#FF4444")
+                    verify_btn.configure(state="normal")
             
-            verify_btn = ctk.CTkButton(code_frame, text=self.lang_manager.get_string("2fa_verify_button"),
-                                      command=verify_and_enable, height=40)
-            verify_btn.pack(pady=10)
+            # Button frame
+            button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+            button_frame.pack(pady=20, fill="x", padx=10)
             
-            cancel_btn = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("cancel_button"),
-                                      command=setup_dialog.destroy, height=35, fg_color="gray")
-            cancel_btn.pack(pady=5)
+            verify_btn = ctk.CTkButton(
+                button_frame,
+                text="✓ Verify & Enable 2FA",
+                command=verify_and_enable,
+                height=45,
+                font=ctk.CTkFont(size=14, weight="bold"),
+                fg_color="#4CAF50",
+                hover_color="#45A049",
+                corner_radius=8
+            )
+            verify_btn.pack(fill="x", pady=5)
+            
+            cancel_btn = ctk.CTkButton(
+                button_frame,
+                text="Cancel",
+                command=setup_dialog.destroy,
+                height=40,
+                font=ctk.CTkFont(size=13),
+                fg_color="#757575",
+                hover_color="#616161",
+                corner_radius=8
+            )
+            cancel_btn.pack(fill="x", pady=5)
             
             code_entry.focus()
             code_entry.bind("<Return>", lambda e: verify_and_enable())
@@ -3479,44 +3613,148 @@ class ModernPasswordManagerGUI:
             self.show_message("error", f"Error setting up 2FA: {str(e)}", msg_type="error")
     
     def show_backup_codes_dialog(self, backup_codes):
-        """Show backup codes to the user."""
+        """Show backup codes to the user with enhanced UI."""
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("2fa_backup_codes_title"))
-        dialog.geometry("500x600")
+        dialog.geometry("650x750")
         dialog.grab_set()
         dialog.resizable(False, False)
         
-        main_frame = ctk.CTkFrame(dialog)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        # Main container
+        main_container = ctk.CTkFrame(dialog, fg_color="transparent")
+        main_container.pack(fill="both", expand=True)
         
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("2fa_backup_codes_title"),
-                    font=ctk.CTkFont(size=20, weight="bold")).pack(pady=10)
+        # Header frame
+        header_frame = ctk.CTkFrame(main_container, fg_color=("#FF9800", "#B8860B"), height=80)
+        header_frame.pack(fill="x", padx=0, pady=0)
+        header_frame.pack_propagate(False)
         
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("2fa_backup_codes_description"),
-                    font=ctk.CTkFont(size=12), wraplength=450, justify="left").pack(pady=10)
+        header_content = ctk.CTkFrame(header_frame, fg_color="transparent")
+        header_content.pack(fill="both", expand=True, padx=20, pady=15)
         
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("2fa_backup_codes_warning"),
-                    font=ctk.CTkFont(size=12, weight="bold"), text_color="#FFAA00",
-                    wraplength=450, justify="left").pack(pady=5)
+        title_frame = ctk.CTkFrame(header_content, fg_color="transparent")
+        title_frame.pack(anchor="w", fill="x")
         
-        # Display backup codes
-        codes_frame = ctk.CTkFrame(main_frame)
-        codes_frame.pack(pady=10, fill="both", expand=True, padx=10)
+        ctk.CTkLabel(title_frame, text="🔑", font=ctk.CTkFont(size=28)).pack(side="left", padx=(0, 10))
+        ctk.CTkLabel(title_frame, text=self.lang_manager.get_string("2fa_backup_codes_title"),
+                    font=ctk.CTkFont(size=20, weight="bold"), text_color="white").pack(side="left", anchor="w")
         
-        codes_text = ctk.CTkTextbox(codes_frame, height=200, font=ctk.CTkFont(size=14, family="monospace"))
-        codes_text.pack(fill="both", expand=True, padx=10, pady=10)
+        ctk.CTkLabel(header_content, text="Save these codes in a secure location for account recovery",
+                    font=ctk.CTkFont(size=12), text_color="white").pack(anchor="w", pady=(5, 0))
         
-        codes_display = "\n".join([f"{i+1}. {code}" for i, code in enumerate(backup_codes)])
+        # Content frame
+        content_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Warning box
+        warning_frame = ctk.CTkFrame(content_frame, fg_color=("#FFF3E0", "#3E2723"), border_width=2, border_color="#FF9800", corner_radius=8)
+        warning_frame.pack(fill="x", pady=(0, 15))
+        
+        warning_content = ctk.CTkFrame(warning_frame, fg_color="transparent")
+        warning_content.pack(fill="both", expand=True, padx=15, pady=12)
+        
+        ctk.CTkLabel(warning_content, text="⚠️ IMPORTANT SECURITY WARNING",
+                    font=ctk.CTkFont(size=12, weight="bold"), text_color="#E65100").pack(anchor="w")
+        
+        ctk.CTkLabel(warning_content, 
+                    text="• These backup codes are your only way to access your account if you lose your authenticator\n"
+                         "• Save them in a SECURE, SEPARATE location from your backup files\n"
+                         "• Each code can only be used ONCE\n"
+                         "• Do NOT share these codes with anyone",
+                    font=ctk.CTkFont(size=11),
+                    justify="left",
+                    text_color="#BF360C").pack(anchor="w", pady=(8, 0))
+        
+        # Codes display section
+        codes_label_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        codes_label_frame.pack(anchor="w", pady=(10, 5), fill="x")
+        
+        ctk.CTkLabel(codes_label_frame, text="Your Backup Codes:", 
+                    font=ctk.CTkFont(size=13, weight="bold")).pack(anchor="w")
+        
+        # Codes text box with monospace font
+        codes_frame = ctk.CTkFrame(content_frame, fg_color=("#F5F5F5", "#2E2E2E"), border_width=2, border_color="#444444", corner_radius=8)
+        codes_frame.pack(fill="both", expand=True, pady=10)
+        
+        codes_text = ctk.CTkTextbox(codes_frame, height=200, font=ctk.CTkFont(size=12, family="monospace"),
+                                   fg_color=("#F5F5F5", "#2E2E2E"))
+        codes_text.pack(fill="both", expand=True, padx=15, pady=15)
+        
+        # Format codes with better styling
+        codes_display = "\n".join([f"{i+1:2d}.  {code}" for i, code in enumerate(backup_codes)])
         codes_text.insert("1.0", codes_display)
         codes_text.configure(state="disabled")
         
-        def on_close():
-            dialog.destroy()
-            self.show_message("success", "2fa_setup_success", msg_type="info")
+        # Copy button
+        def copy_codes():
+            import pyperclip
+            try:
+                pyperclip.copy(codes_display)
+                copy_btn.configure(text="✓ Copied to Clipboard!")
+                dialog.after(2000, lambda: copy_btn.configure(text="📋 Copy All Codes"))
+            except:
+                # Fallback to tkinter clipboard
+                dialog.clipboard_clear()
+                dialog.clipboard_append(codes_display)
+                copy_btn.configure(text="✓ Copied to Clipboard!")
+                dialog.after(2000, lambda: copy_btn.configure(text="📋 Copy All Codes"))
         
-        close_btn = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("2fa_backup_codes_saved"),
-                                  command=on_close, height=40)
-        close_btn.pack(pady=10)
+        copy_btn = ctk.CTkButton(content_frame, text="📋 Copy All Codes", command=copy_codes,
+                               height=40, font=ctk.CTkFont(size=12, weight="bold"),
+                               fg_color="#2196F3", hover_color="#1976D2", corner_radius=8)
+        copy_btn.pack(fill="x", pady=5)
+        
+        # Download and close buttons frame
+        button_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        button_frame.pack(fill="x", pady=10)
+        
+        def download_codes():
+            """Download backup codes to a text file."""
+            try:
+                # Use filedialog to let user choose save location
+                file_path = filedialog.asksaveasfilename(
+                    defaultextension=".txt",
+                    initialfile="securevault -backup keys.txt",
+                    filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
+                    parent=dialog
+                )
+                
+                if file_path:
+                    # Write codes to file
+                    with open(file_path, 'w') as f:
+                        f.write("SecureVault Pro - Backup Recovery Codes\n")
+                        f.write("=" * 50 + "\n\n")
+                        f.write("IMPORTANT SECURITY INFORMATION:\n")
+                        f.write("- Store these codes in a secure location\n")
+                        f.write("- Each code can only be used ONCE\n")
+                        f.write("- Do NOT share these codes with anyone\n")
+                        f.write("- These are your only recovery option if you lose your authenticator\n\n")
+                        f.write("Your Backup Codes:\n")
+                        f.write("-" * 50 + "\n\n")
+                        for i, code in enumerate(backup_codes, 1):
+                            f.write(f"{i:2d}.  {code}\n")
+                        f.write("\n" + "-" * 50 + "\n")
+                        f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                    
+                    download_btn.configure(text="✓ Downloaded Successfully!")
+                    dialog.after(2000, lambda: download_btn.configure(text="📥 Download Codes"))
+                    
+            except Exception as e:
+                logger.error(f"Error downloading backup codes: {e}")
+                messagebox.showerror("Download Error", f"Failed to download backup codes: {str(e)}", parent=dialog)
+        
+        download_btn = ctk.CTkButton(button_frame, text="📥 Download Codes", command=download_codes,
+                                    height=45, font=ctk.CTkFont(size=13, weight="bold"),
+                                    fg_color="#FF9800", hover_color="#F57C00", corner_radius=8)
+        download_btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        
+        # Close button
+        close_btn = ctk.CTkButton(button_frame, text="✓ Done",
+                                 command=dialog.destroy, height=45,
+                                 font=ctk.CTkFont(size=13, weight="bold"),
+                                 fg_color="#4CAF50", hover_color="#45A049",
+                                 corner_radius=8)
+        close_btn.pack(side="left", fill="x", expand=True, padx=(5, 0))
     
     def disable_2fa_dialog(self):
         """Dialog to disable Two-Factor Authentication."""
@@ -3536,8 +3774,11 @@ class ModernPasswordManagerGUI:
         if result:
             try:
                 if self.auth_guardian.disable_tfa():
+                    # Close settings window if open
+                    if hasattr(self, 'settings_window') and self.settings_window and self.settings_window.winfo_exists():
+                        self.settings_window.destroy()
+                    
                     self.show_message("success", "2fa_disabled_success", msg_type="info")
-                    self.show_settings()  # Refresh settings window
                 else:
                     self.show_message("error", "Failed to disable 2FA", msg_type="error")
             except Exception as e:

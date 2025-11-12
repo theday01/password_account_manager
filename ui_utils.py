@@ -26,6 +26,9 @@ def set_icon(window):
                 img = Image.open(icon_path_png)
                 photo = ImageTk.PhotoImage(img)
                 window.wm_iconphoto(True, photo)
+                # Store reference to prevent garbage collection
+                if not hasattr(window, '_icon_photo'):
+                    window._icon_photo = photo
             else:
                 print(f"Warning: Fallback PNG icon not found at {icon_path_png}")
         except Exception as pil_e:
