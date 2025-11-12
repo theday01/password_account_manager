@@ -1008,7 +1008,7 @@ class ModernPasswordManagerGUI:
         welcome_window = ThemedToplevel(self.root)
         welcome_window.title(self.lang_manager.get_string("welcome_title"))
         welcome_window.geometry("550x550")
-        welcome_window.resizable(False, False)
+        #welcome_window.resizable(False, False)
         welcome_window.grab_set()  # Make the window modal
 
         # Center the window
@@ -1081,7 +1081,7 @@ class ModernPasswordManagerGUI:
             height=50,
             font=ctk.CTkFont(size=13, weight="bold")
         )
-        close_button.pack(pady=20, padx=20)
+        close_button.pack(pady=10, padx=0)
 
         welcome_window.wait_window()
 
@@ -1330,7 +1330,7 @@ class ModernPasswordManagerGUI:
         self.root.geometry(f"{width}x{height}+{x}+{y}")
         try:
             logo_image = Image.open("icons/mainlogo.png")
-            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(330, 80))
+            logo_ctk_image = ctk.CTkImage(light_image=logo_image, size=(300, 80))
             logo_label = ctk.CTkLabel(login_card, image=logo_ctk_image, text="")
             logo_label.pack(pady=(30, 30), padx=40)
         except Exception as e:
