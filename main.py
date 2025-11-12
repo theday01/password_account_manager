@@ -3369,7 +3369,7 @@ class ModernPasswordManagerGUI:
                 provisioning_uri = self.auth_guardian.get_tfa_provisioning_uri(
                     account_name=email if email else "SecureVault Pro",
                     issuer_name="SecureVault PRO",
-                    icon_path=icon_path
+                    secret=secret
                 )
 
                 qr = qrcode.QRCode(

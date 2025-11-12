@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from cryptography.exceptions import InvalidTag
 import secrets
 import base64
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,25 @@ try:
 except ImportError:
     PYOTP_AVAILABLE = False
     logger.warning("pyotp not available. 2FA functionality will be disabled. Install with: pip install pyotp qrcode[pil]")
+
+# Try to import qrcode and PIL for QR code + image composition
+try:
+    import qrcode
+    from qrcode.image.pil import PilImage as QRPilImage
+    QRCODE_AVAILABLE = True
+except Exception:
+    qrcode = None
+    QRPilImage = None
+    QRCODE_AVAILABLE = False
+    logger.info("qrcode library not available. QR code image generation will be disabled. Install with: pip install qrcode[pil]")
+
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except Exception:
+    Image = None
+    PIL_AVAILABLE = False
+    logger.info("Pillow (PIL) not available. Image composition will be disabled. Install with: pip install pillow")
 
 class AuthGuardian:
     """
@@ -258,49 +278,253 @@ class AuthGuardian:
             raise ValueError("pyotp library is not available. Please install it: pip install pyotp")
         return pyotp.random_base32()
     
-    def get_tfa_provisioning_uri(self, account_name: str = None, issuer_name: str = "SecureVault") -> str:
-        """Get the provisioning URI for the TOTP secret (for QR code generation)."""
-        if not PYOTP_AVAILABLE:
-            raise ValueError("pyotp library is not available")
-        if not self.is_tfa_enabled():
-            raise ValueError("2FA is not enabled")
-        totp = pyotp.TOTP(self._settings['tfa_secret'])
+    def _get_icon_data_uri(self, max_size: int = 32) -> str:
+        """Convert the security icon to a base64 data URI for use in the provisioning URI.
         
-        # Use the provided account_name, but fall back to the default "SecureVault Pro" if it's None or empty.
-        effective_account_name = account_name if account_name else "SecureVault Pro"
+        This icon will appear inside 2FA apps like Google Authenticator if space permits.
+        The data URI format allows embedding the icon directly in the provisioning URI without
+        requiring external URL hosting.
         
-        # Try to load and encode the security-themed icon
-        import os
-        icon_path = os.path.join("icons", "security_shield.png")  # Changed to security-themed icon
+        Args:
+            max_size: Maximum pixel size for the icon (smaller = smaller URI). Default 32x32.
         
-        # Fallback to other security-themed icons if the primary one doesn't exist
-        fallback_icons = [
-            "icons/security_shield.png",
-            "icons/security_icon.png", 
-            "icons/safe_icon.png",
-            "icons/lock_icon.png",
-            "icons/shield_icon.png"
+        Returns:
+            str: The base64 data URI for the icon, or empty string if icon cannot be loaded.
+        """
+        if not PIL_AVAILABLE:
+            logger.debug("PIL not available. Cannot generate icon data URI for 2FA provisioning.")
+            return ""
+        
+        # Try to find and load the security icon
+        icon_candidates = [
+            "icons/security.png",
+            "icons/2fa_icon.png",
+            "icons/main.png",
         ]
         
-        image_param = None
-        
-        for icon_file in fallback_icons:
-            if os.path.exists(icon_file):
-                try:
-                    with open(icon_file, 'rb') as f:
-                        icon_data = f.read()
-                    # Convert to base64 data URI
-                    icon_base64 = base64.b64encode(icon_data).decode('utf-8')
-                    image_param = f"data:image/png;base64,{icon_base64}"
-                    logger.info(f"Successfully loaded security icon: {icon_file}")
+        icon_path = None
+        for candidate in icon_candidates:
+            try:
+                if Path(candidate).exists():
+                    icon_path = candidate
                     break
-                except Exception as e:
-                    logger.warning(f"Failed to load security icon {icon_file}: {e}")
+            except Exception:
+                continue
         
-        if not image_param:
-            logger.warning("No security-themed icon found for 2FA QR code")
+        if not icon_path:
+            logger.debug("No suitable icon found for 2FA provisioning URI")
+            return ""
         
-        return totp.provisioning_uri(name=effective_account_name, issuer_name=issuer_name, image=image_param)    
+        try:
+            # Open and process the icon image
+            img = Image.open(icon_path)
+            
+            # Convert to RGBA if necessary
+            if img.mode != 'RGBA':
+                img = img.convert('RGBA')
+            
+            # Resize to small size for minimal URI data
+            icon_size = (max_size, max_size)
+            img.thumbnail(icon_size, Image.LANCZOS)
+            
+            # Ensure it's exactly the right size (pad if needed)
+            if img.size != icon_size:
+                new_img = Image.new('RGBA', icon_size, (255, 255, 255, 0))
+                offset = ((icon_size[0] - img.size[0]) // 2, (icon_size[1] - img.size[1]) // 2)
+                new_img.paste(img, offset, img)
+                img = new_img
+            
+            # Convert to PNG bytes in memory with aggressive optimization
+            from io import BytesIO
+            buffer = BytesIO()
+            # Use optimize=True and reduce colors for even smaller files
+            img.save(buffer, format='PNG', optimize=True)
+            png_data = buffer.getvalue()
+            
+            # If icon is still too large (>2000 bytes), return empty
+            if len(png_data) > 2000:
+                logger.debug(f"Icon data too large ({len(png_data)} bytes) - skipping to keep URI compact")
+                return ""
+            
+            # Encode as base64 and create data URI
+            b64_data = base64.b64encode(png_data).decode('ascii')
+            data_uri = f"data:image/png;base64,{b64_data}"
+            
+            logger.debug(f"Generated optimized icon data URI ({len(data_uri)} chars)")
+            return data_uri
+            
+        except Exception as e:
+            logger.debug(f"Failed to generate icon data URI for 2FA provisioning: {e}")
+            return ""
+    
+    def get_tfa_provisioning_uri(self, account_name: str = None, issuer_name: str = "SecureVault", secret: str = None) -> str:
+        """Get the provisioning URI for the TOTP secret (for QR code generation).
+        
+        Tries to include a small optimized security icon for Google Authenticator.
+        If icon data makes URI too large (>2953 chars for QR v40), returns URI without icon.
+        """
+        if not PYOTP_AVAILABLE:
+            raise ValueError("pyotp library is not available")
+        # Allow using a provided secret for cases where 2FA is being set up but not yet enabled
+        totp_secret = secret if secret else self._settings.get('tfa_secret')
+        if not totp_secret:
+            raise ValueError("2FA is not enabled")
+
+        totp = pyotp.TOTP(totp_secret)
+
+        # Use the provided account_name, but fall back to the default "SecureVault Pro" if it's None or empty.
+        effective_account_name = account_name if account_name else "SecureVault Pro"
+
+        # Generate the base provisioning URI
+        uri = totp.provisioning_uri(name=effective_account_name, issuer_name=issuer_name)
+        
+        # Maximum URI length for QR version 40 (highest capacity)
+        # QR v40 can hold ~7089 alphanumeric chars, we use 2953 as safe limit
+        MAX_URI_LENGTH = 2953
+        
+        # Try to add the optimized icon (very small 32x32 to minimize URI size)
+        # Only add if it keeps URI within safe limits for QR scanning
+        if len(uri) < MAX_URI_LENGTH - 1000:  # Leave 1000 chars buffer for icon
+            try:
+                icon_uri = self._get_icon_data_uri(max_size=32)  # Even smaller: 32x32
+                if icon_uri:
+                    test_uri = uri + f"&image={icon_uri}"
+                    # Only add icon if final URI stays within limits
+                    if len(test_uri) <= MAX_URI_LENGTH:
+                        uri = test_uri
+                        logger.debug(f"Icon added to URI (length: {len(uri)} chars)")
+                    else:
+                        logger.debug(f"Icon skipped - would exceed max URI length ({len(test_uri)} > {MAX_URI_LENGTH})")
+            except Exception as e:
+                logger.debug(f"Could not add icon to provisioning URI: {e}. Continuing without icon.")
+        else:
+            logger.debug(f"Base URI too long ({len(uri)} chars) - skipping icon to ensure QR scannability")
+        
+        return uri
+
+    def generate_tfa_qr_with_logo(self, account_name: str = None, issuer_name: str = "SecureVault",
+                                  logo_path: str = None, qr_size: int = 400, logo_scale: float = 0.34,
+                                  secret: str = None):
+        """Generate a QR code PIL Image for the current TOTP secret and overlay a security logo.
+
+        Args:
+            account_name: Optional account name to include in the provisioning URI.
+            issuer_name: Issuer name for the provisioning URI.
+            logo_path: Path to a logo image. If None, tries sensible defaults in the `icons/` folder.
+            qr_size: Size in pixels for the generated QR (square).
+            logo_scale: Fractional size of logo relative to QR (0.0 - 0.5 typical).
+
+        Returns:
+            PIL.Image: The composed image object ready for display or saving.
+
+        Raises:
+            ValueError: If required libraries or TOTP secret are missing.
+        """
+        if not PYOTP_AVAILABLE:
+            raise ValueError("pyotp is required to generate TOTP provisioning URIs")
+        if not QRCODE_AVAILABLE or not PIL_AVAILABLE:
+            raise ValueError("qrcode and pillow are required to generate QR images with logos")
+        # Allow generation using a provided secret (useful during setup) or the saved secret
+        totp_secret = secret if secret else self._settings.get('tfa_secret')
+        if not totp_secret:
+            raise ValueError("2FA secret is not available. Provide `secret` parameter or enable 2FA first.")
+
+        # Determine effective account name
+        effective_account_name = account_name if account_name else "SecureVault Pro"
+
+        # Generate provisioning URI
+        totp = pyotp.TOTP(totp_secret)
+        uri = totp.provisioning_uri(name=effective_account_name, issuer_name=issuer_name)
+
+        # Create QR code
+        qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=4)
+        qr.add_data(uri)
+        qr.make(fit=True)
+        qr_img = qr.make_image(image_factory=QRPilImage).convert('RGBA')
+        
+
+        # Determine logo path defaults
+        if not logo_path:
+            # Prefer a security-themed icon if present
+            possible = [
+                'icons/security.png',
+                'icons/2fa_icon.png',
+                'icons/mainlogo.png'
+            ]
+            found = None
+            for p in possible:
+                try:
+                    with open(p, 'rb'):
+                        found = p
+                        break
+                except Exception:
+                    continue
+            logo_path = found
+
+        # If no logo found, just return the QR image
+        if not logo_path:
+            return qr_img
+
+        # Load logo image and coerce to a square with preserved aspect by adding transparent padding
+        try:
+            logo_img = Image.open(logo_path).convert('RGBA')
+        except Exception as e:
+            logger.warning(f"Failed to open logo at {logo_path}: {e}")
+            return qr_img
+
+        # Make the logo square (centered) to improve recognizability in small icon thumbnails
+        lw, lh = logo_img.size
+        if lw != lh:
+            side = max(lw, lh)
+            square = Image.new('RGBA', (side, side), (255, 255, 255, 0))
+            paste_pos = ((side - lw) // 2, (side - lh) // 2)
+            square.paste(logo_img, paste_pos, logo_img)
+            logo_img = square
+
+        # Calculate logo size and paste centered
+        logo_max_size = int(qr_size * float(logo_scale))
+        # Preserve aspect ratio
+        logo_w, logo_h = logo_img.size
+        scale = min(logo_max_size / logo_w, logo_max_size / logo_h, 1.0)
+        new_logo_size = (max(1, int(logo_w * scale)), max(1, int(logo_h * scale)))
+        logo_img = logo_img.resize(new_logo_size, resample=Image.LANCZOS)
+
+        # Create a solid white square background for the logo to maximize contrast in small thumbnails
+        padding = max(6, int(logo_max_size * 0.10))
+        bg_size = (logo_img.size[0] + padding * 2, logo_img.size[1] + padding * 2)
+
+        # White opaque background (helps small icons remain identifiable)
+        bg = Image.new('RGBA', bg_size, (255, 255, 255, 255))
+        # Create an alpha mask for the background if we want rounded corners; use full opaque by default
+        mask = None
+        try:
+            from PIL import ImageDraw
+            mask = Image.new('L', bg_size, 0)
+            draw_mask = ImageDraw.Draw(mask)
+            corner_radius = int(min(bg_size) * 0.12)
+            draw_mask.rounded_rectangle([(0, 0), (bg_size[0]-1, bg_size[1]-1)], radius=corner_radius, fill=255)
+        except Exception:
+            mask = None
+
+        # Compose images: QR base -> bg -> logo (centered)
+        composed = Image.new('RGBA', (qr_size, qr_size), (255, 255, 255, 0))
+        composed.paste(qr_img, (0, 0))
+
+        # Position background centered
+        bg_pos = ((qr_size - bg_size[0]) // 2, (qr_size - bg_size[1]) // 2)
+        if mask:
+            composed.paste(bg, bg_pos, mask)
+        else:
+            composed.paste(bg, bg_pos)
+
+        # Position logo centered on top of background
+        logo_pos = ((qr_size - logo_img.size[0]) // 2, (qr_size - logo_img.size[1]) // 2)
+        try:
+            composed.paste(logo_img, logo_pos, logo_img)
+        except Exception:
+            composed.paste(logo_img, logo_pos)
+
+        return composed
         
     def enable_tfa(self, secret: str) -> bool:
         """Enable 2FA with the given secret."""
