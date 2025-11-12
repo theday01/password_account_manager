@@ -4362,16 +4362,17 @@ class ModernPasswordManagerGUI:
             else:
                 password_entry.configure(show="*")
                 eye_btn.configure(text="👁️")
-        eye_btn = ctk.CTkButton(password_frame, text="👁️", width=40, height=40, 
-                                command=toggle_password)
+        eye_btn = ctk.CTkButton(password_frame, text="👁️", width=45, height=45, 
+                                command=toggle_password, font=ctk.CTkFont(size=20))
         eye_btn.pack(side="left", padx=(0, 10))
         
         def generate_password():
             new_password = self.password_generator.generate_password(length=16)
             password_entry.delete(0, tk.END)
             password_entry.insert(0, new_password)
-        gen_btn = ctk.CTkButton(password_frame, text="🎲", width=40, height=40, 
-                                command=generate_password)
+        gen_btn = ctk.CTkButton(password_frame, text="🎲", width=45, height=45, 
+                                command=generate_password, font=ctk.CTkFont(size=20),
+                                fg_color="#3B82F6", hover_color="#2563EB")
         gen_btn.pack(side="left")
         return password_entry
 
@@ -4484,43 +4485,104 @@ class ModernPasswordManagerGUI:
         for widget in self.main_panel.winfo_children():
             widget.destroy()
         
-        header = ctk.CTkFrame(self.main_panel)
-        header.pack(fill="x", padx=15, pady=15)
+        # Main container with better spacing
+        main_container = ctk.CTkScrollableFrame(self.main_panel)
+        main_container.pack(fill="both", expand=True, padx=0, pady=0)
         
-        ctk.CTkLabel(header, text=self.lang_manager.get_string("password_generator_title"), 
-                     font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
+        # Header section with title and description
+        header = ctk.CTkFrame(main_container, fg_color="transparent")
+        header.pack(fill="x", padx=25, pady=(20, 10))
         
-        content = ctk.CTkFrame(self.main_panel)
-        content.pack(fill="both", expand=True, padx=15, pady=15)
-        settings_frame = ctk.CTkFrame(content)
-        settings_frame.pack(side="left", fill="both", expand=True, padx=(20, 10), pady=20)
+        title_frame = ctk.CTkFrame(header, fg_color="transparent")
+        title_frame.pack(fill="x", anchor="w")
         
-        ctk.CTkLabel(settings_frame, text=self.lang_manager.get_string("generator_settings"), 
-                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
+        ctk.CTkLabel(title_frame, text=self.lang_manager.get_string("password_generator_title"), 
+                     font=ctk.CTkFont(size=28, weight="bold")).pack(side="left", anchor="w")
         
+        desc_label = ctk.CTkLabel(title_frame, 
+                                 text="✨ Create secure, custom passwords with real-time strength analysis", 
+                                 font=ctk.CTkFont(size=12),
+                                 text_color="#888888")
+        desc_label.pack(side="left", padx=(15, 0), anchor="w")
+        
+        # Quick Presets Section
+        presets_frame = ctk.CTkFrame(main_container, fg_color=("gray90", "gray15"), corner_radius=12)
+        presets_frame.pack(fill="x", padx=25, pady=15)
+        
+        presets_header = ctk.CTkLabel(presets_frame, text="🎯 Quick Presets", 
+                                     font=ctk.CTkFont(size=14, weight="bold"))
+        presets_header.pack(anchor="w", padx=15, pady=(12, 8))
+        
+        presets_btn_frame = ctk.CTkFrame(presets_frame, fg_color="transparent")
+        presets_btn_frame.pack(fill="x", padx=15, pady=(0, 12))
+        
+        preset_configs = [
+            ("🌐 Web", {"length": 16, "uppercase": True, "lowercase": True, "digits": True, "symbols": True, "ambiguous": False}),
+            ("💼 Business", {"length": 20, "uppercase": True, "lowercase": True, "digits": True, "symbols": False, "ambiguous": True}),
+            ("🔒 Banking", {"length": 24, "uppercase": True, "lowercase": True, "digits": True, "symbols": True, "ambiguous": False}),
+            ("🎮 Social", {"length": 14, "uppercase": True, "lowercase": True, "digits": True, "symbols": False, "ambiguous": False}),
+        ]
+        
+        for preset_name, preset_config in preset_configs:
+            ctk.CTkButton(presets_btn_frame, text=preset_name, width=100, height=32,
+                         command=lambda cfg=preset_config: self._apply_preset(cfg),
+                         font=ctk.CTkFont(size=11)).pack(side="left", padx=5)
+        
+        # Main content with two columns
+        content = ctk.CTkFrame(main_container, fg_color="transparent")
+        content.pack(fill="both", expand=True, padx=25, pady=15)
+        
+        # Left column - Settings
+        settings_frame = ctk.CTkFrame(content, fg_color=("gray90", "gray15"), corner_radius=12)
+        settings_frame.pack(side="left", fill="both", expand=True, padx=(0, 12), pady=0)
+        
+        settings_title = ctk.CTkLabel(settings_frame, text="⚙️ " + self.lang_manager.get_string("generator_settings"), 
+                     font=ctk.CTkFont(size=16, weight="bold"))
+        settings_title.pack(anchor="w", padx=20, pady=(15, 10))
+        
+        # Password Length with visual indicator
         length_frame = ctk.CTkFrame(settings_frame, fg_color="transparent")
-        length_frame.pack(fill="x", padx=20, pady=10)
+        length_frame.pack(fill="x", padx=20, pady=(10, 5))
         
-        ctk.CTkLabel(length_frame, text=self.lang_manager.get_string("password_length"), 
-                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w")
+        length_label_frame = ctk.CTkFrame(length_frame, fg_color="transparent")
+        length_label_frame.pack(fill="x", pady=(0, 5))
+        
+        ctk.CTkLabel(length_label_frame, text=self.lang_manager.get_string("password_length"), 
+                     font=ctk.CTkFont(size=13, weight="bold")).pack(side="left", anchor="w")
         
         self.length_var = tk.IntVar(value=16)
-        self.length_slider = ctk.CTkSlider(length_frame, from_=8, to=64, 
-                                           variable=self.length_var, width=300)
-        self.length_slider.pack(fill="x", pady=5)
-        self.length_label = ctk.CTkLabel(length_frame, text=self.lang_manager.get_string("password_length_template", value=16))
-        self.length_label.pack(anchor="w")
+        self.length_label = ctk.CTkLabel(length_label_frame, 
+                                        text="16 characters", 
+                                        font=ctk.CTkFont(size=12, weight="bold"),
+                                        text_color="#3B82F6")
+        self.length_label.pack(side="right", anchor="e")
+        
+        self.length_slider = ctk.CTkSlider(length_frame, from_=8, to=100, 
+                                           variable=self.length_var, width=250,
+                                           button_length=20)
+        self.length_slider.pack(fill="x", pady=8)
+        
+        # Length indicator
+        length_info = ctk.CTkLabel(length_frame, text="8 ─────────────────────────────────── 100", 
+                                  font=ctk.CTkFont(size=10),
+                                  text_color="#666666")
+        length_info.pack(fill="x", pady=(5, 10))
         
         def update_length_label(value):
-            self.length_label.configure(text=self.lang_manager.get_string("password_length_template", value=int(float(value))))
+            length_val = int(float(value))
+            self.length_label.configure(text=f"{length_val} characters")
+            self.generate_password_gui()  # Auto-generate on slider change
         
         self.length_slider.configure(command=update_length_label)
         
-        options_frame = ctk.CTkFrame(settings_frame)
-        options_frame.pack(fill="x", padx=20, pady=15)
+        # Character types with better layout
+        char_frame = ctk.CTkFrame(settings_frame, fg_color="transparent")
+        char_frame.pack(fill="x", padx=20, pady=15)
         
-        ctk.CTkLabel(options_frame, text=self.lang_manager.get_string("character_types"), 
-                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=15, pady=(15, 10))
+        char_title = ctk.CTkLabel(char_frame, text=self.lang_manager.get_string("character_types"), 
+                     font=ctk.CTkFont(size=13, weight="bold"))
+        char_title.pack(anchor="w", pady=(0, 10))
+        
         self.use_uppercase = tk.BooleanVar(value=True)
         self.use_lowercase = tk.BooleanVar(value=True)
         self.use_digits = tk.BooleanVar(value=True)
@@ -4528,50 +4590,135 @@ class ModernPasswordManagerGUI:
         self.exclude_ambiguous = tk.BooleanVar(value=False)
         
         checkbox_options = [
-            (self.lang_manager.get_string("include_uppercase"), self.use_uppercase),
-            (self.lang_manager.get_string("include_lowercase"), self.use_lowercase),
-            (self.lang_manager.get_string("include_digits"), self.use_digits),
-            (self.lang_manager.get_string("include_symbols"), self.use_symbols),
-            (self.lang_manager.get_string("exclude_ambiguous"), self.exclude_ambiguous)
+            ("Include Uppercase (A-Z)", self.use_uppercase),
+            ("Include Lowercase (a-z)", self.use_lowercase),
+            ("Include Digits (0-9)", self.use_digits),
+            ("Include Symbols (!@#$...)", self.use_symbols),
+            ("Exclude Ambiguous (0,O,1,l,I)", self.exclude_ambiguous)
         ]
+        
         for text, var in checkbox_options:
-            ctk.CTkCheckBox(options_frame, text=text, variable=var).pack(anchor="w", padx=15, pady=5)
+            check_frame = ctk.CTkFrame(char_frame, fg_color="transparent")
+            check_frame.pack(fill="x", pady=4)
+            check_box = ctk.CTkCheckBox(check_frame, text=text, variable=var,
+                                       command=self.generate_password_gui,
+                                       font=ctk.CTkFont(size=12))
+            check_box.pack(anchor="w")
         
-        ctk.CTkButton(settings_frame, text=self.lang_manager.get_string("generate_password_action"), 
+        # Generate button - More prominent
+        gen_btn_frame = ctk.CTkFrame(settings_frame, fg_color="transparent")
+        gen_btn_frame.pack(fill="x", padx=20, pady=20)
+        
+        ctk.CTkButton(gen_btn_frame, text="🎲 Generate Password", 
                       command=self.generate_password_gui, height=50,
-                      font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+                      font=ctk.CTkFont(size=14, weight="bold"),
+                      fg_color="#3B82F6",
+                      hover_color="#2563EB").pack(fill="x")
         
-        result_frame = ctk.CTkFrame(content)
-        result_frame.pack(side="right", fill="both", expand=True, padx=(10, 20), pady=20)
+        # Right column - Results
+        result_frame = ctk.CTkFrame(content, fg_color=("gray90", "gray15"), corner_radius=12)
+        result_frame.pack(side="right", fill="both", expand=True, padx=(12, 0), pady=0)
         
-        ctk.CTkLabel(result_frame, text=self.lang_manager.get_string("generated_password"), 
-                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
+        result_title = ctk.CTkLabel(result_frame, text="🔐 " + self.lang_manager.get_string("generated_password"), 
+                     font=ctk.CTkFont(size=16, weight="bold"))
+        result_title.pack(anchor="w", padx=20, pady=(15, 10))
         
+        # Password display with enhanced styling
         password_display_frame = ctk.CTkFrame(result_frame, fg_color="transparent")
         password_display_frame.pack(fill="x", padx=20, pady=10)
-        self.generated_password_entry = ctk.CTkEntry(password_display_frame, width=350, height=50,
-                                                     font=ctk.CTkFont(size=16, family="monospace"))
-        self.generated_password_entry.pack(fill="x", pady=(0, 10))
+        
+        self.generated_password_entry = ctk.CTkEntry(password_display_frame, width=300, height=55,
+                                                     font=ctk.CTkFont(size=16, family="monospace"),
+                                                     border_width=2,
+                                                     border_color="#3B82F6")
+        self.generated_password_entry.pack(fill="x", pady=(0, 12))
+        
+        # Action buttons
         button_frame = ctk.CTkFrame(password_display_frame, fg_color="transparent")
         button_frame.pack(fill="x")
         
-        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("copy_action"), width=120, height=40,
-                      command=self.copy_generated_password).pack(side="left", padx=(0, 10))
+        ctk.CTkButton(button_frame, text="📋 Copy", 
+                      height=40,
+                      command=self.copy_generated_password,
+                      font=ctk.CTkFont(size=12),
+                      fg_color="#10B981",
+                      hover_color="#059669").pack(side="left", padx=(0, 8), fill="x", expand=True)
         
-        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("regenerate_action"), width=120, height=40,
-                      command=self.generate_password_gui).pack(side="right")
+        ctk.CTkButton(button_frame, text="🔄 Regenerate", 
+                      height=40,
+                      command=self.generate_password_gui,
+                      font=ctk.CTkFont(size=12),
+                      fg_color="#F59E0B",
+                      hover_color="#D97706").pack(side="left", padx=4, fill="x", expand=True)
         
-        self.strength_frame = ctk.CTkFrame(result_frame)
-        self.strength_frame.pack(fill="x", padx=20, pady=15)
-        self.strength_title = ctk.CTkLabel(self.strength_frame, text=self.lang_manager.get_string("strength_analysis_title"), 
-                                           font=ctk.CTkFont(size=16, weight="bold"))
-        self.strength_title.pack(pady=10)
-        self.strength_details = ctk.CTkLabel(self.strength_frame, text=self.lang_manager.get_string("generate_to_see_analysis"))
-        self.strength_details.pack(pady=10)
+        ctk.CTkButton(button_frame, text="👁️ Show", 
+                      height=40,
+                      command=self._toggle_password_visibility,
+                      font=ctk.CTkFont(size=12)).pack(side="right", padx=(8, 0), fill="x", expand=True)
+        
+        # Strength Analysis with visual meter
+        self.strength_frame = ctk.CTkFrame(result_frame, fg_color="transparent")
+        self.strength_frame.pack(fill="x", padx=20, pady=20)
+        
+        strength_title = ctk.CTkLabel(self.strength_frame, 
+                                     text=self.lang_manager.get_string("strength_analysis_title"), 
+                                     font=ctk.CTkFont(size=14, weight="bold"))
+        strength_title.pack(anchor="w", pady=(0, 10))
+        
+        # Strength meter background
+        self.strength_meter_bg = ctk.CTkFrame(self.strength_frame, fg_color=("gray70", "gray40"), 
+                                             height=8, corner_radius=4)
+        self.strength_meter_bg.pack(fill="x", pady=(0, 8))
+        self.strength_meter_bg.pack_propagate(False)
+        
+        # Strength meter fill (will be updated dynamically)
+        self.strength_meter = ctk.CTkFrame(self.strength_meter_bg, fg_color="#D1D5DB", 
+                                          height=8, corner_radius=4)
+        self.strength_meter.pack(side="left", fill="y", expand=False)
+        
+        # Strength details
+        self.strength_details = ctk.CTkLabel(self.strength_frame, 
+                                            text=self.lang_manager.get_string("generate_to_see_analysis"),
+                                            font=ctk.CTkFont(size=12),
+                                            justify="left")
+        self.strength_details.pack(anchor="w", pady=5)
+        
+        # Password statistics
+        self.stats_frame = ctk.CTkFrame(result_frame, fg_color="transparent")
+        self.stats_frame.pack(fill="x", padx=20, pady=10)
+        
+        self.stats_label = ctk.CTkLabel(self.stats_frame, text="", font=ctk.CTkFont(size=11),
+                                       text_color="#888888")
+        self.stats_label.pack(anchor="w")
+        
+        # Generate initial password
         self.generate_password_gui()
+    
+    def _apply_preset(self, preset_config):
+        """Apply preset configuration to the generator settings"""
+        self.length_var.set(preset_config["length"])
+        self.use_uppercase.set(preset_config["uppercase"])
+        self.use_lowercase.set(preset_config["lowercase"])
+        self.use_digits.set(preset_config["digits"])
+        self.use_symbols.set(preset_config["symbols"])
+        self.exclude_ambiguous.set(preset_config["ambiguous"])
+        self.generate_password_gui()
+    
+    def _toggle_password_visibility(self):
+        """Toggle password visibility in the generator"""
+        if self.generated_password_entry.cget("show") == "*":
+            self.generated_password_entry.configure(show="")
+        else:
+            self.generated_password_entry.configure(show="*")
 
     def generate_password_gui(self):
         try:
+            # Validate that at least one character type is selected
+            if not any([self.use_uppercase.get(), self.use_lowercase.get(), 
+                       self.use_digits.get(), self.use_symbols.get()]):
+                self.show_message("error", "Please select at least one character type", msg_type="error")
+                return
+            
             password = self.password_generator.generate_password(
                 length=self.length_var.get(),
                 use_uppercase=self.use_uppercase.get(),
@@ -4580,18 +4727,83 @@ class ModernPasswordManagerGUI:
                 use_symbols=self.use_symbols.get(),
                 exclude_ambiguous=self.exclude_ambiguous.get()
             )
+            
+            # Clear and insert with visual feedback
             self.generated_password_entry.delete(0, tk.END)
             self.generated_password_entry.insert(0, password)
+            
+            # Update border color to indicate successful generation
+            self.generated_password_entry.configure(border_color="#10B981")
+            # Check if widget still exists before scheduling the update
+            try:
+                self.root.after(1500, lambda: self._reset_entry_border())
+            except Exception as e:
+                logger.debug(f"Could not schedule border reset: {e}")
+            
             self.update_strength_analysis(password)
         except Exception as e:
             self.show_message("Error", f"Failed to generate password: {str(e)}", msg_type="error")
 
+
+    def _reset_entry_border(self):
+        """Safely reset the entry border color after password generation."""
+        try:
+            # Check if widget still exists and is valid
+            if hasattr(self, 'generated_password_entry') and self.generated_password_entry.winfo_exists():
+                self.generated_password_entry.configure(border_color="#3B82F6")
+        except Exception as e:
+            logger.debug(f"Could not reset entry border: {e}")
+
     def update_strength_analysis(self, password):
         score, strength, recommendations = self.password_generator.assess_strength(password)
         strength_color = self.get_strength_color(strength)
+        
+        # Update strength meter
+        meter_width = int((score / 100) * 300)  # Max width 300px
+        if score < 40:
+            meter_color = "#EF4444"  # Red
+        elif score < 60:
+            meter_color = "#F59E0B"  # Orange
+        elif score < 80:
+            meter_color = "#FBBF24"  # Yellow
+        else:
+            meter_color = "#10B981"  # Green
+        
+        self.strength_meter.configure(fg_color=meter_color)
+        self.strength_meter.configure(width=meter_width)
+        
+        # Build strength details text
+        strength_emoji = "🔴" if score < 40 else "🟠" if score < 60 else "🟡" if score < 80 else "🟢"
+        strength_text = f"{strength_emoji} {strength} ({score}%)"
+        
+        stats_text = f"Length: {len(password)} | Unique: {len(set(password))} | Entropy: {score}%"
+        
+        # Build recommendations if weak
+        detail_text = strength_text + "\n" + stats_text
+        if recommendations:
+            detail_text += "\n\n💡 Suggestions:\n"
+            for rec in recommendations[:3]:  # Show top 3 recommendations
+                detail_text += f"• {rec}\n"
+        
         self.strength_details.configure(
-            text=self.lang_manager.get_string("strength_analysis_template", strength=strength, score=score, length=len(password), unique_chars=len(set(password))),
-            text_color=strength_color
+            text=detail_text,
+            text_color=strength_color,
+            justify="left"
+        )
+        
+        # Update stats label
+        char_types = []
+        if any(c.isupper() for c in password):
+            char_types.append("Uppercase")
+        if any(c.islower() for c in password):
+            char_types.append("Lowercase")
+        if any(c.isdigit() for c in password):
+            char_types.append("Digits")
+        if any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password):
+            char_types.append("Symbols")
+        
+        self.stats_label.configure(
+            text=f"📊 Character Types: {', '.join(char_types) if char_types else 'None'}"
         )
 
     def copy_generated_password(self):
@@ -4599,7 +4811,12 @@ class ModernPasswordManagerGUI:
         if password:
             self.root.clipboard_clear()
             self.root.clipboard_append(password)
-            self.show_message("copied_title", "copied_message")
+            
+            # Create temporary success feedback
+            self.show_message("copied_title", "✅ Password copied to clipboard!", msg_type="info")
+            
+            # Auto-clear clipboard after 30 seconds for security
+            self.root.after(30000, lambda: self.root.clipboard_clear())
         else:
             self.show_message("error", "no_password_to_copy", msg_type="error")
 
