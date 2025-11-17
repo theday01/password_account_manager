@@ -4521,6 +4521,11 @@ class ModernPasswordManagerGUI:
             ("💼 Business", {"length": 20, "uppercase": True, "lowercase": True, "digits": True, "symbols": False, "ambiguous": True}),
             ("🔒 Banking", {"length": 24, "uppercase": True, "lowercase": True, "digits": True, "symbols": True, "ambiguous": False}),
             ("🎮 Social", {"length": 14, "uppercase": True, "lowercase": True, "digits": True, "symbols": False, "ambiguous": False}),
+            ("🗄️ Database", {"length": 52, "uppercase": True, "lowercase": True, "digits": True, "symbols": True, "ambiguous": False}),
+            ("🖥️ Server", {"length": 56, "uppercase": True, "lowercase": True, "digits": True, "symbols": True, "ambiguous": False}),
+            ("🔐 Encryption Key", {"length": 64, "uppercase": True, "lowercase": True, "digits": True, "symbols": True, "ambiguous": False}),
+            ("🏛️ Admin Account", {"length": 48, "uppercase": True, "lowercase": True, "digits": True, "symbols": True, "ambiguous": False}),
+            ("☁️ Cloud Storage", {"length": 50, "uppercase": True, "lowercase": True, "digits": True, "symbols": True, "ambiguous": False}),
         ]
         
         for preset_name, preset_config in preset_configs:
