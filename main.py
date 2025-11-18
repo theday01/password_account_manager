@@ -1731,6 +1731,7 @@ class ModernPasswordManagerGUI:
         
         self.setup_master_password.bind("<KeyRelease>", self.validate_master_password_realtime)
 
+
         # Step 2: Security Questions
         step2_frame = ctk.CTkFrame(self.setup_window)
         # Don't pack it yet, it will be shown later
@@ -1747,6 +1748,16 @@ class ModernPasswordManagerGUI:
             text=self.lang_manager.get_string("security_questions_instruction"),
             font=ctk.CTkFont(size=14)
         ).pack(pady=10)
+
+        # Add duplicate warning label
+        self.duplicate_warning_label = ctk.CTkLabel(
+            step2_frame,
+            text="",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#FF4444",
+            wraplength=500
+        )
+        self.duplicate_warning_label.pack(pady=(0, 10))
 
         self.security_questions = []
         self.security_questions_vars = []
@@ -1767,7 +1778,8 @@ class ModernPasswordManagerGUI:
             question_frame = ctk.CTkFrame(step2_frame, fg_color="transparent")
             question_frame.pack(fill="x", padx=20, pady=5)
 
-            chk = ctk.CTkCheckBox(question_frame, text=question_text, variable=var)
+            chk = ctk.CTkCheckBox(question_frame, text=question_text, variable=var,
+                                command=lambda idx=i: self.on_question_toggle(idx))
             chk.pack(side="left")
 
             entry = ctk.CTkEntry(
@@ -1777,9 +1789,13 @@ class ModernPasswordManagerGUI:
                 height=30
             )
             entry.pack(side="right")
+            
+            # Bind key release event for real-time duplicate detection
+            entry.bind("<KeyRelease>", lambda e, idx=i: self.check_duplicate_answers())
+            
             self.security_questions_entries.append(entry)
             self.security_questions.append({"question": question_text, "var": var, "entry": entry})
-
+            
         # Navigation buttons
         self.navigation_frame = ctk.CTkFrame(self.setup_window)
         self.navigation_frame.pack(fill="x", padx=20, pady=20)
@@ -1809,6 +1825,51 @@ class ModernPasswordManagerGUI:
         # Don't pack finish_btn yet
 
         self.show_step()
+        
+    def on_question_toggle(self, index):
+        """Handle when a question checkbox is toggled"""
+        # Clear the entry if checkbox is unchecked
+        if not self.security_questions_vars[index].get():
+            self.security_questions_entries[index].delete(0, tk.END)
+        
+        # Check for duplicates after toggle
+        self.check_duplicate_answers()
+
+    def check_duplicate_answers(self):
+        """Check for duplicate answers in real-time and update UI"""
+        # Collect answers from selected questions
+        answers = {}
+        duplicates = set()
+        
+        for i, item in enumerate(self.security_questions):
+            if item["var"].get():  # Only check selected questions
+                answer = item["entry"].get().strip().lower()
+                if answer:  # Only check non-empty answers
+                    if answer in answers:
+                        duplicates.add(answer)
+                        answers[answer].append(i)
+                    else:
+                        answers[answer] = [i]
+        
+        # Update UI based on duplicates found
+        if duplicates:
+            duplicate_text = "⚠️ Duplicate answers detected: " + ", ".join(f'"{dup}"' for dup in duplicates)
+            self.duplicate_warning_label.configure(text=duplicate_text)
+            
+            # Highlight duplicate entries with red border
+            for answer, indices in answers.items():
+                if answer in duplicates:
+                    for idx in indices:
+                        self.security_questions_entries[idx].configure(border_color="#FF4444")
+                else:
+                    for idx in indices:
+                        self.security_questions_entries[idx].configure(border_color="#3B82F6")
+        else:
+            self.duplicate_warning_label.configure(text="")
+            # Reset all entry borders to normal
+            for i, item in enumerate(self.security_questions):
+                if item["var"].get():
+                    self.security_questions_entries[i].configure(border_color="#3B82F6")
 
     def show_step(self):
         for frame in self.wizard_frames:
@@ -2041,6 +2102,12 @@ class ModernPasswordManagerGUI:
             self.show_message("security_questions_error_title", "security_questions_error_message", msg_type="error")
             return
 
+        # Check for duplicate answers
+        answers = [answer for _, answer in selected_questions]
+        if len(answers) != len(set(answers)):
+            self.show_message("security_questions_error_title", "duplicate_answers_error", msg_type="error")
+            return
+
         try:
             if self.secure_file_manager:
                 if not self.secure_file_manager.initialize_encryption(master_password):
@@ -2070,7 +2137,6 @@ class ModernPasswordManagerGUI:
             self.show_login_screen()
         except Exception as e:
             self.show_message("error", "setup_failed_message", msg_type="error", error=str(e))
-
     def show_main_interface(self):
         for widget in self.main_frame.winfo_children():
             widget.destroy()
