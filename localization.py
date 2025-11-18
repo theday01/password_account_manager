@@ -427,7 +427,8 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "welcome_feature_3_title": "🛡️ Stay Safe",
         "welcome_feature_3_desc": "Use our security report to find and fix weak or reused passwords.",
         "get_started_button": "Let's Get Started",
-        "duplicate_answers_error": "You cannot use the same answer for multiple security questions. Please provide unique answers for each question."
+        "duplicate_answers_error": "You cannot use the same answer for multiple security questions. Please provide unique answers for each question.",
+        "invalid_email_domain_error": "Please use a valid email from Gmail, Yahoo, Hotmail, or Outlook services."
     }
 }
 

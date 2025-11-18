@@ -34,8 +34,10 @@ class PasswordReminder:
             self.timer.start()
 
     def start(self):
-        # Run the first check immediately without delay
-        self._check_accounts()
+        # Delay the first check to avoid slowing down the UI at startup
+        self.timer = threading.Timer(3, self._check_accounts)  # 3-second delay
+        self.timer.daemon = True
+        self.timer.start()
 
     def stop(self):
         if self.timer:

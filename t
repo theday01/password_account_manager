@@ -6,14 +6,6 @@ remove copy and paste password from the clipboard to avoid tampering
 ويجب ان يكون ذلك بشكل سريع وليس بطيئا
 
 
-اذا كتب المستخدم نفس كلمة السر في الاجوبة الخاصة بالامان
-قم بتحذيره
-وايضا لا تجعل البرنامج يقبل اجوبة مكررة لنفس السؤال
-
-if ther is no @gmail.com or @yahoo.com or @hotmail.com or @yahoo.fr or @outlook.com in the email field don't accept it and show an error message 
-in first setup screen
-
-
 
 load screen should be enhanced in UI and make it real professional
 

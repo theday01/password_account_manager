@@ -1500,7 +1500,9 @@ class ModernPasswordManagerGUI:
             asyncio_manager.submit_coroutine(
                 _periodic_sender(is_trial_active=self.trial_manager.is_trial_active)
             )
-            self.show_main_interface()
+            self.show_loading_main_ui()
+            self.root.after(100, self.show_main_interface)
+
         else:
             if hasattr(self.database, 'last_integrity_error') and self.database.last_integrity_error:
                 result = self.show_message("integrity_error_title", "integrity_error_body", ask="yesno")
@@ -1904,6 +1906,9 @@ class ModernPasswordManagerGUI:
             elif not email:
                 self.show_message("error", "email_required_error", msg_type="error")
                 validation_passed = False
+            elif not self.validate_email_domain(email):
+                self.show_message("error", "invalid_email_domain_error", msg_type="error")
+                validation_passed = False
             elif not master_password or master_password != confirm_password:
                 self.show_message("error", "passwords_dont_match", msg_type="error")
                 validation_passed = False
@@ -1914,6 +1919,19 @@ class ModernPasswordManagerGUI:
         if validation_passed and self.wizard_step < len(self.wizard_frames) - 1:
             self.wizard_step += 1
             self.show_step()
+
+    def validate_email_domain(self, email):
+        """Validate that email has one of the allowed domains"""
+        allowed_domains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'yahoo.fr', 'outlook.com']
+        
+        # Basic email format validation
+        if '@' not in email:
+            return False
+        
+        domain = email.split('@')[1].lower()
+        
+        # Check if domain is in allowed list
+        return domain in allowed_domains
 
     def prev_step(self):
         if self.wizard_step > 0:
@@ -3051,6 +3069,20 @@ class ModernPasswordManagerGUI:
         self._stop_trial_check_timer()
         self.lock_vault()
         self.root.quit()
+
+        
+    def show_loading_main_ui(self):
+        for widget in self.main_frame.winfo_children():
+            widget.destroy()
+
+        loading_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        loading_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+        ctk.CTkLabel(loading_frame, text="Loading your vault, please wait...", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=20)
+        
+        progress_bar = ctk.CTkProgressBar(loading_frame, mode='indeterminate')
+        progress_bar.pack(pady=10, padx=50)
+        progress_bar.start()
     
     def run(self):
         try:
