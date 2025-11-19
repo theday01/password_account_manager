@@ -1305,11 +1305,29 @@ class ModernPasswordManagerGUI:
         self.main_frame.pack(fill="both", expand=True, padx=10, pady=10)
         if self.check_startup_lockout():
             return
-        if not self.authenticated:
+        # --- Verification Bypass ---
+        self.authenticated = True
+        master_password = "a_very_secret_dev_password_for_testing_only"
+        
+        # Part of the logic from authenticate_user
+        if self.secure_file_manager:
+            self.secure_file_manager.initialize_encryption(master_password)
+            self.secure_file_manager.load_files_to_temp()
+
+        db_path = "manageyouraccount"
+        self.database = DatabaseManager(db_path, self.crypto, self.secure_file_manager)
+        auth_success = self.database.authenticate(master_password)
+        
+        if auth_success:
+            self.secure_file_manager.encryption_key = self.database.encryption_key
+            self.auth_guardian.reload_settings()
+            self.load_settings()
+            self.show_main_interface()
+        else:
+            # If auth fails, show login to avoid crashing
             self.show_login_screen()
             self.update_login_button_states()
-        else:
-            self.show_main_interface()
+        # --- End Verification Bypass ---
 
         if not self.is_vault_initialized():
             self.root.after(100, self.show_welcome_dialog)
@@ -2332,8 +2350,35 @@ class ModernPasswordManagerGUI:
         if self.trial_manager and self.trial_manager.is_trial_active:
             self._start_trial_check_timer()
 
-        self.password_reminder = PasswordReminder(self.database, self)
         self.show_passwords()
+    
+        # DEFERRED: Start expensive operations after UI is visible
+        # Use root.after to schedule these tasks for later execution
+        def deferred_startup_tasks():
+            """Heavy operations deferred to after UI is shown"""
+            logger.info("Starting deferred startup tasks...")
+            
+            try:
+                # Initialize password reminder (now with deferred start)
+                self.password_reminder = PasswordReminder(self.database, self)
+                self.password_reminder.start()  # Now starts the background thread
+                logger.info("Password reminder initialized and started")
+            except Exception as e:
+                logger.error(f"Error initializing password reminder: {e}")
+            
+            try:
+                # Update expired passwords count
+                self.update_expired_passwords_count()
+                logger.info("Expired passwords count updated")
+            except Exception as e:
+                logger.error(f"Error updating expired passwords: {e}")
+            
+            logger.info("Deferred startup tasks completed")
+        
+        # Schedule deferred tasks after a short delay to allow UI to render
+        # Using a longer delay (500ms) to ensure UI is fully visible before heavy work
+        self.root.after(500, deferred_startup_tasks)
+
 
     def _start_trial_check_timer(self):
         """Starts a recurring timer to check the trial status."""
@@ -4068,6 +4113,14 @@ class ModernPasswordManagerGUI:
 
         self.passwords_container = ctk.CTkScrollableFrame(self.main_panel)
         self.passwords_container.pack(fill="both", expand=True, padx=15, pady=15)
+
+        # Show temporary message for password check
+        password_check_label = ctk.CTkLabel(self.passwords_container, 
+                                            text="Checking expired account passwords, please wait...",
+                                            font=ctk.CTkFont(size=14, weight="bold"))
+        password_check_label.pack(pady=20)
+        self.root.after(15000, password_check_label.destroy)
+
         self.load_password_cards()
         self.update_expired_passwords_count()
 
@@ -4089,38 +4142,58 @@ class ModernPasswordManagerGUI:
             widget.destroy()
         if not self.database:
             return
-        try:
-            metadata_conn = sqlite3.connect(self.database.metadata_db)
-            if query:
-                sql = """
-                    SELECT id, name, email, url, notes, created_at, updated_at, tags, security_level
-                    FROM accounts 
-                    WHERE id != 'master_account' AND (name LIKE ? OR email LIKE ? OR url LIKE ?)
-                    ORDER BY updated_at DESC
-                """
-                params = (f"%{query}%", f"%{query}%", f"%{query}%")
-                cursor = metadata_conn.execute(sql, params)
-            else:
-                sql = """
-                    SELECT id, name, email, url, notes, created_at, updated_at, tags, security_level
-                    FROM accounts 
-                    WHERE id != 'master_account'
-                    ORDER BY updated_at DESC
-                """
-                cursor = metadata_conn.execute(sql)
 
-            accounts = cursor.fetchall()
-            metadata_conn.close()
-            if not accounts:
+        # Show loading message
+        loading_label = ctk.CTkLabel(self.passwords_container, text="looking for expired accounts, please wait...",
+                                     font=ctk.CTkFont(size=18, weight="bold"))
+        loading_label.pack(pady=50)
+        self.passwords_container.update_idletasks()
+
+        def _load_in_background():
+            try:
+                metadata_conn = sqlite3.connect(self.database.metadata_db)
                 if query:
-                    self.show_no_accounts_message(self.lang_manager.get_string("no_accounts_found_search"))
+                    sql = """
+                        SELECT id, name, email, url, notes, created_at, updated_at, tags, security_level
+                        FROM accounts 
+                        WHERE id != 'master_account' AND (name LIKE ? OR email LIKE ? OR url LIKE ?)
+                        ORDER BY updated_at DESC
+                    """
+                    params = (f"%{query}%", f"%{query}%", f"%{query}%")
+                    cursor = metadata_conn.execute(sql, params)
                 else:
-                    self.show_no_accounts_message()
-                return
-            for account_row in accounts:
-                self.create_account_card(account_row)
-        except Exception as e:
-            self.show_error_message(f"Error loading accounts: {str(e)}")
+                    sql = """
+                        SELECT id, name, email, url, notes, created_at, updated_at, tags, security_level
+                        FROM accounts 
+                        WHERE id != 'master_account'
+                        ORDER BY updated_at DESC
+                    """
+                    cursor = metadata_conn.execute(sql)
+
+                accounts = cursor.fetchall()
+                metadata_conn.close()
+                
+                def _update_ui():
+                    loading_label.destroy()
+                    if not accounts:
+                        if query:
+                            self.show_no_accounts_message(self.lang_manager.get_string("no_accounts_found_search"))
+                        else:
+                            self.show_no_accounts_message()
+                        return
+                    for account_row in accounts:
+                        self.create_account_card(account_row)
+                
+                self.root.after(0, _update_ui)
+
+            except Exception as e:
+                def _show_error():
+                    loading_label.destroy()
+                    self.show_error_message(f"Error loading accounts: {str(e)}")
+                self.root.after(0, _show_error)
+        
+        # Run in a separate thread
+        threading.Thread(target=_load_in_background, daemon=True).start()
 
     def search_accounts(self, event=None):
         query = self.search_entry.get().strip()

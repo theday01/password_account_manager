@@ -26,6 +26,7 @@ and also make the program use a strong encryption algorithm to encrypt the datab
 and also make the program use a strong hashing algorithm to hash the user password such as PBKDF2 or bcrypt
 
 
+remove "aduit.log" from final build files
 
 
 123456789hamzaSAADI@A
