@@ -428,7 +428,11 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "welcome_feature_3_desc": "Use our security report to find and fix weak or reused passwords.",
         "get_started_button": "Let's Get Started",
         "duplicate_answers_error": "You cannot use the same answer for multiple security questions. Please provide unique answers for each question.",
-        "invalid_email_domain_error": "Please use a valid email from Gmail, Yahoo, Hotmail, or Outlook services."
+        "invalid_email_domain_error": "Please use a valid email from Gmail, Yahoo, Hotmail, or Outlook services.",
+        "filter_show_all": "Show All",
+        "filter_weak_passwords": "Weak Passwords",
+        "filter_expired_passwords": "Expired Passwords",
+        "filter_by_label": "Filter by:"
     }
 }
 

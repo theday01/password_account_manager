@@ -1,12 +1,5 @@
 remove copy and paste password from the clipboard to avoid tampering
 
-
-البرنامج عن التشغيل يبدوا بطيئا وهذا يعود الى انه يقوم بالتحقق من الحسابات التي تم انتهاء صلاحيتها
-يجب ان يقوم بالتحقق من الحسابات التي تم انتهاء صلاحيتها فقط عند الدخول الى البرنامج وليس في الخلفية
-ويجب ان يكون ذلك بشكل سريع وليس بطيئا
-
-
-
 load screen should be enhanced in UI and make it real professional
 
 
@@ -26,7 +19,7 @@ and also make the program use a strong encryption algorithm to encrypt the datab
 and also make the program use a strong hashing algorithm to hash the user password such as PBKDF2 or bcrypt
 
 
-remove "aduit.log" from final build files
+remove "audit.log" from final build files
 
 
 123456789hamzaSAADI@A

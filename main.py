@@ -4104,6 +4104,16 @@ class ModernPasswordManagerGUI:
                                          width=400, height=45)
         self.search_entry.pack(side="left", padx=25, pady=15)
         
+        ctk.CTkLabel(search_frame, text=self.lang_manager.get_string("filter_by_label")).pack(side="left", padx=(10, 5))
+        self.filter_var = ctk.StringVar(value=self.lang_manager.get_string("filter_show_all"))
+        filter_options = [
+            self.lang_manager.get_string("filter_show_all"),
+            self.lang_manager.get_string("filter_weak_passwords"),
+            self.lang_manager.get_string("filter_expired_passwords")
+        ]
+        self.filter_menu = ctk.CTkOptionMenu(search_frame, variable=self.filter_var, values=filter_options, command=self.filter_accounts)
+        self.filter_menu.pack(side="left", padx=(0, 10))
+
         self.expired_passwords_label = ctk.CTkLabel(search_frame, text="", 
                                                     font=ctk.CTkFont(size=14, weight="bold"),
                                                     text_color="red")
@@ -4124,6 +4134,19 @@ class ModernPasswordManagerGUI:
         self.load_password_cards()
         self.update_expired_passwords_count()
 
+    def is_password_weak(self, password: str) -> bool:
+        if len(password) < 16:
+            return True
+        if not any(c.isupper() for c in password):
+            return True
+        if not any(c.islower() for c in password):
+            return True
+        if not any(c.isdigit() for c in password):
+            return True
+        if not any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password):
+            return True
+        return False
+
     def update_expired_passwords_count(self):
         if hasattr(self, 'expired_passwords_label') and self.expired_passwords_label.winfo_exists():
             if self.password_reminder:
@@ -4135,7 +4158,7 @@ class ModernPasswordManagerGUI:
             else:
                 self.expired_passwords_label.configure(text="")
 
-    def load_password_cards(self, query: str = None):
+    def load_password_cards(self, query: str = None, filter_option: str = None):
         if not hasattr(self, 'passwords_container') or not self.passwords_container.winfo_exists():
             return
         for widget in self.passwords_container.winfo_children():
@@ -4144,7 +4167,7 @@ class ModernPasswordManagerGUI:
             return
 
         # Show loading message
-        loading_label = ctk.CTkLabel(self.passwords_container, text="looking for expired accounts, please wait...",
+        loading_label = ctk.CTkLabel(self.passwords_container, text="(For your safety) We are currently reviewing the security of your accounts, please wait....",
                                      font=ctk.CTkFont(size=18, weight="bold"))
         loading_label.pack(pady=50)
         self.passwords_container.update_idletasks()
@@ -4152,7 +4175,12 @@ class ModernPasswordManagerGUI:
         def _load_in_background():
             try:
                 metadata_conn = sqlite3.connect(self.database.metadata_db)
-                if query:
+                
+                # Disable search bar if a filter is active
+                is_filter_active = filter_option and filter_option != self.lang_manager.get_string("filter_show_all")
+                self.search_entry.configure(state="disabled" if is_filter_active else "normal")
+                
+                if query and not is_filter_active:
                     sql = """
                         SELECT id, name, email, url, notes, created_at, updated_at, tags, security_level
                         FROM accounts 
@@ -4172,6 +4200,18 @@ class ModernPasswordManagerGUI:
 
                 accounts = cursor.fetchall()
                 metadata_conn.close()
+                
+                if is_filter_active:
+                    if filter_option == self.lang_manager.get_string("filter_expired_passwords"):
+                        expired_account_ids = self.password_reminder.get_reminded_accounts()
+                        accounts = [acc for acc in accounts if acc[0] in expired_account_ids]
+                    elif filter_option == self.lang_manager.get_string("filter_weak_passwords"):
+                        weak_accounts = []
+                        for acc in accounts:
+                            _, password = self.database.get_account_credentials(acc[0])
+                            if password and self.is_password_weak(password):
+                                weak_accounts.append(acc)
+                        accounts = weak_accounts
                 
                 def _update_ui():
                     loading_label.destroy()
@@ -4198,6 +4238,9 @@ class ModernPasswordManagerGUI:
     def search_accounts(self, event=None):
         query = self.search_entry.get().strip()
         self.load_password_cards(query=query)
+
+    def filter_accounts(self, selected_filter: str):
+        self.load_password_cards(filter_option=selected_filter)
 
     def show_no_accounts_message(self, message=None):
         if message is None:

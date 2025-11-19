@@ -1552,3 +1552,609 @@
 2025-11-19 13:59:48,515 - secure_file_manager - INFO - Restored paths to secure directory. settings_path now: secure_vault\settings.json
 2025-11-19 13:59:48,516 - secure_file_manager - INFO - Temporary files cleaned up successfully.
 2025-11-19 13:59:48,518 - __main__ - INFO - Secure cleanup completed
+2025-11-19 14:22:51,716 - root - INFO - Logging has been set up.
+2025-11-19 14:22:51,716 - __main__ - INFO - Starting SecureVault Pro...
+2025-11-19 14:22:51,842 - asyncio_manager - INFO - Asyncio event loop started in background thread.
+2025-11-19 14:22:51,953 - __main__ - INFO - Application initialized successfully
+2025-11-19 14:22:55,695 - __main__ - INFO - Initializing secure file management system...
+2025-11-19 14:22:55,755 - __main__ - INFO - Secure file manager initialized
+2025-11-19 14:22:56,259 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 14:22:56,260 - secure_file_manager - WARNING - Settings file is encrypted, but no encryption key is available (this is expected on startup).
+2025-11-19 14:22:56,717 - root - INFO - --- Starting Trial Status Check ---
+2025-11-19 14:22:56,747 - root - INFO - Guardian Anchor check returned: status=OK_RESTORED_FROM_BACKUP, data={'install_ts': '2025-11-13T19:06:30.864841', 'machine_fp': '57760c5575fad941f37d490b1cd91368b4d441c49745fb8b3e0734efe5118ed6', 'shutdown_status': 'RUNNING'}
+2025-11-19 14:22:56,748 - root - INFO - Installation timestamp: 2025-11-13 19:06:30.864841
+2025-11-19 14:22:56,748 - root - INFO - Current UTC time: 2025-11-19 13:22:56.748201
+2025-11-19 14:22:56,748 - root - INFO - Time elapsed since installation: 5 days, 18:16:25.883360
+2025-11-19 14:22:56,749 - root - INFO - Trial period: 8 days, 0:00:00
+2025-11-19 14:22:56,750 - root - INFO - Guardian Observer check returned: OK_UNEXPECTED_SHUTDOWN
+2025-11-19 14:22:56,751 - root - INFO - Trial is active. Minutes remaining: 3223.57. Status: TRIAL
+2025-11-19 14:22:56,751 - __main__ - INFO - Trial status at startup: TRIAL
+2025-11-19 14:22:57,216 - auth_guardian - INFO - AuthGuardian init: No encryption key available, starting with empty settings. Will reload after authentication.
+2025-11-19 14:22:57,216 - __main__ - INFO - Loading settings from auth_guardian: []
+2025-11-19 14:22:57,216 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-19 14:22:57,221 - secure_file_manager - INFO - Initializing encryption...
+2025-11-19 14:22:57,222 - secure_file_manager - INFO - Salt loaded from secure_vault\salt_file
+2025-11-19 14:22:57,223 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-11-19 14:22:57,344 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-11-19 14:22:57,344 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-11-19 14:22:57,347 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_kzd7fhnx
+2025-11-19 14:22:57,352 - secure_file_manager - INFO - Updated paths to point to temp directory. settings_path now: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_kzd7fhnx\settings.json
+2025-11-19 14:22:57,353 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-11-19 14:22:57,353 - __main__ - INFO - Attempting authentication...
+2025-11-19 14:22:57,353 - __main__ - INFO - Salt path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_kzd7fhnx\salt_file
+2025-11-19 14:22:57,354 - __main__ - INFO - Metadata DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_kzd7fhnx\metadata.db
+2025-11-19 14:22:57,354 - __main__ - INFO - Sensitive DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_kzd7fhnx\sensitive.db
+2025-11-19 14:22:57,355 - __main__ - INFO - Integrity path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_kzd7fhnx\integrity_file
+2025-11-19 14:22:57,356 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-11-19 14:22:57,476 - __main__ - INFO - Encryption keys generated
+2025-11-19 14:22:57,477 - secure_file_manager - INFO - Verifying integrity...
+2025-11-19 14:22:57,492 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-19 14:22:57,493 - secure_file_manager - INFO - Integrity verification result: FAILED
+2025-11-19 14:22:57,494 - __main__ - INFO - Database integrity check: FAILED
+2025-11-19 14:22:57,495 - __main__ - ERROR - Database integrity check failed
+2025-11-19 14:22:57,495 - __main__ - INFO - Attempting integrity recovery...
+2025-11-19 14:22:57,495 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 14:22:57,497 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 14:22:57,499 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_kzd7fhnx\integrity_file
+2025-11-19 14:22:57,499 - __main__ - INFO - Integrity signature regenerated, retrying verification...
+2025-11-19 14:22:57,499 - secure_file_manager - INFO - Verifying integrity...
+2025-11-19 14:22:57,511 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-19 14:22:57,511 - secure_file_manager - INFO - Integrity verification result: OK
+2025-11-19 14:22:57,511 - __main__ - INFO - Integrity recovery successful
+2025-11-19 14:22:57,515 - __main__ - ERROR - Test decryption failed: Invalid authentication tag. This almost certainly means the password is wrong.
+2025-11-19 14:23:05,480 - __main__ - INFO - Initializing encryption...
+2025-11-19 14:23:05,480 - secure_file_manager - INFO - Initializing encryption...
+2025-11-19 14:23:05,482 - secure_file_manager - INFO - Salt loaded from C:\Users\Hamza\AppData\Local\Temp\sv_tmp_kzd7fhnx\salt_file
+2025-11-19 14:23:05,482 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-11-19 14:23:05,619 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-11-19 14:23:05,621 - __main__ - INFO - Loading files from secure storage...
+2025-11-19 14:23:05,621 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-11-19 14:23:05,622 - secure_file_manager - INFO - Removing old temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_kzd7fhnx
+2025-11-19 14:23:05,624 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq
+2025-11-19 14:23:05,629 - secure_file_manager - INFO - Updated paths to point to temp directory. settings_path now: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\settings.json
+2025-11-19 14:23:05,630 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-11-19 14:23:05,630 - __main__ - INFO - Attempting authentication...
+2025-11-19 14:23:05,630 - __main__ - INFO - Salt path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\salt_file
+2025-11-19 14:23:05,631 - __main__ - INFO - Metadata DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\metadata.db
+2025-11-19 14:23:05,631 - __main__ - INFO - Sensitive DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\sensitive.db
+2025-11-19 14:23:05,631 - __main__ - INFO - Integrity path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\integrity_file
+2025-11-19 14:23:05,633 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-11-19 14:23:05,752 - __main__ - INFO - Encryption keys generated
+2025-11-19 14:23:05,752 - secure_file_manager - INFO - Verifying integrity...
+2025-11-19 14:23:05,758 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-19 14:23:05,758 - secure_file_manager - INFO - Integrity verification result: FAILED
+2025-11-19 14:23:05,758 - __main__ - INFO - Database integrity check: FAILED
+2025-11-19 14:23:05,759 - __main__ - ERROR - Database integrity check failed
+2025-11-19 14:23:05,759 - __main__ - INFO - Attempting integrity recovery...
+2025-11-19 14:23:05,759 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 14:23:05,761 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 14:23:05,762 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\integrity_file
+2025-11-19 14:23:05,763 - __main__ - INFO - Integrity signature regenerated, retrying verification...
+2025-11-19 14:23:05,765 - secure_file_manager - INFO - Verifying integrity...
+2025-11-19 14:23:05,777 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-19 14:23:05,777 - secure_file_manager - INFO - Integrity verification result: OK
+2025-11-19 14:23:05,778 - __main__ - INFO - Integrity recovery successful
+2025-11-19 14:23:05,780 - __main__ - INFO - Test decryption and password verification successful
+2025-11-19 14:23:05,781 - __main__ - INFO - Authentication successful!
+2025-11-19 14:23:05,781 - __main__ - INFO - Encryption key set on secure_file_manager after login. Key is set: True
+2025-11-19 14:23:05,781 - __main__ - INFO - Calling reload_settings() after successful auth...
+2025-11-19 14:23:05,782 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 14:23:05,782 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 14:23:05,782 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,783 - auth_guardian - INFO - Reloading settings, read_settings returned: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,783 - auth_guardian - INFO - tfa_secret present in reloaded settings: False
+2025-11-19 14:23:05,783 - auth_guardian - INFO - tfa_enabled_at present in reloaded settings: False
+2025-11-19 14:23:05,784 - auth_guardian - INFO - After reload, _settings has: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,784 - auth_guardian - INFO - After reload, is_tfa_enabled(): False
+2025-11-19 14:23:05,785 - __main__ - INFO - reload_settings() completed
+2025-11-19 14:23:05,785 - __main__ - INFO - Recording login attempt after settings reload...
+2025-11-19 14:23:05,785 - auth_guardian - INFO - Successful master password login recorded. Resetting guardian state.
+2025-11-19 14:23:05,786 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 14:23:05,787 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 14:23:05,787 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,788 - auth_guardian - INFO - Loaded existing settings before save. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,789 - auth_guardian - INFO - About to save settings. Keys to save: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,790 - secure_file_manager - INFO - Writing encrypted settings to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\settings.json. Settings keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,793 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 14:23:05,804 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 14:23:05,806 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\integrity_file
+2025-11-19 14:23:05,806 - secure_file_manager - INFO - Settings file written successfully. Size: 475 bytes
+2025-11-19 14:23:05,807 - auth_guardian - INFO - Successfully saved settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,809 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 14:23:05,809 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 14:23:05,810 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,810 - auth_guardian - INFO - Loaded existing settings before save. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,811 - auth_guardian - INFO - About to save settings. Keys to save: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,811 - secure_file_manager - INFO - Writing encrypted settings to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\settings.json. Settings keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,813 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 14:23:05,824 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 14:23:05,827 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\integrity_file
+2025-11-19 14:23:05,827 - secure_file_manager - INFO - Settings file written successfully. Size: 475 bytes
+2025-11-19 14:23:05,828 - auth_guardian - INFO - Successfully saved settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,828 - __main__ - INFO - Login attempt recorded
+2025-11-19 14:23:05,828 - __main__ - INFO - Loading settings from auth_guardian: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,829 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-19 14:23:05,829 - __main__ - INFO - load_settings() completed
+2025-11-19 14:23:05,829 - __main__ - INFO - Checking 2FA status: hasattr(auth_guardian)=True, auth_guardian exists=True
+2025-11-19 14:23:05,830 - __main__ - INFO - 2FA is_tfa_enabled() returned: False
+2025-11-19 14:23:05,830 - __main__ - INFO - 2FA is not enabled, skipping 2FA verification
+2025-11-19 14:23:05,830 - auth_guardian - INFO - Updating setting 'last_login_timestamp' and persisting changes.
+2025-11-19 14:23:05,831 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 14:23:05,831 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 14:23:05,831 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,832 - auth_guardian - INFO - Loaded existing settings before save. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,832 - auth_guardian - INFO - About to save settings. Keys to save: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,833 - secure_file_manager - INFO - Writing encrypted settings to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\settings.json. Settings keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,835 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 14:23:05,846 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 14:23:05,848 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\integrity_file
+2025-11-19 14:23:05,848 - secure_file_manager - INFO - Settings file written successfully. Size: 475 bytes
+2025-11-19 14:23:05,849 - auth_guardian - INFO - Successfully saved settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,849 - auth_guardian - INFO - Updating setting 'consecutive_logins' and persisting changes.
+2025-11-19 14:23:05,850 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 14:23:05,850 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 14:23:05,850 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,851 - auth_guardian - INFO - Loaded existing settings before save. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,852 - auth_guardian - INFO - About to save settings. Keys to save: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,852 - secure_file_manager - INFO - Writing encrypted settings to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\settings.json. Settings keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,854 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 14:23:05,865 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 14:23:05,867 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_gqgcq5tq\integrity_file
+2025-11-19 14:23:05,868 - secure_file_manager - INFO - Settings file written successfully. Size: 475 bytes
+2025-11-19 14:23:05,868 - auth_guardian - INFO - Successfully saved settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 14:23:05,869 - notification_manager - INFO - Trial mode active - backup notifications disabled
+2025-11-19 14:23:07,331 - __main__ - INFO - Starting deferred startup tasks...
+2025-11-19 14:23:07,332 - password_reminder - INFO - PasswordReminder initialized
+2025-11-19 14:23:07,332 - password_reminder - INFO - Starting PasswordReminder timer (first check in 30 seconds)
+2025-11-19 14:23:07,333 - password_reminder - INFO - Starting PasswordReminder timer (first check in 30 seconds)
+2025-11-19 14:23:07,333 - __main__ - INFO - Password reminder initialized and started
+2025-11-19 14:23:07,334 - __main__ - INFO - Expired passwords count updated
+2025-11-19 14:23:07,334 - __main__ - INFO - Deferred startup tasks completed
+2025-11-19 14:23:22,350 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:23:22,351 - password_reminder - INFO - Adding reminder for account: lmmlml (ID: lwUOipkLJoPaSaD2EPtY_A, Last updated: 2025-11-19T12:49:53.373858)
+2025-11-19 14:23:22,362 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:23:22,364 - password_reminder - INFO - Adding reminder for account: jlkjljlkj (ID: UYP92YW1SAGgvlJa3miw1g, Last updated: 2025-11-19T12:50:00.147290)
+2025-11-19 14:23:22,516 - password_reminder - INFO - Adding reminder for account: 132 (ID: akVLO3dle4Qd7fDJO6tPBQ, Last updated: 2025-11-19T12:50:08.471796)
+2025-11-19 14:23:22,529 - password_reminder - INFO - Adding reminder for account: 21321 (ID: qz3eS8bwVHAO7bxBImw_Bw, Last updated: 2025-11-19T12:50:14.010847)
+2025-11-19 14:23:23,608 - password_reminder - INFO - Adding reminder for account: 87879789978 (ID: e1wpGC2ftfb0u31Y1BWJ4g, Last updated: 2025-11-19T12:50:20.427652)
+2025-11-19 14:23:23,608 - password_reminder - INFO - Adding reminder for account: 87879789978 (ID: e1wpGC2ftfb0u31Y1BWJ4g, Last updated: 2025-11-19T12:50:20.427652)
+2025-11-19 14:23:24,911 - password_reminder - INFO - Adding reminder for account: 654654 (ID: fgZ95wcOkJhdkFrXYhdCbQ, Last updated: 2025-11-19T12:50:27.028098)
+2025-11-19 14:23:24,911 - password_reminder - INFO - Adding reminder for account: 654654 (ID: fgZ95wcOkJhdkFrXYhdCbQ, Last updated: 2025-11-19T12:50:27.028098)
+2025-11-19 14:23:26,094 - password_reminder - INFO - Adding reminder for account: 8879789879978987987789978 (ID: _5rDq9_kFC9y2F2DXIY1ng, Last updated: 2025-11-19T12:50:48.996015)
+2025-11-19 14:23:26,094 - password_reminder - INFO - Adding reminder for account: 8879789879978987987789978 (ID: _5rDq9_kFC9y2F2DXIY1ng, Last updated: 2025-11-19T12:50:48.996015)
+2025-11-19 14:23:27,263 - password_reminder - INFO - Adding reminder for account: oipoipoipoip (ID: TY5NtWHizIUBsPWXZXdv0w, Last updated: 2025-11-19T12:51:04.987673)
+2025-11-19 14:23:27,263 - password_reminder - INFO - Adding reminder for account: oipoipoipoip (ID: TY5NtWHizIUBsPWXZXdv0w, Last updated: 2025-11-19T12:51:04.987673)
+2025-11-19 14:23:28,479 - password_reminder - INFO - Adding reminder for account: uytyuyuyuyuyytytytyt (ID: WE5vkAh0djSfehIhdmkFpg, Last updated: 2025-11-19T12:51:55.430109)
+2025-11-19 14:23:28,480 - password_reminder - INFO - Adding reminder for account: uytyuyuyuyuyytytytyt (ID: WE5vkAh0djSfehIhdmkFpg, Last updated: 2025-11-19T12:51:55.430109)
+2025-11-19 14:24:29,725 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:24:29,738 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:25:29,780 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:25:29,827 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:26:29,793 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:26:29,842 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:27:29,811 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:27:29,859 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:28:29,818 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:28:29,864 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:29:29,838 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:29:29,874 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:30:29,849 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:30:29,897 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:31:29,856 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:31:29,902 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:32:29,866 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:32:29,913 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:33:29,882 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:33:29,928 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:34:29,888 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:34:29,936 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:35:29,910 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:35:29,955 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:36:29,927 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:36:29,971 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:37:29,938 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:37:29,981 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:38:29,945 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:38:30,000 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:39:29,962 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:39:30,015 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:40:29,997 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:40:30,030 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:41:30,034 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:41:30,049 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:42:30,045 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:42:30,061 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:43:30,057 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:43:30,072 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:44:30,065 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:44:30,082 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:45:30,072 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:45:30,103 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:46:30,084 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:46:30,116 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:47:30,092 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:47:30,125 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:48:30,111 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:48:30,144 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:49:30,121 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:49:30,165 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:50:30,134 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:50:30,182 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:51:30,145 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:51:30,190 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:52:30,160 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 14:52:30,203 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:06:20,758 - root - INFO - Logging has been set up.
+2025-11-19 15:06:20,758 - __main__ - INFO - Starting SecureVault Pro...
+2025-11-19 15:06:21,096 - asyncio_manager - INFO - Asyncio event loop started in background thread.
+2025-11-19 15:06:21,252 - __main__ - INFO - Application initialized successfully
+2025-11-19 15:06:24,947 - __main__ - INFO - Initializing secure file management system...
+2025-11-19 15:06:24,951 - __main__ - INFO - Secure file manager initialized
+2025-11-19 15:06:25,948 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 15:06:25,948 - secure_file_manager - WARNING - Settings file is encrypted, but no encryption key is available (this is expected on startup).
+2025-11-19 15:06:26,613 - root - INFO - --- Starting Trial Status Check ---
+2025-11-19 15:06:26,647 - root - INFO - Guardian Anchor check returned: status=OK_RESTORED_FROM_BACKUP, data={'install_ts': '2025-11-13T19:06:30.864841', 'machine_fp': '57760c5575fad941f37d490b1cd91368b4d441c49745fb8b3e0734efe5118ed6', 'shutdown_status': 'RUNNING'}
+2025-11-19 15:06:26,649 - root - INFO - Installation timestamp: 2025-11-13 19:06:30.864841
+2025-11-19 15:06:26,649 - root - INFO - Current UTC time: 2025-11-19 14:06:26.648984
+2025-11-19 15:06:26,649 - root - INFO - Time elapsed since installation: 5 days, 18:59:55.784143
+2025-11-19 15:06:26,650 - root - INFO - Trial period: 8 days, 0:00:00
+2025-11-19 15:06:26,651 - root - INFO - Guardian Observer check returned: OK_UNEXPECTED_SHUTDOWN
+2025-11-19 15:06:26,652 - root - INFO - Trial is active. Minutes remaining: 3180.07. Status: TRIAL
+2025-11-19 15:06:26,653 - __main__ - INFO - Trial status at startup: TRIAL
+2025-11-19 15:06:27,220 - auth_guardian - INFO - AuthGuardian init: No encryption key available, starting with empty settings. Will reload after authentication.
+2025-11-19 15:06:27,220 - __main__ - INFO - Loading settings from auth_guardian: []
+2025-11-19 15:06:27,220 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-19 15:06:27,225 - secure_file_manager - INFO - Initializing encryption...
+2025-11-19 15:06:27,226 - secure_file_manager - INFO - Salt loaded from secure_vault\salt_file
+2025-11-19 15:06:27,226 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-11-19 15:06:27,348 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-11-19 15:06:27,349 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-11-19 15:06:27,350 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_rfusnoil
+2025-11-19 15:06:27,356 - secure_file_manager - INFO - Updated paths to point to temp directory. settings_path now: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_rfusnoil\settings.json
+2025-11-19 15:06:27,358 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-11-19 15:06:27,358 - __main__ - INFO - Attempting authentication...
+2025-11-19 15:06:27,359 - __main__ - INFO - Salt path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_rfusnoil\salt_file
+2025-11-19 15:06:27,359 - __main__ - INFO - Metadata DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_rfusnoil\metadata.db
+2025-11-19 15:06:27,360 - __main__ - INFO - Sensitive DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_rfusnoil\sensitive.db
+2025-11-19 15:06:27,361 - __main__ - INFO - Integrity path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_rfusnoil\integrity_file
+2025-11-19 15:06:27,363 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-11-19 15:06:27,514 - __main__ - INFO - Encryption keys generated
+2025-11-19 15:06:27,514 - secure_file_manager - INFO - Verifying integrity...
+2025-11-19 15:06:27,521 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-19 15:06:27,521 - secure_file_manager - INFO - Integrity verification result: FAILED
+2025-11-19 15:06:27,522 - __main__ - INFO - Database integrity check: FAILED
+2025-11-19 15:06:27,522 - __main__ - ERROR - Database integrity check failed
+2025-11-19 15:06:27,523 - __main__ - INFO - Attempting integrity recovery...
+2025-11-19 15:06:27,524 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:06:27,525 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:06:27,528 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_rfusnoil\integrity_file
+2025-11-19 15:06:27,529 - __main__ - INFO - Integrity signature regenerated, retrying verification...
+2025-11-19 15:06:27,530 - secure_file_manager - INFO - Verifying integrity...
+2025-11-19 15:06:27,541 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-19 15:06:27,550 - secure_file_manager - INFO - Integrity verification result: OK
+2025-11-19 15:06:27,564 - __main__ - INFO - Integrity recovery successful
+2025-11-19 15:06:27,573 - __main__ - ERROR - Test decryption failed: Invalid authentication tag. This almost certainly means the password is wrong.
+2025-11-19 15:06:30,757 - __main__ - INFO - Initializing encryption...
+2025-11-19 15:06:30,758 - secure_file_manager - INFO - Initializing encryption...
+2025-11-19 15:06:30,758 - secure_file_manager - INFO - Salt loaded from C:\Users\Hamza\AppData\Local\Temp\sv_tmp_rfusnoil\salt_file
+2025-11-19 15:06:30,759 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-11-19 15:06:30,887 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-11-19 15:06:30,887 - __main__ - INFO - Loading files from secure storage...
+2025-11-19 15:06:30,888 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-11-19 15:06:30,888 - secure_file_manager - INFO - Removing old temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_rfusnoil
+2025-11-19 15:06:30,890 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh
+2025-11-19 15:06:30,897 - secure_file_manager - INFO - Updated paths to point to temp directory. settings_path now: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\settings.json
+2025-11-19 15:06:30,897 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-11-19 15:06:30,898 - __main__ - INFO - Attempting authentication...
+2025-11-19 15:06:30,898 - __main__ - INFO - Salt path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\salt_file
+2025-11-19 15:06:30,898 - __main__ - INFO - Metadata DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\metadata.db
+2025-11-19 15:06:30,898 - __main__ - INFO - Sensitive DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\sensitive.db
+2025-11-19 15:06:30,898 - __main__ - INFO - Integrity path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\integrity_file
+2025-11-19 15:06:30,900 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-11-19 15:06:31,020 - __main__ - INFO - Encryption keys generated
+2025-11-19 15:06:31,020 - secure_file_manager - INFO - Verifying integrity...
+2025-11-19 15:06:31,027 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-19 15:06:31,027 - secure_file_manager - INFO - Integrity verification result: FAILED
+2025-11-19 15:06:31,028 - __main__ - INFO - Database integrity check: FAILED
+2025-11-19 15:06:31,028 - __main__ - ERROR - Database integrity check failed
+2025-11-19 15:06:31,028 - __main__ - INFO - Attempting integrity recovery...
+2025-11-19 15:06:31,028 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:06:31,030 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:06:31,032 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\integrity_file
+2025-11-19 15:06:31,032 - __main__ - INFO - Integrity signature regenerated, retrying verification...
+2025-11-19 15:06:31,033 - secure_file_manager - INFO - Verifying integrity...
+2025-11-19 15:06:31,044 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-19 15:06:31,045 - secure_file_manager - INFO - Integrity verification result: OK
+2025-11-19 15:06:31,045 - __main__ - INFO - Integrity recovery successful
+2025-11-19 15:06:31,048 - __main__ - INFO - Test decryption and password verification successful
+2025-11-19 15:06:31,049 - __main__ - INFO - Authentication successful!
+2025-11-19 15:06:31,049 - __main__ - INFO - Encryption key set on secure_file_manager after login. Key is set: True
+2025-11-19 15:06:31,049 - __main__ - INFO - Calling reload_settings() after successful auth...
+2025-11-19 15:06:31,050 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 15:06:31,050 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 15:06:31,050 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,051 - auth_guardian - INFO - Reloading settings, read_settings returned: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,051 - auth_guardian - INFO - tfa_secret present in reloaded settings: False
+2025-11-19 15:06:31,051 - auth_guardian - INFO - tfa_enabled_at present in reloaded settings: False
+2025-11-19 15:06:31,052 - auth_guardian - INFO - After reload, _settings has: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,052 - auth_guardian - INFO - After reload, is_tfa_enabled(): False
+2025-11-19 15:06:31,052 - __main__ - INFO - reload_settings() completed
+2025-11-19 15:06:31,053 - __main__ - INFO - Recording login attempt after settings reload...
+2025-11-19 15:06:31,053 - auth_guardian - INFO - Successful master password login recorded. Resetting guardian state.
+2025-11-19 15:06:31,053 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 15:06:31,053 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 15:06:31,054 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,054 - auth_guardian - INFO - Loaded existing settings before save. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,055 - auth_guardian - INFO - About to save settings. Keys to save: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,055 - secure_file_manager - INFO - Writing encrypted settings to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\settings.json. Settings keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,058 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:06:31,071 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:06:31,072 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\integrity_file
+2025-11-19 15:06:31,077 - secure_file_manager - INFO - Settings file written successfully. Size: 475 bytes
+2025-11-19 15:06:31,077 - auth_guardian - INFO - Successfully saved settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,079 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 15:06:31,080 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 15:06:31,080 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,081 - auth_guardian - INFO - Loaded existing settings before save. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,081 - auth_guardian - INFO - About to save settings. Keys to save: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,081 - secure_file_manager - INFO - Writing encrypted settings to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\settings.json. Settings keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,083 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:06:31,095 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:06:31,104 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\integrity_file
+2025-11-19 15:06:31,114 - secure_file_manager - INFO - Settings file written successfully. Size: 475 bytes
+2025-11-19 15:06:31,117 - auth_guardian - INFO - Successfully saved settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,121 - __main__ - INFO - Login attempt recorded
+2025-11-19 15:06:31,122 - __main__ - INFO - Loading settings from auth_guardian: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,122 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-19 15:06:31,122 - __main__ - INFO - load_settings() completed
+2025-11-19 15:06:31,126 - __main__ - INFO - Checking 2FA status: hasattr(auth_guardian)=True, auth_guardian exists=True
+2025-11-19 15:06:31,127 - __main__ - INFO - 2FA is_tfa_enabled() returned: False
+2025-11-19 15:06:31,127 - __main__ - INFO - 2FA is not enabled, skipping 2FA verification
+2025-11-19 15:06:31,128 - auth_guardian - INFO - Updating setting 'last_login_timestamp' and persisting changes.
+2025-11-19 15:06:31,128 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 15:06:31,129 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 15:06:31,129 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,129 - auth_guardian - INFO - Loaded existing settings before save. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,130 - auth_guardian - INFO - About to save settings. Keys to save: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,131 - secure_file_manager - INFO - Writing encrypted settings to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\settings.json. Settings keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,134 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:06:31,146 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:06:31,148 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\integrity_file
+2025-11-19 15:06:31,149 - secure_file_manager - INFO - Settings file written successfully. Size: 475 bytes
+2025-11-19 15:06:31,149 - auth_guardian - INFO - Successfully saved settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,150 - auth_guardian - INFO - Updating setting 'consecutive_logins' and persisting changes.
+2025-11-19 15:06:31,150 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 15:06:31,151 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 15:06:31,151 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,152 - auth_guardian - INFO - Loaded existing settings before save. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,152 - auth_guardian - INFO - About to save settings. Keys to save: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,153 - secure_file_manager - INFO - Writing encrypted settings to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\settings.json. Settings keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,154 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:06:31,166 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:06:31,168 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\integrity_file
+2025-11-19 15:06:31,168 - secure_file_manager - INFO - Settings file written successfully. Size: 475 bytes
+2025-11-19 15:06:31,168 - auth_guardian - INFO - Successfully saved settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:06:31,169 - notification_manager - INFO - Trial mode active - backup notifications disabled
+2025-11-19 15:06:32,730 - __main__ - INFO - Starting deferred startup tasks...
+2025-11-19 15:06:32,731 - password_reminder - INFO - PasswordReminder initialized
+2025-11-19 15:06:32,731 - password_reminder - INFO - Starting PasswordReminder timer (first check in 30 seconds)
+2025-11-19 15:06:32,732 - password_reminder - INFO - Starting PasswordReminder timer (first check in 30 seconds)
+2025-11-19 15:06:32,733 - __main__ - INFO - Password reminder initialized and started
+2025-11-19 15:06:32,733 - __main__ - INFO - Expired passwords count updated
+2025-11-19 15:06:32,733 - __main__ - INFO - Deferred startup tasks completed
+2025-11-19 15:06:47,744 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:06:47,745 - password_reminder - INFO - Adding reminder for account: lmmlml (ID: lwUOipkLJoPaSaD2EPtY_A, Last updated: 2025-11-19T12:49:53.373858)
+2025-11-19 15:06:47,758 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:06:47,760 - password_reminder - INFO - Adding reminder for account: jlkjljlkj (ID: UYP92YW1SAGgvlJa3miw1g, Last updated: 2025-11-19T12:50:00.147290)
+2025-11-19 15:06:47,883 - password_reminder - INFO - Adding reminder for account: 132 (ID: akVLO3dle4Qd7fDJO6tPBQ, Last updated: 2025-11-19T12:50:08.471796)
+2025-11-19 15:06:47,893 - password_reminder - INFO - Adding reminder for account: 21321 (ID: qz3eS8bwVHAO7bxBImw_Bw, Last updated: 2025-11-19T12:50:14.010847)
+2025-11-19 15:06:47,893 - password_reminder - INFO - Adding reminder for account: 87879789978 (ID: e1wpGC2ftfb0u31Y1BWJ4g, Last updated: 2025-11-19T12:50:20.427652)
+2025-11-19 15:06:47,902 - password_reminder - INFO - Adding reminder for account: 654654 (ID: fgZ95wcOkJhdkFrXYhdCbQ, Last updated: 2025-11-19T12:50:27.028098)
+2025-11-19 15:06:48,397 - password_reminder - INFO - Adding reminder for account: 8879789879978987987789978 (ID: _5rDq9_kFC9y2F2DXIY1ng, Last updated: 2025-11-19T12:50:48.996015)
+2025-11-19 15:06:48,398 - password_reminder - INFO - Adding reminder for account: 8879789879978987987789978 (ID: _5rDq9_kFC9y2F2DXIY1ng, Last updated: 2025-11-19T12:50:48.996015)
+2025-11-19 15:06:48,984 - password_reminder - INFO - Adding reminder for account: oipoipoipoip (ID: TY5NtWHizIUBsPWXZXdv0w, Last updated: 2025-11-19T12:51:04.987673)
+2025-11-19 15:06:48,984 - password_reminder - INFO - Adding reminder for account: oipoipoipoip (ID: TY5NtWHizIUBsPWXZXdv0w, Last updated: 2025-11-19T12:51:04.987673)
+2025-11-19 15:06:50,656 - password_reminder - INFO - Adding reminder for account: uytyuyuyuyuyytytytyt (ID: WE5vkAh0djSfehIhdmkFpg, Last updated: 2025-11-19T12:51:55.430109)
+2025-11-19 15:06:50,656 - password_reminder - INFO - Adding reminder for account: uytyuyuyuyuyytytytyt (ID: WE5vkAh0djSfehIhdmkFpg, Last updated: 2025-11-19T12:51:55.430109)
+2025-11-19 15:07:51,464 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:07:52,544 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:08:51,471 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:08:52,555 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:09:34,755 - __main__ - INFO - Generated a new password of length 16.
+2025-11-19 15:09:43,421 - __main__ - INFO - DB Action: CREATE, Type: ACCOUNT, ID: bPQ9vN2mN4dLH18X9KTn3A, Details: Created account: ezezezze
+2025-11-19 15:09:43,536 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:09:43,537 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:09:43,539 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\integrity_file
+2025-11-19 15:09:43,539 - __main__ - INFO - Syncing account 'ezezezze' to secure storage...
+2025-11-19 15:09:43,539 - secure_file_manager - INFO - Syncing all files...
+2025-11-19 15:09:43,540 - secure_file_manager - INFO - Syncing from temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh
+2025-11-19 15:09:43,544 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:09:43,553 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:09:43,566 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_9ronukyh\integrity_file
+2025-11-19 15:09:43,569 - secure_file_manager - INFO - Sync from temp directory completed.
+2025-11-19 15:09:43,569 - __main__ - INFO - Account 'ezezezze' synced to secure storage successfully
+2025-11-19 15:09:43,570 - __main__ - INFO - Account 'ezezezze' created successfully with ID: bPQ9vN2mN4dLH18X9KTn3A
+2025-11-19 15:09:51,481 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:09:52,571 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:10:30,863 - root - INFO - Logging has been set up.
+2025-11-19 15:10:30,863 - __main__ - INFO - Starting SecureVault Pro...
+2025-11-19 15:10:31,021 - asyncio_manager - INFO - Asyncio event loop started in background thread.
+2025-11-19 15:10:31,135 - __main__ - INFO - Application initialized successfully
+2025-11-19 15:10:34,801 - __main__ - INFO - Initializing secure file management system...
+2025-11-19 15:10:34,803 - __main__ - INFO - Secure file manager initialized
+2025-11-19 15:10:35,316 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 15:10:35,316 - secure_file_manager - WARNING - Settings file is encrypted, but no encryption key is available (this is expected on startup).
+2025-11-19 15:10:35,793 - root - INFO - --- Starting Trial Status Check ---
+2025-11-19 15:10:35,794 - root - INFO - Guardian Anchor check returned: status=OK_UNEXPECTED_SHUTDOWN, data={'install_ts': '2025-11-13T19:06:30.864841', 'machine_fp': '57760c5575fad941f37d490b1cd91368b4d441c49745fb8b3e0734efe5118ed6', 'shutdown_status': 'RUNNING'}
+2025-11-19 15:10:35,794 - root - WARNING - Guardian Anchor reported an unexpected shutdown.
+2025-11-19 15:10:35,794 - root - INFO - Installation timestamp: 2025-11-13 19:06:30.864841
+2025-11-19 15:10:35,795 - root - INFO - Current UTC time: 2025-11-19 14:10:35.794629
+2025-11-19 15:10:35,795 - root - INFO - Time elapsed since installation: 5 days, 19:04:04.929788
+2025-11-19 15:10:35,795 - root - INFO - Trial period: 8 days, 0:00:00
+2025-11-19 15:10:35,795 - root - INFO - Trial is active. Minutes remaining: 3175.92. Status: TRIAL
+2025-11-19 15:10:35,796 - __main__ - INFO - Trial status at startup: TRIAL
+2025-11-19 15:10:36,289 - auth_guardian - INFO - AuthGuardian init: No encryption key available, starting with empty settings. Will reload after authentication.
+2025-11-19 15:10:36,290 - __main__ - INFO - Loading settings from auth_guardian: []
+2025-11-19 15:10:36,290 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-19 15:10:36,294 - secure_file_manager - INFO - Initializing encryption...
+2025-11-19 15:10:36,296 - secure_file_manager - INFO - Salt loaded from secure_vault\salt_file
+2025-11-19 15:10:36,296 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-11-19 15:10:36,418 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-11-19 15:10:36,419 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-11-19 15:10:36,420 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_fbmg39_p
+2025-11-19 15:10:36,425 - secure_file_manager - INFO - Updated paths to point to temp directory. settings_path now: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_fbmg39_p\settings.json
+2025-11-19 15:10:36,426 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-11-19 15:10:36,426 - __main__ - INFO - Attempting authentication...
+2025-11-19 15:10:36,426 - __main__ - INFO - Salt path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_fbmg39_p\salt_file
+2025-11-19 15:10:36,427 - __main__ - INFO - Metadata DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_fbmg39_p\metadata.db
+2025-11-19 15:10:36,427 - __main__ - INFO - Sensitive DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_fbmg39_p\sensitive.db
+2025-11-19 15:10:36,428 - __main__ - INFO - Integrity path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_fbmg39_p\integrity_file
+2025-11-19 15:10:36,429 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-11-19 15:10:36,551 - __main__ - INFO - Encryption keys generated
+2025-11-19 15:10:36,551 - secure_file_manager - INFO - Verifying integrity...
+2025-11-19 15:10:36,566 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-19 15:10:36,566 - secure_file_manager - INFO - Integrity verification result: FAILED
+2025-11-19 15:10:36,566 - __main__ - INFO - Database integrity check: FAILED
+2025-11-19 15:10:36,567 - __main__ - ERROR - Database integrity check failed
+2025-11-19 15:10:36,567 - __main__ - INFO - Attempting integrity recovery...
+2025-11-19 15:10:36,568 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:10:36,569 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:10:36,571 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_fbmg39_p\integrity_file
+2025-11-19 15:10:36,571 - __main__ - INFO - Integrity signature regenerated, retrying verification...
+2025-11-19 15:10:36,572 - secure_file_manager - INFO - Verifying integrity...
+2025-11-19 15:10:36,584 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-19 15:10:36,584 - secure_file_manager - INFO - Integrity verification result: OK
+2025-11-19 15:10:36,585 - __main__ - INFO - Integrity recovery successful
+2025-11-19 15:10:36,588 - __main__ - ERROR - Test decryption failed: Invalid authentication tag. This almost certainly means the password is wrong.
+2025-11-19 15:10:41,724 - __main__ - INFO - Initializing encryption...
+2025-11-19 15:10:41,724 - secure_file_manager - INFO - Initializing encryption...
+2025-11-19 15:10:41,726 - secure_file_manager - INFO - Salt loaded from C:\Users\Hamza\AppData\Local\Temp\sv_tmp_fbmg39_p\salt_file
+2025-11-19 15:10:41,726 - secure_file_manager - INFO - Using 'cryptography' package for key derivation.
+2025-11-19 15:10:41,860 - secure_file_manager - INFO - Encryption key derived successfully.
+2025-11-19 15:10:41,861 - __main__ - INFO - Loading files from secure storage...
+2025-11-19 15:10:41,861 - secure_file_manager - INFO - Loading files to temporary directory...
+2025-11-19 15:10:41,861 - secure_file_manager - INFO - Removing old temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_fbmg39_p
+2025-11-19 15:10:41,864 - secure_file_manager - INFO - Created new temp directory: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x
+2025-11-19 15:10:41,868 - secure_file_manager - INFO - Updated paths to point to temp directory. settings_path now: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\settings.json
+2025-11-19 15:10:41,869 - secure_file_manager - INFO - Files loaded to temp directory successfully.
+2025-11-19 15:10:41,869 - __main__ - INFO - Attempting authentication...
+2025-11-19 15:10:41,870 - __main__ - INFO - Salt path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\salt_file
+2025-11-19 15:10:41,870 - __main__ - INFO - Metadata DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\metadata.db
+2025-11-19 15:10:41,871 - __main__ - INFO - Sensitive DB path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\sensitive.db
+2025-11-19 15:10:41,871 - __main__ - INFO - Integrity path: C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\integrity_file
+2025-11-19 15:10:41,873 - __main__ - INFO - Salt loaded successfully (32 bytes)
+2025-11-19 15:10:41,990 - __main__ - INFO - Encryption keys generated
+2025-11-19 15:10:41,991 - secure_file_manager - INFO - Verifying integrity...
+2025-11-19 15:10:41,996 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-19 15:10:41,997 - secure_file_manager - INFO - Integrity verification result: FAILED
+2025-11-19 15:10:41,997 - __main__ - INFO - Database integrity check: FAILED
+2025-11-19 15:10:41,998 - __main__ - ERROR - Database integrity check failed
+2025-11-19 15:10:41,998 - __main__ - INFO - Attempting integrity recovery...
+2025-11-19 15:10:41,998 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:10:42,000 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:10:42,001 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\integrity_file
+2025-11-19 15:10:42,002 - __main__ - INFO - Integrity signature regenerated, retrying verification...
+2025-11-19 15:10:42,002 - secure_file_manager - INFO - Verifying integrity...
+2025-11-19 15:10:42,012 - secure_file_manager - INFO - Verifying with HMAC-SHA256.
+2025-11-19 15:10:42,013 - secure_file_manager - INFO - Integrity verification result: OK
+2025-11-19 15:10:42,013 - __main__ - INFO - Integrity recovery successful
+2025-11-19 15:10:42,016 - __main__ - INFO - Test decryption and password verification successful
+2025-11-19 15:10:42,016 - __main__ - INFO - Authentication successful!
+2025-11-19 15:10:42,017 - __main__ - INFO - Encryption key set on secure_file_manager after login. Key is set: True
+2025-11-19 15:10:42,021 - __main__ - INFO - Calling reload_settings() after successful auth...
+2025-11-19 15:10:42,024 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 15:10:42,025 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 15:10:42,030 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,040 - auth_guardian - INFO - Reloading settings, read_settings returned: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,042 - auth_guardian - INFO - tfa_secret present in reloaded settings: False
+2025-11-19 15:10:42,043 - auth_guardian - INFO - tfa_enabled_at present in reloaded settings: False
+2025-11-19 15:10:42,043 - auth_guardian - INFO - After reload, _settings has: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,044 - auth_guardian - INFO - After reload, is_tfa_enabled(): False
+2025-11-19 15:10:42,044 - __main__ - INFO - reload_settings() completed
+2025-11-19 15:10:42,044 - __main__ - INFO - Recording login attempt after settings reload...
+2025-11-19 15:10:42,045 - auth_guardian - INFO - Successful master password login recorded. Resetting guardian state.
+2025-11-19 15:10:42,045 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 15:10:42,046 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 15:10:42,046 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,046 - auth_guardian - INFO - Loaded existing settings before save. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,047 - auth_guardian - INFO - About to save settings. Keys to save: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,047 - secure_file_manager - INFO - Writing encrypted settings to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\settings.json. Settings keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,050 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:10:42,061 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:10:42,063 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\integrity_file
+2025-11-19 15:10:42,064 - secure_file_manager - INFO - Settings file written successfully. Size: 475 bytes
+2025-11-19 15:10:42,065 - auth_guardian - INFO - Successfully saved settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,066 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 15:10:42,066 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 15:10:42,067 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,068 - auth_guardian - INFO - Loaded existing settings before save. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,069 - auth_guardian - INFO - About to save settings. Keys to save: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,070 - secure_file_manager - INFO - Writing encrypted settings to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\settings.json. Settings keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,072 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:10:42,082 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:10:42,085 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\integrity_file
+2025-11-19 15:10:42,085 - secure_file_manager - INFO - Settings file written successfully. Size: 475 bytes
+2025-11-19 15:10:42,086 - auth_guardian - INFO - Successfully saved settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,087 - __main__ - INFO - Login attempt recorded
+2025-11-19 15:10:42,087 - __main__ - INFO - Loading settings from auth_guardian: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,088 - __main__ - INFO - Loaded tutorial_completed: False
+2025-11-19 15:10:42,088 - __main__ - INFO - load_settings() completed
+2025-11-19 15:10:42,088 - __main__ - INFO - Checking 2FA status: hasattr(auth_guardian)=True, auth_guardian exists=True
+2025-11-19 15:10:42,088 - __main__ - INFO - 2FA is_tfa_enabled() returned: False
+2025-11-19 15:10:42,089 - __main__ - INFO - 2FA is not enabled, skipping 2FA verification
+2025-11-19 15:10:42,089 - auth_guardian - INFO - Updating setting 'last_login_timestamp' and persisting changes.
+2025-11-19 15:10:42,090 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 15:10:42,090 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 15:10:42,090 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,091 - auth_guardian - INFO - Loaded existing settings before save. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,091 - auth_guardian - INFO - About to save settings. Keys to save: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,092 - secure_file_manager - INFO - Writing encrypted settings to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\settings.json. Settings keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,093 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:10:42,104 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:10:42,107 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\integrity_file
+2025-11-19 15:10:42,107 - secure_file_manager - INFO - Settings file written successfully. Size: 475 bytes
+2025-11-19 15:10:42,107 - auth_guardian - INFO - Successfully saved settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,108 - auth_guardian - INFO - Updating setting 'consecutive_logins' and persisting changes.
+2025-11-19 15:10:42,108 - secure_file_manager - INFO - Read 475 bytes from settings file
+2025-11-19 15:10:42,108 - secure_file_manager - INFO - Decrypting encrypted settings file...
+2025-11-19 15:10:42,109 - secure_file_manager - INFO - Successfully decrypted settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,109 - auth_guardian - INFO - Loaded existing settings before save. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,110 - auth_guardian - INFO - About to save settings. Keys to save: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,110 - secure_file_manager - INFO - Writing encrypted settings to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\settings.json. Settings keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,112 - secure_file_manager - INFO - Rotating integrity signature.
+2025-11-19 15:10:42,123 - secure_file_manager - INFO - Using HMAC-SHA256 for integrity signature.
+2025-11-19 15:10:42,125 - secure_file_manager - INFO - Integrity signature written to C:\Users\Hamza\AppData\Local\Temp\sv_tmp_i7twtr_x\integrity_file
+2025-11-19 15:10:42,125 - secure_file_manager - INFO - Settings file written successfully. Size: 475 bytes
+2025-11-19 15:10:42,126 - auth_guardian - INFO - Successfully saved settings. Keys: ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time', 'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time', 'last_login_timestamp', 'consecutive_logins']
+2025-11-19 15:10:42,127 - notification_manager - INFO - Trial mode active - backup notifications disabled
+2025-11-19 15:10:43,650 - __main__ - INFO - Starting deferred startup tasks...
+2025-11-19 15:10:43,650 - password_reminder - INFO - PasswordReminder initialized
+2025-11-19 15:10:43,650 - password_reminder - INFO - Starting PasswordReminder timer (first check in 30 seconds)
+2025-11-19 15:10:43,651 - password_reminder - INFO - Starting PasswordReminder timer (first check in 30 seconds)
+2025-11-19 15:10:43,652 - __main__ - INFO - Password reminder initialized and started
+2025-11-19 15:10:43,652 - __main__ - INFO - Expired passwords count updated
+2025-11-19 15:10:43,653 - __main__ - INFO - Deferred startup tasks completed
+2025-11-19 15:10:58,661 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:10:58,662 - password_reminder - INFO - Adding reminder for account: lmmlml (ID: lwUOipkLJoPaSaD2EPtY_A, Last updated: 2025-11-19T12:49:53.373858)
+2025-11-19 15:10:58,674 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:10:58,686 - password_reminder - INFO - Adding reminder for account: jlkjljlkj (ID: UYP92YW1SAGgvlJa3miw1g, Last updated: 2025-11-19T12:50:00.147290)
+2025-11-19 15:10:58,814 - password_reminder - INFO - Adding reminder for account: 132 (ID: akVLO3dle4Qd7fDJO6tPBQ, Last updated: 2025-11-19T12:50:08.471796)
+2025-11-19 15:10:58,824 - password_reminder - INFO - Adding reminder for account: 21321 (ID: qz3eS8bwVHAO7bxBImw_Bw, Last updated: 2025-11-19T12:50:14.010847)
+2025-11-19 15:10:58,825 - password_reminder - INFO - Adding reminder for account: 87879789978 (ID: e1wpGC2ftfb0u31Y1BWJ4g, Last updated: 2025-11-19T12:50:20.427652)
+2025-11-19 15:10:58,847 - password_reminder - INFO - Adding reminder for account: 654654 (ID: fgZ95wcOkJhdkFrXYhdCbQ, Last updated: 2025-11-19T12:50:27.028098)
+2025-11-19 15:10:58,847 - password_reminder - INFO - Adding reminder for account: 654654 (ID: fgZ95wcOkJhdkFrXYhdCbQ, Last updated: 2025-11-19T12:50:27.028098)
+2025-11-19 15:11:00,148 - password_reminder - INFO - Adding reminder for account: 8879789879978987987789978 (ID: _5rDq9_kFC9y2F2DXIY1ng, Last updated: 2025-11-19T12:50:48.996015)
+2025-11-19 15:11:02,093 - password_reminder - INFO - Adding reminder for account: oipoipoipoip (ID: TY5NtWHizIUBsPWXZXdv0w, Last updated: 2025-11-19T12:51:04.987673)
+2025-11-19 15:11:02,094 - password_reminder - INFO - Adding reminder for account: uytyuyuyuyuyytytytyt (ID: WE5vkAh0djSfehIhdmkFpg, Last updated: 2025-11-19T12:51:55.430109)
+2025-11-19 15:11:02,094 - password_reminder - INFO - Adding reminder for account: uytyuyuyuyuyytytytyt (ID: WE5vkAh0djSfehIhdmkFpg, Last updated: 2025-11-19T12:51:55.430109)
+2025-11-19 15:12:02,117 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:12:02,131 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:13:02,132 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:13:02,174 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:14:02,149 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:14:02,185 - password_reminder - INFO - Found 9 accounts older than 5 minutes
+2025-11-19 15:15:02,162 - password_reminder - INFO - Found 10 accounts older than 5 minutes
+2025-11-19 15:15:02,162 - password_reminder - INFO - Adding reminder for account: ezezezze (ID: bPQ9vN2mN4dLH18X9KTn3A, Last updated: 2025-11-19T15:09:43.407682)
+2025-11-19 15:15:02,193 - password_reminder - INFO - Found 10 accounts older than 5 minutes
+2025-11-19 15:16:02,175 - password_reminder - INFO - Found 10 accounts older than 5 minutes
+2025-11-19 15:16:02,209 - password_reminder - INFO - Found 10 accounts older than 5 minutes
