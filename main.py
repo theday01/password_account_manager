@@ -2688,6 +2688,7 @@ class ModernPasswordManagerGUI:
         win.focus_force()
 
     def show_backup_dialog(self):
+        """Enhanced backup dialog with password generator button"""
         import tkinter.simpledialog as simpledialog
         if not self.database:
             self.show_message("error", "database_not_available_error", msg_type="error")
@@ -2734,6 +2735,10 @@ class ModernPasswordManagerGUI:
                                 placeholder_text=self.lang_manager.get_string("backup_code_placeholder"))
         code_entry.pack(pady=(0, 10))
 
+        # Button container for Show/Hide and Generate buttons
+        button_container = ctk.CTkFrame(code_frame, fg_color="transparent")
+        button_container.pack(pady=(0, 15))
+
         def toggle_code_visibility():
             if code_entry.cget("show") == "*":
                 code_entry.configure(show="")
@@ -2742,9 +2747,63 @@ class ModernPasswordManagerGUI:
                 code_entry.configure(show="*")
                 show_btn.configure(text=self.lang_manager.get_string("show_button"))
 
-        show_btn = ctk.CTkButton(code_frame, text=self.lang_manager.get_string("show_button"), width=80, height=30,
+        show_btn = ctk.CTkButton(button_container, text=self.lang_manager.get_string("show_button"), 
+                                width=80, height=30,
                                 command=toggle_code_visibility)
-        show_btn.pack(pady=(0, 15))
+        show_btn.pack(side="left", padx=5)
+
+        def generate_strong_password():
+            """Generate a random password with minimum 50 characters"""
+            try:
+                # Generate a very strong password (50-64 characters)
+                password_length = 50  # Minimum 50 characters
+                generated_password = self.password_generator.generate_password(
+                    length=password_length,
+                    use_uppercase=True,
+                    use_lowercase=True,
+                    use_digits=True,
+                    use_symbols=True,
+                    exclude_ambiguous=True  # Exclude confusing characters for better copying
+                )
+                
+                # Clear current entry and insert the generated password
+                code_entry.delete(0, 'end')
+                code_entry.insert(0, generated_password)
+                
+                # Temporarily show the password
+                code_entry.configure(show="")
+                show_btn.configure(text=self.lang_manager.get_string("hide_button"))
+                
+                # Show success feedback
+                generate_btn.configure(text="✓ Generated!", fg_color="#4CAF50")
+                dialog.after(2000, lambda: generate_btn.configure(
+                    text="🎲 Generate Strong Password", 
+                    fg_color="#10B981"
+                ))
+                
+                # Assess and display strength
+                score, strength, _ = self.password_generator.assess_strength(generated_password)
+                strength_info = f"Password generated: {password_length} chars | Strength: {strength} ({score}%)"
+                
+                # Update the warning label temporarily with strength info
+                original_text = warning_label.cget("text")
+                warning_label.configure(text=f"🔐 {strength_info}", text_color="#4CAF50")
+                dialog.after(5000, lambda: warning_label.configure(text=original_text, text_color="#ff6666"))
+                
+            except Exception as e:
+                self.show_message("error", f"Failed to generate password: {str(e)}", msg_type="error")
+
+        # Add the generate button with green color
+        generate_btn = ctk.CTkButton(
+            button_container, 
+            text="🎲 Generate Strong Password", 
+            width=200, 
+            height=30,
+            command=generate_strong_password,
+            fg_color="#10B981",  # Green color
+            hover_color="#059669"  # Darker green on hover
+        )
+        generate_btn.pack(side="left", padx=5)
 
         def create_backup():
             code = code_entry.get().strip()
@@ -2789,7 +2848,7 @@ class ModernPasswordManagerGUI:
                     width=180, height=45, 
                     font=ctk.CTkFont(size=16, weight="bold")).pack(side="right", padx=15)
         code_entry.focus()
-        
+
     def create_sidebar(self, parent):
         self.sidebar = ctk.CTkFrame(parent, width=280)
         self.sidebar.pack(side="left", fill="y", padx=10, pady=10)
