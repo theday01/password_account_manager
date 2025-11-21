@@ -391,13 +391,50 @@ class TrialManager:
                 return
 
             input_dialog = ctk.CTkInputDialog(text="Please enter your license key:", title="Activate Full Version")
+            
+            # Center the input dialog
+            input_dialog.update_idletasks()
+            dialog_width = input_dialog.winfo_width()
+            dialog_height = input_dialog.winfo_height()
+            screen_width = input_dialog.winfo_screenwidth()
+            screen_height = input_dialog.winfo_screenheight()
+            x = (screen_width - dialog_width) // 2
+            y = (screen_height - dialog_height) // 2
+            input_dialog.geometry(f"+{x}+{y}")
+            
             license_key = input_dialog.get_input()
             
             if self.validate_and_activate(license_key):
-                messagebox.showinfo("Activated", "Thank you for your purchase! The application is now fully activated.")
-                dialog.destroy()
-                if self.restart_callback:
-                    self.restart_callback()
+                # Create centered success dialog
+                success_dialog = ThemedToplevel(dialog)
+                success_dialog.title("Activated")
+                success_dialog.update_idletasks()
+                dialog_width = 400
+                dialog_height = 150
+                screen_width = success_dialog.winfo_screenwidth()
+                screen_height = success_dialog.winfo_screenheight()
+                x = (screen_width - dialog_width) // 2
+                y = (screen_height - dialog_height) // 2
+                success_dialog.geometry(f"{dialog_width}x{dialog_height}+{x}+{y}")
+                success_dialog.resizable(False, False)
+                success_dialog.grab_set()
+                
+                success_frame = ctk.CTkFrame(success_dialog, corner_radius=15)
+                success_frame.pack(fill="both", expand=True, padx=20, pady=20)
+                
+                ctk.CTkLabel(success_frame, text="Thank you for your purchase!\nThe application is now fully activated.", 
+                            font=ctk.CTkFont(size=14), justify="center").pack(pady=20)
+                
+                def close_success():
+                    success_dialog.destroy()
+                    dialog.destroy()
+                    if self.restart_callback:
+                        self.restart_callback()
+                
+                ctk.CTkButton(success_frame, text="OK", command=close_success, width=100, height=35,
+                             fg_color="#4CAF50", hover_color="#45a049").pack(pady=10)
+                
+                success_dialog.wait_window()
             else:
                 if self.is_activation_locked_out():
                     new_lockout_time = self.get_remaining_activation_lockout_time()

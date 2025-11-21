@@ -961,6 +961,14 @@ class SecurityQuestionsDialog(ThemedToplevel):
 
 class ModernPasswordManagerGUI:
     def __init__(self):
+        self.version_data = {}
+        try:
+            with open("version.json", "r") as f:
+                self.version_data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            logger.error(f"Could not load version data: {e}")
+            self.version_data = {"version": "N/A"}
+
         self.lang_manager = LanguageManager()
         self.crypto = CryptoManager()
         self.password_generator = PasswordGenerator(self.lang_manager)
@@ -3300,7 +3308,10 @@ class ModernPasswordManagerGUI:
 
         about_text = self.lang_manager.get_string("about_text")
         
-        textbox = ctk.CTkTextbox(main_frame, wrap="word", height=400, font=ctk.CTkFont(size=14))
+        version_label = ctk.CTkLabel(main_frame, text=f"Version: {self.version_data.get('version', 'N/A')}", font=ctk.CTkFont(size=12, weight="bold"))
+        version_label.pack(pady=(0, 10))
+
+        textbox = ctk.CTkTextbox(main_frame, wrap="word", height=380, font=ctk.CTkFont(size=14))
         textbox.pack(fill="both", expand=True, pady=10)
         textbox.insert("1.0", about_text)
         textbox.configure(state="disabled")
@@ -5336,7 +5347,7 @@ class ModernPasswordManagerGUI:
         content = ctk.CTkFrame(self.main_panel)
         content.pack(fill="both", expand=True, padx=15, pady=15)
 
-        info_label = ctk.CTkLabel(content, text=self.lang_manager.get_string("update_check_info"),
+        info_label = ctk.CTkLabel(content, text=f"Current Version: {self.version_data.get('version', 'N/A')}",
                                   font=ctk.CTkFont(size=14))
         info_label.pack(pady=20)
 
@@ -5361,8 +5372,23 @@ class ModernPasswordManagerGUI:
 
     def check_for_updates_action(self):
         self.update_status_label.configure(text=self.lang_manager.get_string("checking_for_updates"), text_color=("#3B82F6", "#1E40AF"))
-        # Simulate a network request
-        self.root.after(2000, lambda: self.update_status_label.configure(text=self.lang_manager.get_string("no_updates_available"), text_color="#44FF44"))
+        
+        # --- Simulated Update Check ---
+        hardcoded_latest_version = "1.0.1" 
+        current_version = self.version_data.get("version", "0.0.0")
+
+        def perform_check():
+            if hardcoded_latest_version > current_version:
+                update_message = self.lang_manager.get_string("update_available", latest_version=hardcoded_latest_version)
+                update_color = "#FFA500"  # Orange for "update available"
+            else:
+                update_message = self.lang_manager.get_string("no_updates_available")
+                update_color = "#44FF44" # Green for "up-to-date"
+            
+            self.update_status_label.configure(text=update_message, text_color=update_color)
+
+        # Simulate a network request delay
+        self.root.after(2000, perform_check)
 
     def contact_developer(self):
         webbrowser.open_new_tab("https://wa.me/212623422858")
