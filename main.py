@@ -4163,57 +4163,180 @@ class ModernPasswordManagerGUI:
         except Exception as e:
             logger.error(f"Password verification error: {e}")
             self.show_message("Verification Warning", f"Password was changed but couldn't verify: {str(e)}", msg_type="warning")
-                                        
+
     def show_passwords(self):
+        """Enhanced version with engaging loading animation"""
         for widget in self.main_panel.winfo_children():
             widget.destroy()
         
-        header = ctk.CTkFrame(self.main_panel)
-        header.pack(fill="x", padx=15, pady=15)
+        # Create loading screen with progress bar
+        loading_container = ctk.CTkFrame(self.main_panel, fg_color="transparent")
+        loading_container.pack(fill="both", expand=True)
         
-        ctk.CTkLabel(header, text=self.lang_manager.get_string("your_accounts_title"), 
-                     font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
+        # Center frame for loading elements
+        center_frame = ctk.CTkFrame(loading_container, fg_color="transparent")
+        center_frame.place(relx=0.5, rely=0.5, anchor="center")
         
-        ctk.CTkButton(header, text=self.lang_manager.get_string("add_new_account"), 
-                      command=self.show_account_dialog,
-                      width=180, height=55, font=ctk.CTkFont(size=20, weight="bold")).pack(side="right", padx=25, pady=15)
+        # Loading title with icon
+        title_frame = ctk.CTkFrame(center_frame, fg_color="transparent")
+        title_frame.pack(pady=(0, 20))
         
-        search_frame = ctk.CTkFrame(self.main_panel)
-        search_frame.pack(fill="x", padx=15, pady=10)
+        ctk.CTkLabel(
+            title_frame,
+            text="🔐 Loading Your Accounts",
+            font=ctk.CTkFont(size=24, weight="bold")
+        ).pack()
         
-        self.search_entry = ctk.CTkEntry(search_frame, placeholder_text=self.lang_manager.get_string("search_placeholder"),
-                                         width=400, height=45)
-        self.search_entry.pack(side="left", padx=25, pady=15)
+        ctk.CTkLabel(
+            title_frame,
+            text="Please wait while we securely retrieve your data...",
+            font=ctk.CTkFont(size=12),
+            text_color="#888888"
+        ).pack(pady=(5, 0))
         
-        ctk.CTkLabel(search_frame, text=self.lang_manager.get_string("filter_by_label")).pack(side="left", padx=(10, 5))
-        self.filter_var = ctk.StringVar(value=self.lang_manager.get_string("filter_show_all"))
-        filter_options = [
-            self.lang_manager.get_string("filter_show_all"),
-            self.lang_manager.get_string("filter_weak_passwords"),
-            self.lang_manager.get_string("filter_expired_passwords")
+        # Progress bar
+        progress_bar = ctk.CTkProgressBar(
+            center_frame,
+            width=400,
+            height=12,
+            corner_radius=6,
+            progress_color="#3B82F6"
+        )
+        progress_bar.pack(pady=20)
+        progress_bar.set(0)
+        
+        # Status label
+        status_label = ctk.CTkLabel(
+            center_frame,
+            text="Initializing...",
+            font=ctk.CTkFont(size=11),
+            text_color="#666666"
+        )
+        status_label.pack(pady=(0, 10))
+        
+        # Fun loading messages
+        loading_messages = [
+            "🔍 Scanning vault...",
+            "🔐 Decrypting accounts...",
+            "🛡️ Verifying security...",
+            "📊 Analyzing passwords...",
+            "✨ Preparing your data...",
+            "🎯 Almost there..."
         ]
-        self.filter_menu = ctk.CTkOptionMenu(search_frame, variable=self.filter_var, values=filter_options, command=self.filter_accounts)
-        self.filter_menu.pack(side="left", padx=(0, 10))
+        
+        message_index = [0]
+        
+        def animate_loading():
+            """Smooth progress animation"""
+            current_progress = progress_bar.get()
+            
+            if current_progress < 0.95:
+                # Increment progress
+                increment = 0.15 if current_progress < 0.5 else 0.10
+                new_progress = min(current_progress + increment, 0.95)
+                progress_bar.set(new_progress)
+                
+                # Update message
+                msg_idx = int(new_progress * len(loading_messages))
+                if msg_idx < len(loading_messages) and msg_idx != message_index[0]:
+                    message_index[0] = msg_idx
+                    status_label.configure(text=loading_messages[msg_idx])
+                
+                # Schedule next update
+                self.root.after(300, animate_loading)
+            else:
+                # Loading complete
+                status_label.configure(text="✅ Ready!")
+                progress_bar.set(1.0)
+                
+                # Show actual content after brief delay
+                self.root.after(200, show_actual_content)
+        
+        def show_actual_content():
+            """Display the actual accounts interface"""
+            # Clear loading screen
+            for widget in self.main_panel.winfo_children():
+                widget.destroy()
+            
+            # Header with title and add button
+            header = ctk.CTkFrame(self.main_panel)
+            header.pack(fill="x", padx=15, pady=15)
+            
+            ctk.CTkLabel(
+                header, 
+                text=self.lang_manager.get_string("your_accounts_title"), 
+                font=ctk.CTkFont(size=24, weight="bold")
+            ).pack(side="left", padx=25, pady=15)
+            
+            ctk.CTkButton(
+                header, 
+                text=self.lang_manager.get_string("add_new_account"), 
+                command=self.show_account_dialog,
+                width=180, 
+                height=55, 
+                font=ctk.CTkFont(size=20, weight="bold")
+            ).pack(side="right", padx=25, pady=15)
+            
+            # Search and filter section
+            search_frame = ctk.CTkFrame(self.main_panel)
+            search_frame.pack(fill="x", padx=15, pady=10)
+            
+            self.search_entry = ctk.CTkEntry(
+                search_frame, 
+                placeholder_text=self.lang_manager.get_string("search_placeholder"),
+                width=400, 
+                height=45
+            )
+            self.search_entry.pack(side="left", padx=25, pady=15)
+            
+            ctk.CTkLabel(
+                search_frame, 
+                text=self.lang_manager.get_string("filter_by_label")
+            ).pack(side="left", padx=(10, 5))
+            
+            self.filter_var = ctk.StringVar(value=self.lang_manager.get_string("filter_show_all"))
+            filter_options = [
+                self.lang_manager.get_string("filter_show_all"),
+                self.lang_manager.get_string("filter_weak_passwords"),
+                self.lang_manager.get_string("filter_expired_passwords")
+            ]
+            self.filter_menu = ctk.CTkOptionMenu(
+                search_frame, 
+                variable=self.filter_var, 
+                values=filter_options, 
+                command=self.filter_accounts
+            )
+            self.filter_menu.pack(side="left", padx=(0, 10))
 
-        self.expired_passwords_label = ctk.CTkLabel(search_frame, text="", 
-                                                    font=ctk.CTkFont(size=14, weight="bold"),
-                                                    text_color="red")
-        self.expired_passwords_label.pack(side="right", padx=25, pady=15)
+            self.expired_passwords_label = ctk.CTkLabel(
+                search_frame, 
+                text="", 
+                font=ctk.CTkFont(size=14, weight="bold"),
+                text_color="red"
+            )
+            self.expired_passwords_label.pack(side="right", padx=25, pady=15)
 
-        self.search_entry.bind("<KeyRelease>", self.search_accounts)
+            self.search_entry.bind("<KeyRelease>", self.search_accounts)
 
-        self.passwords_container = ctk.CTkScrollableFrame(self.main_panel)
-        self.passwords_container.pack(fill="both", expand=True, padx=15, pady=15)
+            # Scrollable container for accounts
+            self.passwords_container = ctk.CTkScrollableFrame(self.main_panel)
+            self.passwords_container.pack(fill="both", expand=True, padx=15, pady=15)
 
-        # Show temporary message for password check
-        password_check_label = ctk.CTkLabel(self.passwords_container, 
-                                            text="Checking expired account passwords, please wait...",
-                                            font=ctk.CTkFont(size=14, weight="bold"))
-        password_check_label.pack(pady=20)
-        self.root.after(15000, password_check_label.destroy)
+            # Show checking message (this will be replaced by load_password_cards)
+            password_check_label = ctk.CTkLabel(
+                self.passwords_container, 
+                text="Checking expired account passwords, please wait...",
+                font=ctk.CTkFont(size=14, weight="bold")
+            )
+            password_check_label.pack(pady=20)
+            self.root.after(15000, password_check_label.destroy)
 
-        self.load_password_cards()
-        self.update_expired_passwords_count()
+            # Load actual password cards
+            self.load_password_cards()
+            self.update_expired_passwords_count()
+        
+        # Start the loading animation
+        self.root.after(100, animate_loading)
 
     def is_password_weak(self, password: str) -> bool:
         if len(password) < 16:
