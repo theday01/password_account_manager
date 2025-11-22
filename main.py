@@ -2192,6 +2192,7 @@ class ModernPasswordManagerGUI:
             self.show_login_screen()
         except Exception as e:
             self.show_message("error", "setup_failed_message", msg_type="error", error=str(e))
+            
     def show_main_interface(self):
         for widget in self.main_frame.winfo_children():
             widget.destroy()
@@ -2307,17 +2308,6 @@ class ModernPasswordManagerGUI:
             justify="left",
             anchor="w"
         ).pack(anchor="w", pady=(5, 0))
-        
-        ctk.CTkButton(
-            toolbar, 
-            text=self.lang_manager.get_string("logout"), 
-            width=100, 
-            height=55,
-            image=logout,
-            compound="left",  # icon on the left, text on the right
-            command=self.lock_vault,
-            font=ctk.CTkFont(size=18)
-        ).pack(side="right", padx=10, pady=8)
         
         ctk.CTkButton(
             toolbar,
@@ -4910,23 +4900,686 @@ class ModernPasswordManagerGUI:
                 logger.error(f"Failed to open website for account {account['name']}: {e}")
                 self.show_message("error", "website_open_failed", msg_type="error", error=str(e))
 
+
     def show_account_dialog(self, account=None):
+        """Enhanced account dialog with comprehensive form fields"""
         is_edit = account is not None
         title = self.lang_manager.get_string("edit_account_title", account_name=account['name']) if is_edit else self.lang_manager.get_string("add_account_title")
+        
         dialog = ThemedToplevel(self.root)
         dialog.title(title)
-        dialog.geometry("550x800")
-        dialog.resizable(0,0)
+        dialog.geometry("900x950")
+        dialog.resizable(True, True)
         dialog.grab_set()
+        
+        # Create main frame with scrollbar
         main_frame = ctk.CTkFrame(dialog)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        main_frame.pack(fill="both", expand=True, padx=0, pady=0)
+        
+        # Header with icon
+        header_frame = ctk.CTkFrame(main_frame, fg_color=("gray90", "gray15"), height=60)
+        header_frame.pack(fill="x", padx=0, pady=0)
+        header_frame.pack_propagate(False)
         
         icon_title = self.lang_manager.get_string("edit_account_icon_title") if is_edit else self.lang_manager.get_string("add_account_icon_title")
-        ctk.CTkLabel(main_frame, text=icon_title, 
-                     font=ctk.CTkFont(size=22, weight="bold")).pack(pady=15)
-        entries = self.create_account_form(main_frame, account)
-        self.create_account_dialog_buttons(main_frame, dialog, entries, account)
+        ctk.CTkLabel(
+            header_frame,
+            text=icon_title,
+            font=ctk.CTkFont(size=22, weight="bold")
+        ).pack(anchor="w", padx=20, pady=15)
+        
+        # Content area with scrollbar
+        content_container = ctk.CTkFrame(main_frame)
+        content_container.pack(fill="both", expand=True, padx=0, pady=0)
+        
+        scrollbar = ctk.CTkScrollbar(content_container)
+        scrollbar.pack(side="right", fill="y")
+        
+        scrollable_frame = ctk.CTkScrollableFrame(
+            content_container,
+            scrollbar_button_color=("gray70", "gray30"),
+            scrollbar_button_hover_color=("gray60", "gray40")
+        )
+        scrollable_frame.pack(side="left", fill="both", expand=True, padx=0, pady=0)
+        
+        # Bind mousewheel scrolling
+        def _on_mousewheel(event):
+            scrollable_frame._parent_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        scrollable_frame.bind_all("<MouseWheel>", _on_mousewheel)
+        
+        # Create form sections
+        entries = self._create_enhanced_account_form(scrollable_frame, account)
+        
+        # Button frame (fixed at bottom)
+        button_frame = ctk.CTkFrame(main_frame, fg_color=("gray90", "gray15"), height=60)
+        button_frame.pack(fill="x", padx=0, pady=0, side="bottom")
+        button_frame.pack_propagate(False)
+        
+        # Buttons
+        button_inner_frame = ctk.CTkFrame(button_frame, fg_color="transparent")
+        button_inner_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        ctk.CTkButton(
+            button_inner_frame,
+            text=self.lang_manager.get_string("cancel_button"),
+            command=dialog.destroy,
+            width=120,
+            height=40,
+            fg_color=("gray70", "gray30"),
+            hover_color=("gray60", "gray40")
+        ).pack(side="left", padx=5)
+        
+        save_text = self.lang_manager.get_string("update_account_button") if is_edit else self.lang_manager.get_string("add_account_button")
+        ctk.CTkButton(
+            button_inner_frame,
+            text=save_text,
+            command=lambda: self.save_enhanced_account(dialog, entries, account),
+            width=150,
+            height=40,
+            font=ctk.CTkFont(size=16, weight="bold"),
+            fg_color=("#3B82F6", "#1E40AF"),
+            hover_color=("#2563EB", "#1D4ED8")
+        ).pack(side="right", padx=5)
 
+
+    def _create_enhanced_account_form(self, parent, account=None):
+        """Create enhanced form with multiple sections"""
+        entries = {}
+        
+        if account:
+            username, password = self.database.get_account_credentials(account["id"])
+        else:
+            username = password = ""
+        
+        # ===== BASIC INFORMATION SECTION =====
+        self._create_form_section(
+            parent,
+            "🔐 Basic Information",
+            "Enter the essential account details"
+        )
+        
+        entries["name"] = self._create_form_field(
+            parent,
+            "Account Name",
+            "e.g., Gmail Personal, GitHub Work, PayPal",
+            account['name'] if account else "",
+            required=True
+        )
+        
+        # Account type selector
+        entries["account_type"] = self._create_form_field(
+            parent,
+            "Account Type",
+            "Select the type of account for better organization",
+            account.get('account_type', 'Email') if account else 'Email',
+            field_type="dropdown",
+            options=["Email", "Social Media", "Banking", "Shopping", "Work", "Gaming", "Cloud Storage", "Development", "Other"]
+        )
+        
+        # ===== CREDENTIALS SECTION =====
+        self._create_form_section(
+            parent,
+            "🔑 Credentials",
+            "Your login information (encrypted and secured)"
+        )
+        
+        entries["username"] = self._create_form_field(
+            parent,
+            "Username / Email",
+            "The email or username used to log in",
+            username,
+            required=True
+        )
+        
+        entries["password"] = self._create_password_field_enhanced(parent, password)
+        
+        # ===== CONTACT INFORMATION SECTION =====
+        self._create_form_section(
+            parent,
+            "📧 Contact Information",
+            "Alternative contact methods for account recovery"
+        )
+        
+        entries["email"] = self._create_form_field(
+            parent,
+            "Recovery Email",
+            "Email address for account recovery (if different from username)",
+            account.get('recovery_email', '') if account else "",
+            field_type="email"
+        )
+        
+        entries["phone_number"] = self._create_form_field(
+            parent,
+            "Recovery Phone Number",
+            "Phone number for account recovery (optional)",
+            account.get('phone_number', '') if account else "",
+            field_type="tel"
+        )
+        
+        # ===== WEBSITE & ACCESS SECTION =====
+        self._create_form_section(
+            parent,
+            "🌐 Website & Access",
+            "Where to find this account online"
+        )
+        
+        entries["url"] = self._create_form_field(
+            parent,
+            "Website URL",
+            "e.g., https://www.gmail.com or https://github.com",
+            account.get('url', '') if account else "",
+            field_type="url"
+        )
+        
+        # ===== SECURITY SECTION =====
+        self._create_form_section(
+            parent,
+            "🛡️ Security Settings",
+            "Security features enabled on this account"
+        )
+        
+        entries["two_factor_enabled"] = self._create_form_field(
+            parent,
+            "Two-Factor Authentication",
+            "Is 2FA/MFA enabled on this account?",
+            account.get('two_factor_enabled', 0) if account else 0,
+            field_type="checkbox"
+        )
+        
+        entries["category"] = self._create_form_field(
+            parent,
+            "Security Category",
+            "How critical is this account?",
+            account.get('category', 'Medium') if account else 'Medium',
+            field_type="dropdown",
+            options=["Low Priority", "Medium Priority", "High Priority", "Critical"]
+        )
+        
+        # ===== ADDITIONAL NOTES SECTION =====
+        self._create_form_section(
+            parent,
+            "📝 Additional Notes",
+            "Any extra information or reminders about this account"
+        )
+        
+        entries["notes"] = self._create_textarea_field(
+            parent,
+            "Notes",
+            "Security questions, hints, or special instructions",
+            account.get('notes', '') if account else ""
+        )
+        
+        return entries
+
+
+    def _create_form_section(self, parent, title, subtitle):
+        """Create a form section header with title and description"""
+        section_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        section_frame.pack(fill="x", padx=25, pady=(20, 10))
+        
+        title_label = ctk.CTkLabel(
+            section_frame,
+            text=title,
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        title_label.pack(anchor="w")
+        
+        subtitle_label = ctk.CTkLabel(
+            section_frame,
+            text=subtitle,
+            font=ctk.CTkFont(size=11),
+            text_color=("gray60", "gray40")
+        )
+        subtitle_label.pack(anchor="w", pady=(2, 0))
+        
+        # Divider line
+        divider = ctk.CTkFrame(parent, height=1, fg_color=("gray80", "gray30"))
+        divider.pack(fill="x", padx=25, pady=(8, 0))
+
+
+    def _create_form_field(self, parent, label, hint, value="", field_type="text", options=None, required=False):
+        """Create a labeled form field with helper text"""
+        field_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        field_frame.pack(fill="x", padx=25, pady=10)
+        
+        # Label with required indicator
+        label_frame = ctk.CTkFrame(field_frame, fg_color="transparent")
+        label_frame.pack(fill="x", pady=(0, 5))
+        
+        label_text = f"{label}"
+        if required:
+            label_text += " *"
+        
+        ctk.CTkLabel(
+            label_frame,
+            text=label_text,
+            font=ctk.CTkFont(size=13, weight="bold")
+        ).pack(side="left", anchor="w")
+        
+        # Helper text
+        ctk.CTkLabel(
+            label_frame,
+            text=hint,
+            font=ctk.CTkFont(size=11),
+            text_color=("gray60", "gray40")
+        ).pack(side="left", anchor="w", padx=(10, 0))
+        
+        # Input field
+        if field_type == "dropdown":
+            entry = ctk.CTkComboBox(
+                field_frame,
+                values=options or [],
+                state="readonly",
+                width=450,
+                height=40
+            )
+            if value in (options or []):
+                entry.set(value)
+            entry.pack(fill="x", pady=(0, 5))
+        
+        elif field_type == "checkbox":
+            entry = ctk.CTkCheckBox(
+                field_frame,
+                text="Yes, this account has 2FA enabled",
+                onvalue=1,
+                offvalue=0
+            )
+            if value:
+                entry.select()
+            entry.pack(anchor="w")
+        
+        elif field_type == "email":
+            entry = ctk.CTkEntry(
+                field_frame,
+                placeholder_text="example@email.com",
+                width=450,
+                height=40
+            )
+            if value:
+                entry.insert(0, value)
+            entry.pack(fill="x", pady=(0, 5))
+        
+        elif field_type == "tel":
+            entry = ctk.CTkEntry(
+                field_frame,
+                placeholder_text="+1 (555) 123-4567",
+                width=450,
+                height=40
+            )
+            if value:
+                entry.insert(0, value)
+            entry.pack(fill="x", pady=(0, 5))
+        
+        elif field_type == "url":
+            entry = ctk.CTkEntry(
+                field_frame,
+                placeholder_text="https://www.example.com",
+                width=450,
+                height=40
+            )
+            if value:
+                entry.insert(0, value)
+            entry.pack(fill="x", pady=(0, 5))
+        
+        else:  # text field (default)
+            entry = ctk.CTkEntry(
+                field_frame,
+                placeholder_text=hint,
+                width=450,
+                height=40
+            )
+            if value:
+                entry.insert(0, value)
+            entry.pack(fill="x", pady=(0, 5))
+        
+        return entry
+
+
+    def _create_textarea_field(self, parent, label, hint, value=""):
+        """Create a textarea field"""
+        field_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        field_frame.pack(fill="x", padx=25, pady=10)
+        
+        # Label
+        ctk.CTkLabel(
+            field_frame,
+            text=f"{label}",
+            font=ctk.CTkFont(size=13, weight="bold")
+        ).pack(anchor="w", pady=(0, 5))
+        
+        # Helper text
+        ctk.CTkLabel(
+            field_frame,
+            text=hint,
+            font=ctk.CTkFont(size=11),
+            text_color=("gray60", "gray40")
+        ).pack(anchor="w", pady=(0, 5))
+        
+        # Textarea
+        textarea = ctk.CTkTextbox(
+            field_frame,
+            width=450,
+            height=100,
+            font=ctk.CTkFont(size=12)
+        )
+        if value:
+            textarea.insert("1.0", value)
+        textarea.pack(fill="both", expand=True, pady=(0, 5))
+        
+        return textarea
+
+
+    def _create_password_field_enhanced(self, parent, default_value=""):
+        """Create an enhanced password field with generator and visibility toggle"""
+        field_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        field_frame.pack(fill="x", padx=25, pady=10)
+        
+        # Label
+        label_frame = ctk.CTkFrame(field_frame, fg_color="transparent")
+        label_frame.pack(fill="x", pady=(0, 5))
+        
+        ctk.CTkLabel(
+            label_frame,
+            text="Password *",
+            font=ctk.CTkFont(size=13, weight="bold")
+        ).pack(side="left", anchor="w")
+        
+        ctk.CTkLabel(
+            label_frame,
+            text="Your secure password (minimum 8 characters)",
+            font=ctk.CTkFont(size=11),
+            text_color=("gray60", "gray40")
+        ).pack(side="left", anchor="w", padx=(10, 0))
+        
+        # Input area
+        input_frame = ctk.CTkFrame(field_frame, fg_color="transparent")
+        input_frame.pack(fill="x", pady=(0, 5))
+        
+        password_entry = ctk.CTkEntry(
+            input_frame,
+            placeholder_text="••••••••",
+            show="*",
+            width=280,
+            height=40
+        )
+        password_entry.pack(side="left", padx=(0, 5), fill="x", expand=True)
+        if default_value:
+            password_entry.insert(0, default_value)
+        
+        # Toggle visibility button
+        def toggle_password():
+            if password_entry.cget("show") == "*":
+                password_entry.configure(show="")
+                eye_btn.configure(text="🙈")
+            else:
+                password_entry.configure(show="*")
+                eye_btn.configure(text="👁️")
+        
+        eye_btn = ctk.CTkButton(
+            input_frame,
+            text="👁️",
+            width=40,
+            height=40,
+            command=toggle_password,
+            font=ctk.CTkFont(size=18)
+        )
+        eye_btn.pack(side="left", padx=(0, 5))
+        
+        # Generate button
+        def generate_password():
+            new_password = self.password_generator.generate_password(length=16)
+            password_entry.delete(0, tk.END)
+            password_entry.insert(0, new_password)
+            password_entry.configure(show="")
+            eye_btn.configure(text="🙈")
+        
+        gen_btn = ctk.CTkButton(
+            input_frame,
+            text="🎲",
+            width=40,
+            height=40,
+            command=generate_password,
+            font=ctk.CTkFont(size=18),
+            fg_color="#10B981",
+            hover_color="#059669"
+        )
+        gen_btn.pack(side="left")
+        
+        # Strength indicator
+        strength_frame = ctk.CTkFrame(field_frame, fg_color="transparent")
+        strength_frame.pack(fill="x", pady=(5, 0))
+        
+        strength_label = ctk.CTkLabel(
+            strength_frame,
+            text="",
+            font=ctk.CTkFont(size=11)
+        )
+        strength_label.pack(anchor="w")
+        
+        def on_password_change(event=None):
+            pwd = password_entry.get()
+            if pwd:
+                score, strength, _ = self.password_generator.assess_strength(pwd)
+                color = self.get_strength_color(strength)
+                strength_label.configure(text=f"💪 {strength} ({score}%)", text_color=color)
+            else:
+                strength_label.configure(text="")
+        
+        password_entry.bind("<KeyRelease>", on_password_change)
+        
+        return password_entry
+
+
+    def save_enhanced_account(self, dialog, entries, account=None):
+        """Save account with all enhanced fields to database"""
+        try:
+            # Validate required fields
+            name = entries["name"].get().strip()
+            username = entries["username"].get().strip()
+            password = entries["password"].get()
+            
+            if not name:
+                self.show_message("error", "account_name_required", msg_type="error")
+                return
+            if not username:
+                self.show_message("error", "Please enter a username or email", msg_type="error")
+                return
+            if not password:
+                self.show_message("error", "password_required", msg_type="error")
+                return
+            
+            # Get field values
+            email = entries["email"].get().strip() if hasattr(entries["email"], "get") else ""
+            phone = entries["phone_number"].get().strip() if hasattr(entries["phone_number"], "get") else ""
+            url = entries["url"].get().strip() if hasattr(entries["url"], "get") else ""
+            notes = entries["notes"].get("1.0", tk.END).strip() if hasattr(entries["notes"], "get") else ""
+            
+            # Handle dropdown and checkbox values
+            account_type = entries["account_type"].get() if hasattr(entries["account_type"], "get") else "Other"
+            category = entries["category"].get() if hasattr(entries["category"], "get") else "Medium Priority"
+            two_factor = 1 if entries["two_factor_enabled"].get() else 0 if hasattr(entries["two_factor_enabled"], "get") else 0
+            
+            if account:  # Edit existing
+                if not self.verify_master_password_dialog():
+                    return
+                
+                # Update in database
+                self._update_account_with_fields(
+                    account["id"],
+                    name=name,
+                    email=email,
+                    phone=phone,
+                    url=url,
+                    notes=notes,
+                    username=username,
+                    password=password,
+                    account_type=account_type,
+                    category=category,
+                    two_factor_enabled=two_factor
+                )
+                
+                if self.password_reminder:
+                    self.password_reminder.mark_as_changed(account["id"])
+                
+                self.update_expired_passwords_count()
+                self.show_message("success", "update_success_message", account_name=name)
+            
+            else:  # Create new
+                # Generate unique ID
+                max_attempts = 10
+                account_id = None
+                
+                for attempt in range(max_attempts):
+                    potential_id = secrets.token_urlsafe(16)
+                    try:
+                        metadata_conn = sqlite3.connect(self.database.metadata_db)
+                        cursor = metadata_conn.execute("SELECT id FROM accounts WHERE id = ?", (potential_id,))
+                        existing = cursor.fetchone()
+                        metadata_conn.close()
+                        if not existing:
+                            account_id = potential_id
+                            break
+                    except Exception as e:
+                        logger.error(f"Error checking account ID uniqueness: {e}")
+                        continue
+                
+                if not account_id:
+                    self.show_message("error", "id_generation_failed", msg_type="error")
+                    return
+                
+                # Create new account
+                try:
+                    metadata_conn = sqlite3.connect(self.database.metadata_db)
+                    cursor = metadata_conn.execute("SELECT name FROM accounts WHERE name = ? AND id != 'master_account'", (name,))
+                    existing_name = cursor.fetchone()
+                    metadata_conn.close()
+                    
+                    if existing_name:
+                        result = self.show_message("duplicate_name_title", "duplicate_name_message", ask="yesno", account_name=name)
+                        if not result:
+                            return
+                except Exception as e:
+                    logger.error(f"Error checking account name: {e}")
+                
+                # Insert with all enhanced fields
+                self._insert_account_with_fields(
+                    account_id=account_id,
+                    name=name,
+                    email=email,
+                    phone=phone,
+                    url=url,
+                    notes=notes,
+                    username=username,
+                    password=password,
+                    account_type=account_type,
+                    category=category,
+                    two_factor_enabled=two_factor
+                )
+                
+                self.show_message("success", "add_success_message", account_name=name)
+            
+            dialog.destroy()
+            self.load_password_cards()
+        
+        except Exception as e:
+            self.show_message("error", "save_failed_message", msg_type="error", error=str(e))
+            logger.error(f"Full error details: {e}")
+            import traceback
+            traceback.print_exc()
+
+
+    def _insert_account_with_fields(self, account_id, name, email, phone, url, notes, username, password, account_type, category, two_factor_enabled):
+        """Insert new account with all enhanced fields"""
+        try:
+            metadata_conn = sqlite3.connect(self.database.metadata_db)
+            
+            metadata_conn.execute("""
+                INSERT INTO accounts 
+                (id, name, email, url, notes, created_at, updated_at, tags, security_level, 
+                recovery_email, phone_number, account_type, category, two_factor_enabled, last_password_change)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                account_id, name, email, url, notes,
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                json.dumps([]),
+                SecurityLevel.MEDIUM.value,
+                phone, phone, account_type, category, two_factor_enabled,
+                datetime.now().isoformat()
+            ))
+            metadata_conn.commit()
+            metadata_conn.close()
+            
+            # Add credentials
+            sensitive_conn = sqlite3.connect(self.database.sensitive_db)
+            encrypted_username = self.crypto.encrypt_data(username, self.database.encryption_key)
+            encrypted_password = self.crypto.encrypt_data(password, self.database.encryption_key)
+            
+            sensitive_conn.execute("""
+                INSERT INTO credentials (account_id, encrypted_username, encrypted_password)
+                VALUES (?, ?, ?)
+            """, (account_id, encrypted_username, encrypted_password))
+            sensitive_conn.commit()
+            sensitive_conn.close()
+            
+            # Sync to secure storage
+            if self.secure_file_manager:
+                self.database._checkpoint_databases()
+                self.secure_file_manager.rotate_integrity_signature()
+                self.secure_file_manager.sync_all_files()
+            
+            logger.info(f"Account '{name}' created successfully")
+        
+        except Exception as e:
+            logger.error(f"Error inserting account with fields: {e}")
+            raise
+
+
+    def _update_account_with_fields(self, account_id, name, email, phone, url, notes, username, password, account_type, category, two_factor_enabled):
+        """Update existing account with all enhanced fields"""
+        try:
+            metadata_conn = sqlite3.connect(self.database.metadata_db)
+            
+            metadata_conn.execute("""
+                UPDATE accounts SET
+                name=?, email=?, url=?, notes=?, updated_at=?,
+                recovery_email=?, phone_number=?, account_type=?, category=?, 
+                two_factor_enabled=?, last_password_change=?
+                WHERE id=?
+            """, (
+                name, email, url, notes, datetime.now().isoformat(),
+                phone, phone, account_type, category, two_factor_enabled,
+                datetime.now().isoformat(),
+                account_id
+            ))
+            metadata_conn.commit()
+            metadata_conn.close()
+            
+            # Update credentials
+            sensitive_conn = sqlite3.connect(self.database.sensitive_db)
+            encrypted_username = self.crypto.encrypt_data(username, self.database.encryption_key)
+            encrypted_password = self.crypto.encrypt_data(password, self.database.encryption_key)
+            
+            sensitive_conn.execute("""
+                UPDATE credentials SET
+                encrypted_username=?, encrypted_password=?
+                WHERE account_id=?
+            """, (encrypted_username, encrypted_password, account_id))
+            sensitive_conn.commit()
+            sensitive_conn.close()
+            
+            # Sync to secure storage
+            if self.secure_file_manager:
+                self.database._checkpoint_databases()
+                self.secure_file_manager.rotate_integrity_signature()
+                self.secure_file_manager.sync_all_files()
+            
+            logger.info(f"Account '{name}' updated successfully")
+        
+        except Exception as e:
+            logger.error(f"Error updating account with fields: {e}")
+            raise
+        
     def create_account_form(self, parent, account=None):
         entries = {}
         if account:
@@ -4945,7 +5598,7 @@ class ModernPasswordManagerGUI:
         
         for field_name, label, default_value in fields:
             ctk.CTkLabel(parent, text=label, 
-                         font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=25, pady=(10, 5))
+                        font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=25, pady=(10, 5))
             
             if field_name == "password":
                 entries[field_name] = self.create_password_field(parent, default_value)
@@ -4998,12 +5651,12 @@ class ModernPasswordManagerGUI:
         button_frame.pack(pady=20)
         
         ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), 
-                      command=dialog.destroy, width=120, height=45).pack(side="left", padx=15)
+                    command=dialog.destroy, width=120, height=45).pack(side="left", padx=15)
         
         save_text = self.lang_manager.get_string("update_account_button") if account else self.lang_manager.get_string("add_account_button")
         ctk.CTkButton(button_frame, text=save_text, 
-                      command=lambda: self.save_account(dialog, entries, account),
-                      width=150, height=45, font=ctk.CTkFont(size=16, weight="bold")).pack(side="right", padx=15)
+                    command=lambda: self.save_account(dialog, entries, account),
+                    width=150, height=45, font=ctk.CTkFont(size=16, weight="bold")).pack(side="right", padx=15)
 
     def save_account(self, dialog, entries, account=None):
         if account:  # This is an edit, requires re-authentication
@@ -5114,12 +5767,12 @@ class ModernPasswordManagerGUI:
         title_frame.pack(fill="x", anchor="w")
         
         ctk.CTkLabel(title_frame, text=self.lang_manager.get_string("password_generator_title"), 
-                     font=ctk.CTkFont(size=28, weight="bold")).pack(side="left", anchor="w")
+                    font=ctk.CTkFont(size=28, weight="bold")).pack(side="left", anchor="w")
         
         desc_label = ctk.CTkLabel(title_frame, 
-                                 text="✨ Create secure, custom passwords with real-time strength analysis", 
-                                 font=ctk.CTkFont(size=12),
-                                 text_color="#888888")
+                                text="✨ Create secure, custom passwords with real-time strength analysis", 
+                                font=ctk.CTkFont(size=12),
+                                text_color="#888888")
         desc_label.pack(side="left", padx=(15, 0), anchor="w")
         
         # Quick Presets Section
@@ -5127,7 +5780,7 @@ class ModernPasswordManagerGUI:
         presets_frame.pack(fill="x", padx=25, pady=15)
         
         presets_header = ctk.CTkLabel(presets_frame, text="🎯 Quick Presets", 
-                                     font=ctk.CTkFont(size=14, weight="bold"))
+                                    font=ctk.CTkFont(size=14, weight="bold"))
         presets_header.pack(anchor="w", padx=15, pady=(12, 8))
         
         presets_btn_frame = ctk.CTkFrame(presets_frame, fg_color="transparent")
@@ -5147,8 +5800,8 @@ class ModernPasswordManagerGUI:
         
         for preset_name, preset_config in preset_configs:
             ctk.CTkButton(presets_btn_frame, text=preset_name, width=100, height=32,
-                         command=lambda cfg=preset_config: self._apply_preset(cfg),
-                         font=ctk.CTkFont(size=11)).pack(side="left", padx=5)
+                        command=lambda cfg=preset_config: self._apply_preset(cfg),
+                        font=ctk.CTkFont(size=11)).pack(side="left", padx=5)
         
         # Main content with two columns
         content = ctk.CTkFrame(main_container, fg_color="transparent")
@@ -5159,7 +5812,7 @@ class ModernPasswordManagerGUI:
         settings_frame.pack(side="left", fill="both", expand=True, padx=(0, 12), pady=0)
         
         settings_title = ctk.CTkLabel(settings_frame, text="⚙️ " + self.lang_manager.get_string("generator_settings"), 
-                     font=ctk.CTkFont(size=16, weight="bold"))
+                    font=ctk.CTkFont(size=16, weight="bold"))
         settings_title.pack(anchor="w", padx=20, pady=(15, 10))
         
         # Password Length with visual indicator
@@ -5170,7 +5823,7 @@ class ModernPasswordManagerGUI:
         length_label_frame.pack(fill="x", pady=(0, 5))
         
         ctk.CTkLabel(length_label_frame, text=self.lang_manager.get_string("password_length"), 
-                     font=ctk.CTkFont(size=13, weight="bold")).pack(side="left", anchor="w")
+                    font=ctk.CTkFont(size=13, weight="bold")).pack(side="left", anchor="w")
         
         self.length_var = tk.IntVar(value=16)
         self.length_label = ctk.CTkLabel(length_label_frame, 
@@ -5180,14 +5833,14 @@ class ModernPasswordManagerGUI:
         self.length_label.pack(side="right", anchor="e")
         
         self.length_slider = ctk.CTkSlider(length_frame, from_=8, to=100, 
-                                           variable=self.length_var, width=250,
-                                           button_length=20)
+                                        variable=self.length_var, width=250,
+                                        button_length=20)
         self.length_slider.pack(fill="x", pady=8)
         
         # Length indicator
         length_info = ctk.CTkLabel(length_frame, text="8 ─────────────────────────────────── 100", 
-                                  font=ctk.CTkFont(size=10),
-                                  text_color="#666666")
+                                font=ctk.CTkFont(size=10),
+                                text_color="#666666")
         length_info.pack(fill="x", pady=(5, 10))
         
         def update_length_label(value):
@@ -5202,7 +5855,7 @@ class ModernPasswordManagerGUI:
         char_frame.pack(fill="x", padx=20, pady=15)
         
         char_title = ctk.CTkLabel(char_frame, text=self.lang_manager.get_string("character_types"), 
-                     font=ctk.CTkFont(size=13, weight="bold"))
+                    font=ctk.CTkFont(size=13, weight="bold"))
         char_title.pack(anchor="w", pady=(0, 10))
         
         self.use_uppercase = tk.BooleanVar(value=True)
@@ -5223,8 +5876,8 @@ class ModernPasswordManagerGUI:
             check_frame = ctk.CTkFrame(char_frame, fg_color="transparent")
             check_frame.pack(fill="x", pady=4)
             check_box = ctk.CTkCheckBox(check_frame, text=text, variable=var,
-                                       command=self.generate_password_gui,
-                                       font=ctk.CTkFont(size=12))
+                                    command=self.generate_password_gui,
+                                    font=ctk.CTkFont(size=12))
             check_box.pack(anchor="w")
         
         # Generate button - More prominent
@@ -5232,17 +5885,17 @@ class ModernPasswordManagerGUI:
         gen_btn_frame.pack(fill="x", padx=20, pady=20)
         
         ctk.CTkButton(gen_btn_frame, text="🎲 Generate Password", 
-                      command=self.generate_password_gui, height=50,
-                      font=ctk.CTkFont(size=14, weight="bold"),
-                      fg_color="#3B82F6",
-                      hover_color="#2563EB").pack(fill="x")
+                    command=self.generate_password_gui, height=50,
+                    font=ctk.CTkFont(size=14, weight="bold"),
+                    fg_color="#3B82F6",
+                    hover_color="#2563EB").pack(fill="x")
         
         # Right column - Results
         result_frame = ctk.CTkFrame(content, fg_color=("gray90", "gray15"), corner_radius=12)
         result_frame.pack(side="right", fill="both", expand=True, padx=(12, 0), pady=0)
         
         result_title = ctk.CTkLabel(result_frame, text="🔐 " + self.lang_manager.get_string("generated_password"), 
-                     font=ctk.CTkFont(size=16, weight="bold"))
+                    font=ctk.CTkFont(size=16, weight="bold"))
         result_title.pack(anchor="w", padx=20, pady=(15, 10))
         
         # Password display with enhanced styling
@@ -5250,9 +5903,9 @@ class ModernPasswordManagerGUI:
         password_display_frame.pack(fill="x", padx=20, pady=10)
         
         self.generated_password_entry = ctk.CTkEntry(password_display_frame, width=300, height=55,
-                                                     font=ctk.CTkFont(size=16, family="monospace"),
-                                                     border_width=2,
-                                                     border_color="#3B82F6")
+                                                    font=ctk.CTkFont(size=16, family="monospace"),
+                                                    border_width=2,
+                                                    border_color="#3B82F6")
         self.generated_password_entry.pack(fill="x", pady=(0, 12))
         
         # Action buttons
@@ -5260,42 +5913,42 @@ class ModernPasswordManagerGUI:
         button_frame.pack(fill="x")
         
         ctk.CTkButton(button_frame, text="📋 Copy", 
-                      height=40,
-                      command=self.copy_generated_password,
-                      font=ctk.CTkFont(size=12),
-                      fg_color="#10B981",
-                      hover_color="#059669").pack(side="left", padx=(0, 8), fill="x", expand=True)
+                    height=40,
+                    command=self.copy_generated_password,
+                    font=ctk.CTkFont(size=12),
+                    fg_color="#10B981",
+                    hover_color="#059669").pack(side="left", padx=(0, 8), fill="x", expand=True)
         
         ctk.CTkButton(button_frame, text="🔄 Regenerate", 
-                      height=40,
-                      command=self.generate_password_gui,
-                      font=ctk.CTkFont(size=12),
-                      fg_color="#F59E0B",
-                      hover_color="#D97706").pack(side="left", padx=4, fill="x", expand=True)
+                    height=40,
+                    command=self.generate_password_gui,
+                    font=ctk.CTkFont(size=12),
+                    fg_color="#F59E0B",
+                    hover_color="#D97706").pack(side="left", padx=4, fill="x", expand=True)
         
         ctk.CTkButton(button_frame, text="👁️ Show", 
-                      height=40,
-                      command=self._toggle_password_visibility,
-                      font=ctk.CTkFont(size=12)).pack(side="right", padx=(8, 0), fill="x", expand=True)
+                    height=40,
+                    command=self._toggle_password_visibility,
+                    font=ctk.CTkFont(size=12)).pack(side="right", padx=(8, 0), fill="x", expand=True)
         
         # Strength Analysis with visual meter
         self.strength_frame = ctk.CTkFrame(result_frame, fg_color="transparent")
         self.strength_frame.pack(fill="x", padx=20, pady=20)
         
         strength_title = ctk.CTkLabel(self.strength_frame, 
-                                     text=self.lang_manager.get_string("strength_analysis_title"), 
-                                     font=ctk.CTkFont(size=14, weight="bold"))
+                                    text=self.lang_manager.get_string("strength_analysis_title"), 
+                                    font=ctk.CTkFont(size=14, weight="bold"))
         strength_title.pack(anchor="w", pady=(0, 10))
         
         # Strength meter background
         self.strength_meter_bg = ctk.CTkFrame(self.strength_frame, fg_color=("gray70", "gray40"), 
-                                             height=8, corner_radius=4)
+                                            height=8, corner_radius=4)
         self.strength_meter_bg.pack(fill="x", pady=(0, 8))
         self.strength_meter_bg.pack_propagate(False)
         
         # Strength meter fill (will be updated dynamically)
         self.strength_meter = ctk.CTkFrame(self.strength_meter_bg, fg_color="#D1D5DB", 
-                                          height=8, corner_radius=4)
+                                        height=8, corner_radius=4)
         self.strength_meter.pack(side="left", fill="y", expand=False)
         
         # Strength details
@@ -5310,7 +5963,7 @@ class ModernPasswordManagerGUI:
         self.stats_frame.pack(fill="x", padx=20, pady=10)
         
         self.stats_label = ctk.CTkLabel(self.stats_frame, text="", font=ctk.CTkFont(size=11),
-                                       text_color="#888888")
+                                    text_color="#888888")
         self.stats_label.pack(anchor="w")
         
         # Generate initial password
@@ -5337,7 +5990,7 @@ class ModernPasswordManagerGUI:
         try:
             # Validate that at least one character type is selected
             if not any([self.use_uppercase.get(), self.use_lowercase.get(), 
-                       self.use_digits.get(), self.use_symbols.get()]):
+                    self.use_digits.get(), self.use_symbols.get()]):
                 self.show_message("error", "Please select at least one character type", msg_type="error")
                 return
             
@@ -5914,18 +6567,18 @@ class ModernPasswordManagerGUI:
         header.pack(fill="x", padx=15, pady=15)
         
         ctk.CTkLabel(header, text=self.lang_manager.get_string("check_for_updates_title"), 
-                     font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
+                    font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
 
         content = ctk.CTkFrame(self.main_panel)
         content.pack(fill="both", expand=True, padx=15, pady=15)
 
         info_label = ctk.CTkLabel(content, text=f"Current Version: {self.version_data.get('version', 'N/A')}",
-                                  font=ctk.CTkFont(size=14))
+                                font=ctk.CTkFont(size=14))
         info_label.pack(pady=20)
 
         update_button = ctk.CTkButton(content, text=self.lang_manager.get_string("check_updates_now"),
-                                      command=self.check_for_updates_action,
-                                      width=200, height=50, font=ctk.CTkFont(size=16))
+                                    command=self.check_for_updates_action,
+                                    width=200, height=50, font=ctk.CTkFont(size=16))
         update_button.pack(pady=10)
 
         url_entry = ctk.CTkEntry(content, width=350)
@@ -5935,8 +6588,8 @@ class ModernPasswordManagerGUI:
 
 
         contact_button = ctk.CTkButton(content, text=self.lang_manager.get_string("contact_developer"),
-                                       command=self.contact_developer,
-                                       width=200, height=50, font=ctk.CTkFont(size=16))
+                                    command=self.contact_developer,
+                                    width=200, height=50, font=ctk.CTkFont(size=16))
         contact_button.pack(pady=10)
 
         self.update_status_label = ctk.CTkLabel(content, text="", font=ctk.CTkFont(size=14))
@@ -6077,7 +6730,7 @@ class ModernPasswordManagerGUI:
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
         ctk.CTkLabel(main_frame, text="🚨 Secure Storage Error", 
-                     font=ctk.CTkFont(size=24, weight="bold")).pack(pady=20)
+                    font=ctk.CTkFont(size=24, weight="bold")).pack(pady=20)
         
         error_text = ctk.CTkTextbox(main_frame, height=200)
         error_text.pack(fill="both", expand=True, padx=10, pady=10)
@@ -6087,8 +6740,8 @@ class ModernPasswordManagerGUI:
         button_frame.pack(fill="x", pady=(0, 10))
         
         ctk.CTkButton(button_frame, text="Close", 
-                      command=dialog.destroy,
-                      width=100).pack(side="right")
+                    command=dialog.destroy,
+                    width=100).pack(side="right")
 
     def run(self):
         try:
