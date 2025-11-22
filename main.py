@@ -5443,90 +5443,469 @@ class ModernPasswordManagerGUI:
             self.show_message("error", "no_password_to_copy", msg_type="error")
 
     def show_security_report(self):
+        """Enhanced security report with modern UI, charts, and actionable insights"""
         for widget in self.main_panel.winfo_children():
             widget.destroy()
+        
+        # Header with refresh button
         header = ctk.CTkFrame(self.main_panel)
         header.pack(fill="x", padx=15, pady=15)
         
         ctk.CTkLabel(header, text=self.lang_manager.get_string("security_report_title"), 
-                     font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
+                    font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
+        
+        def refresh_report():
+            self.show_security_report()
+        
+        ctk.CTkButton(header, text="🔄 Refresh", command=refresh_report,
+                    width=120, height=45, font=ctk.CTkFont(size=16)).pack(side="right", padx=25)
+        
+        # Main scrollable content
         content = ctk.CTkScrollableFrame(self.main_panel)
         content.pack(fill="both", expand=True, padx=15, pady=15)
         
-        stats_frame = ctk.CTkFrame(content)
-        stats_frame.pack(fill="x", padx=20, pady=15)
-        
-        ctk.CTkLabel(stats_frame, text=self.lang_manager.get_string("overall_statistics"), 
-                     font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
-        
         try:
+            # Collect account data
             metadata_conn = sqlite3.connect(self.database.metadata_db)
-            cursor = metadata_conn.execute("SELECT id, name FROM accounts WHERE id != 'master_account'")
+            cursor = metadata_conn.execute("SELECT id, name, created_at, updated_at FROM accounts WHERE id != 'master_account'")
             accounts = cursor.fetchall()
             metadata_conn.close()
             
+            # Initialize counters and lists
             total_accounts = len(accounts)
-            weak_passwords = 0
-            strong_passwords = 0
+            weak_passwords = []
+            medium_passwords = []
+            strong_passwords = []
             duplicate_passwords = []
+            reused_passwords = []
+            old_passwords = []  # Passwords not changed in 90+ days
+            very_old_passwords = []  # Passwords not changed in 180+ days
             password_counts = {}
+            password_ages = {}
             
-            for account_id, name in accounts:
+            # Analyze each account
+            from datetime import datetime, timedelta
+            now = datetime.now()
+            
+            for account_id, name, created_at, updated_at in accounts:
                 username, password = self.database.get_account_credentials(account_id)
+                
                 if password:
-                    score, strength, _ = self.password_generator.assess_strength(password)
-                    if score < 60:
-                        weak_passwords += 1
-                    elif score >= 80:
-                        strong_passwords += 1
+                    # Check password strength
+                    score, strength, recommendations = self.password_generator.assess_strength(password)
+                    
+                    if score < 40:
+                        weak_passwords.append((name, strength, score, recommendations))
+                    elif score < 70:
+                        medium_passwords.append((name, strength, score))
+                    else:
+                        strong_passwords.append((name, strength, score))
+                    
+                    # Check for duplicates
                     if password in password_counts:
                         password_counts[password].append(name)
                     else:
                         password_counts[password] = [name]
+                    
+                    # Check password age
+                    try:
+                        updated = datetime.fromisoformat(updated_at)
+                        age_days = (now - updated).days
+                        password_ages[name] = age_days
+                        
+                        if age_days >= 180:
+                            very_old_passwords.append((name, age_days))
+                        elif age_days >= 90:
+                            old_passwords.append((name, age_days))
+                    except:
+                        pass
             
+            # Identify duplicate and reused passwords
             for password, names in password_counts.items():
                 if len(names) > 1:
                     duplicate_passwords.extend(names)
+                    reused_passwords.append((password, names))
             
-            stats_text = self.lang_manager.get_string("statistics_template", total_accounts=total_accounts, strong_passwords=strong_passwords, weak_passwords=weak_passwords, duplicate_passwords=len(duplicate_passwords))
-            ctk.CTkLabel(stats_frame, text=stats_text, 
-                         font=ctk.CTkFont(size=14)).pack(pady=10)
-            if weak_passwords > 0:
-                weak_frame = ctk.CTkFrame(content)
-                weak_frame.pack(fill="x", padx=20, pady=15)
+            # Calculate security score (0-100)
+            security_score = 0
+            if total_accounts > 0:
+                strong_percentage = (len(strong_passwords) / total_accounts) * 40
+                no_duplicates = (1 - (len(set(duplicate_passwords)) / total_accounts)) * 30
+                password_freshness = (1 - (len(old_passwords + very_old_passwords) / total_accounts)) * 30
+                security_score = int(strong_percentage + no_duplicates + password_freshness)
+            
+            # ============= OVERALL SECURITY SCORE CARD =============
+            score_card = ctk.CTkFrame(content, fg_color=("gray90", "gray15"), corner_radius=15)
+            score_card.pack(fill="x", padx=20, pady=(0, 20))
+            
+            score_header = ctk.CTkFrame(score_card, fg_color="transparent")
+            score_header.pack(fill="x", padx=20, pady=(20, 10))
+            
+            ctk.CTkLabel(score_header, text="🛡️ Overall Security Score", 
+                        font=ctk.CTkFont(size=20, weight="bold")).pack(anchor="w")
+            
+            # Visual score indicator
+            score_display = ctk.CTkFrame(score_card, fg_color="transparent")
+            score_display.pack(fill="x", padx=20, pady=15)
+            
+            # Determine color and rating
+            if security_score >= 80:
+                score_color = "#10B981"  # Green
+                rating = "Excellent"
+                emoji = "🟢"
+            elif security_score >= 60:
+                score_color = "#F59E0B"  # Orange
+                rating = "Good"
+                emoji = "🟡"
+            elif security_score >= 40:
+                score_color = "#FF6B6B"  # Light Red
+                rating = "Fair"
+                emoji = "🟠"
+            else:
+                score_color = "#EF4444"  # Red
+                rating = "Poor"
+                emoji = "🔴"
+            
+            # Large score display
+            score_frame = ctk.CTkFrame(score_display, fg_color="transparent")
+            score_frame.pack(side="left", padx=(0, 30))
+            
+            ctk.CTkLabel(score_frame, text=f"{security_score}", 
+                        font=ctk.CTkFont(size=72, weight="bold"),
+                        text_color=score_color).pack()
+            
+            ctk.CTkLabel(score_frame, text="/100", 
+                        font=ctk.CTkFont(size=24),
+                        text_color="gray").pack()
+            
+            # Rating and breakdown
+            details_frame = ctk.CTkFrame(score_display, fg_color="transparent")
+            details_frame.pack(side="left", fill="both", expand=True)
+            
+            ctk.CTkLabel(details_frame, text=f"{emoji} {rating}", 
+                        font=ctk.CTkFont(size=18, weight="bold"),
+                        text_color=score_color).pack(anchor="w", pady=(0, 10))
+            
+            ctk.CTkLabel(details_frame, 
+                        text=f"📊 {total_accounts} Total Accounts\n"
+                            f"✅ {len(strong_passwords)} Strong Passwords\n"
+                            f"⚠️ {len(weak_passwords)} Weak Passwords\n"
+                            f"🔄 {len(set(duplicate_passwords))} Reused Passwords",
+                        font=ctk.CTkFont(size=13),
+                        justify="left").pack(anchor="w")
+            
+            # ============= QUICK STATS GRID =============
+            stats_grid = ctk.CTkFrame(content, fg_color="transparent")
+            stats_grid.pack(fill="x", padx=20, pady=(0, 20))
+            
+            def create_stat_card(parent, title, value, subtitle, color, row, col):
+                card = ctk.CTkFrame(parent, fg_color=("gray90", "gray15"), corner_radius=12)
+                card.grid(row=row, column=col, padx=10, pady=10, sticky="nsew")
                 
-                ctk.CTkLabel(weak_frame, text=self.lang_manager.get_string("weak_passwords_title"), 
-                             font=ctk.CTkFont(size=16, weight="bold"), 
-                             text_color="#FF8844").pack(pady=15)
+                ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=12),
+                            text_color="gray").pack(pady=(15, 5))
                 
-                for account_id, name in accounts:
-                    username, password = self.database.get_account_credentials(account_id)
-                    if password:
-                        score, strength, _ = self.password_generator.assess_strength(password)
-                        if score < 60:
-                            account_frame = ctk.CTkFrame(weak_frame)
-                            account_frame.pack(fill="x", padx=15, pady=5)
+                ctk.CTkLabel(card, text=str(value), font=ctk.CTkFont(size=32, weight="bold"),
+                            text_color=color).pack(pady=5)
+                
+                ctk.CTkLabel(card, text=subtitle, font=ctk.CTkFont(size=11),
+                            text_color="gray").pack(pady=(0, 15))
+            
+            # Configure grid weights
+            for i in range(4):
+                stats_grid.columnconfigure(i, weight=1)
+            
+            create_stat_card(stats_grid, "Strong", len(strong_passwords), "passwords", "#10B981", 0, 0)
+            create_stat_card(stats_grid, "Medium", len(medium_passwords), "passwords", "#F59E0B", 0, 1)
+            create_stat_card(stats_grid, "Weak", len(weak_passwords), "passwords", "#EF4444", 0, 2)
+            create_stat_card(stats_grid, "Reused", len(set(duplicate_passwords)), "passwords", "#FF6B6B", 0, 3)
+            
+            # ============= WEAK PASSWORDS SECTION =============
+            if weak_passwords:
+                weak_frame = ctk.CTkFrame(content, fg_color=("gray90", "gray15"), corner_radius=12)
+                weak_frame.pack(fill="x", padx=20, pady=(0, 20))
+                
+                weak_header = ctk.CTkFrame(weak_frame, fg_color="transparent")
+                weak_header.pack(fill="x", padx=20, pady=(15, 10))
+                
+                ctk.CTkLabel(weak_header, text="⚠️ Accounts with Weak Passwords", 
+                            font=ctk.CTkFont(size=18, weight="bold"),
+                            text_color="#FF6B6B").pack(side="left")
+                
+                ctk.CTkLabel(weak_header, text=f"{len(weak_passwords)} accounts need attention", 
+                            font=ctk.CTkFont(size=12),
+                            text_color="gray").pack(side="right")
+                
+                # List weak passwords
+                for name, strength, score, recommendations in weak_passwords:
+                    account_frame = ctk.CTkFrame(weak_frame, fg_color=("gray85", "gray20"), corner_radius=8)
+                    account_frame.pack(fill="x", padx=15, pady=8)
+                    
+                    info_frame = ctk.CTkFrame(account_frame, fg_color="transparent")
+                    info_frame.pack(fill="x", padx=15, pady=12)
+                    
+                    # Account name and strength
+                    left_info = ctk.CTkFrame(info_frame, fg_color="transparent")
+                    left_info.pack(side="left", fill="both", expand=True)
+                    
+                    ctk.CTkLabel(left_info, text=name, 
+                                font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w")
+                    
+                    ctk.CTkLabel(left_info, text=f"Strength: {strength} ({score}%)", 
+                                font=ctk.CTkFont(size=12),
+                                text_color=self.get_strength_color(strength)).pack(anchor="w", pady=(3, 0))
+                    
+                    # Recommendations
+                    if recommendations:
+                        rec_text = "💡 " + ", ".join(recommendations[:2])
+                        ctk.CTkLabel(left_info, text=rec_text, 
+                                    font=ctk.CTkFont(size=11),
+                                    text_color="gray",
+                                    wraplength=400).pack(anchor="w", pady=(5, 0))
+                    
+                    # Quick fix button
+                    def make_edit_wrapper(acc_name):
+                        def edit_account_wrapper():
+                            # Find the account and open edit dialog
+                            metadata_conn = sqlite3.connect(self.database.metadata_db)
+                            cursor = metadata_conn.execute("SELECT id, name, email, url, notes FROM accounts WHERE name=?", (acc_name,))
+                            row = cursor.fetchone()
+                            metadata_conn.close()
                             
-                            ctk.CTkLabel(account_frame, text=self.lang_manager.get_string("weak_password_template", name=name, strength=strength, score=score), 
-                                         text_color=self.get_strength_color(strength)).pack(side="left", padx=15, pady=10)
-            if duplicate_passwords:
-                dup_frame = ctk.CTkFrame(content)
-                dup_frame.pack(fill="x", padx=20, pady=15)
+                            if row:
+                                account_id, name, email, url, notes = row
+                                username, password = self.database.get_account_credentials(account_id)
+                                account = {
+                                    'id': account_id,
+                                    'name': name,
+                                    'username': username,
+                                    'email': email,
+                                    'url': url,
+                                    'notes': notes
+                                }
+                                self.show_account_dialog(account)
+                        return edit_account_wrapper
+                    
+                    ctk.CTkButton(info_frame, text="🔧 Fix Now", 
+                                command=make_edit_wrapper(name),
+                                width=100, height=35,
+                                fg_color="#3B82F6",
+                                hover_color="#2563EB").pack(side="right")
+            
+            # ============= REUSED PASSWORDS SECTION =============
+            if reused_passwords:
+                reused_frame = ctk.CTkFrame(content, fg_color=("gray90", "gray15"), corner_radius=12)
+                reused_frame.pack(fill="x", padx=20, pady=(0, 20))
                 
-                ctk.CTkLabel(dup_frame, text=self.lang_manager.get_string("duplicate_passwords_title"), 
-                             font=ctk.CTkFont(size=16, weight="bold"), 
-                             text_color="#FF4444").pack(pady=15)
-                for password, names in password_counts.items():
-                    if len(names) > 1:
-                        dup_account_frame = ctk.CTkFrame(dup_frame)
-                        dup_account_frame.pack(fill="x", padx=15, pady=5)
+                reused_header = ctk.CTkFrame(reused_frame, fg_color="transparent")
+                reused_header.pack(fill="x", padx=20, pady=(15, 10))
+                
+                ctk.CTkLabel(reused_header, text="🔄 Reused Passwords", 
+                            font=ctk.CTkFont(size=18, weight="bold"),
+                            text_color="#FF6B6B").pack(side="left")
+                
+                ctk.CTkLabel(reused_header, text=f"{len(reused_passwords)} password(s) used multiple times", 
+                            font=ctk.CTkFont(size=12),
+                            text_color="gray").pack(side="right")
+                
+                for password, names in reused_passwords:
+                    dup_frame = ctk.CTkFrame(reused_frame, fg_color=("gray85", "gray20"), corner_radius=8)
+                    dup_frame.pack(fill="x", padx=15, pady=8)
+                    
+                    ctk.CTkLabel(dup_frame, 
+                                text=f"Shared by {len(names)} accounts: {', '.join(names)}", 
+                                font=ctk.CTkFont(size=13),
+                                wraplength=700,
+                                justify="left").pack(anchor="w", padx=15, pady=12)
+            
+            # ============= PASSWORD AGE SECTION =============
+            if old_passwords or very_old_passwords:
+                age_frame = ctk.CTkFrame(content, fg_color=("gray90", "gray15"), corner_radius=12)
+                age_frame.pack(fill="x", padx=20, pady=(0, 20))
+                
+                age_header = ctk.CTkFrame(age_frame, fg_color="transparent")
+                age_header.pack(fill="x", padx=20, pady=(15, 10))
+                
+                ctk.CTkLabel(age_header, text="⏰ Outdated Passwords", 
+                            font=ctk.CTkFont(size=18, weight="bold"),
+                            text_color="#F59E0B").pack(side="left")
+                
+                total_old = len(old_passwords) + len(very_old_passwords)
+                ctk.CTkLabel(age_header, text=f"{total_old} password(s) need updating", 
+                            font=ctk.CTkFont(size=12),
+                            text_color="gray").pack(side="right")
+                
+                # Very old passwords (180+ days)
+                if very_old_passwords:
+                    for name, age_days in sorted(very_old_passwords, key=lambda x: x[1], reverse=True):
+                        old_frame = ctk.CTkFrame(age_frame, fg_color=("gray85", "gray20"), corner_radius=8)
+                        old_frame.pack(fill="x", padx=15, pady=5)
                         
-                        ctk.CTkLabel(dup_account_frame, text=self.lang_manager.get_string("shared_by_template", names=', '.join(names)), 
-                                     text_color="#FF4444").pack(side="left", padx=15, pady=10)
+                        ctk.CTkLabel(old_frame, 
+                                    text=f"🔴 {name} - Not changed in {age_days} days", 
+                                    font=ctk.CTkFont(size=13)).pack(anchor="w", padx=15, pady=10)
+                
+                # Old passwords (90-179 days)
+                if old_passwords:
+                    for name, age_days in sorted(old_passwords, key=lambda x: x[1], reverse=True):
+                        old_frame = ctk.CTkFrame(age_frame, fg_color=("gray85", "gray20"), corner_radius=8)
+                        old_frame.pack(fill="x", padx=15, pady=5)
+                        
+                        ctk.CTkLabel(old_frame, 
+                                    text=f"🟡 {name} - Not changed in {age_days} days", 
+                                    font=ctk.CTkFont(size=13)).pack(anchor="w", padx=15, pady=10)
+            
+            # ============= SECURITY TIPS SECTION =============
+            tips_frame = ctk.CTkFrame(content, fg_color=("gray90", "gray15"), corner_radius=12)
+            tips_frame.pack(fill="x", padx=20, pady=(0, 20))
+            
+            tips_header = ctk.CTkFrame(tips_frame, fg_color="transparent")
+            tips_header.pack(fill="x", padx=20, pady=(15, 10))
+            
+            ctk.CTkLabel(tips_header, text="💡 Security Recommendations", 
+                        font=ctk.CTkFont(size=18, weight="bold")).pack(anchor="w")
+            
+            # Generate personalized tips based on analysis
+            tips = []
+            
+            if len(weak_passwords) > 0:
+                tips.append(("⚠️ Urgent", f"Update {len(weak_passwords)} weak password(s) immediately", "#EF4444"))
+            
+            if len(reused_passwords) > 0:
+                tips.append(("🔄 Important", "Use unique passwords for each account to prevent cascading breaches", "#FF6B6B"))
+            
+            if len(very_old_passwords) > 0:
+                tips.append(("⏰ Recommended", "Change passwords that haven't been updated in 6+ months", "#F59E0B"))
+            
+            # General tips
+            general_tips = [
+                ("🔐 Best Practice", "Use passwords with at least 16 characters", "#3B82F6"),
+                ("🎲 Best Practice", "Use the password generator for stronger passwords", "#3B82F6"),
+                ("✅ Best Practice", "Enable 2FA on all accounts that support it", "#10B981"),
+                ("💾 Best Practice", "Create regular encrypted backups of your vault", "#10B981"),
+            ]
+            
+            # Add 2-3 general tips
+            import random
+            tips.extend(random.sample(general_tips, min(3, len(general_tips))))
+            
+            for priority, tip, color in tips:
+                tip_item = ctk.CTkFrame(tips_frame, fg_color=("gray85", "gray20"), corner_radius=8)
+                tip_item.pack(fill="x", padx=15, pady=5)
+                
+                tip_content = ctk.CTkFrame(tip_item, fg_color="transparent")
+                tip_content.pack(fill="x", padx=15, pady=10)
+                
+                ctk.CTkLabel(tip_content, text=priority, 
+                            font=ctk.CTkFont(size=12, weight="bold"),
+                            text_color=color).pack(side="left", padx=(0, 10))
+                
+                ctk.CTkLabel(tip_content, text=tip, 
+                            font=ctk.CTkFont(size=12),
+                            wraplength=600).pack(side="left", fill="x", expand=True)
+            
+            # ============= QUICK ACTIONS =============
+            actions_frame = ctk.CTkFrame(content, fg_color="transparent")
+            actions_frame.pack(fill="x", padx=20, pady=(0, 20))
+            
+            ctk.CTkLabel(actions_frame, text="⚡ Quick Actions", 
+                        font=ctk.CTkFont(size=18, weight="bold")).pack(anchor="w", pady=(0, 10))
+            
+            button_grid = ctk.CTkFrame(actions_frame, fg_color="transparent")
+            button_grid.pack(fill="x")
+            
+            for i in range(3):
+                button_grid.columnconfigure(i, weight=1)
+            
+            ctk.CTkButton(button_grid, text="🔧 Fix All Weak Passwords",
+                        command=lambda: self.fix_weak_passwords(weak_passwords),
+                        height=45, font=ctk.CTkFont(size=14)).grid(row=0, column=0, padx=5, sticky="ew")
+            
+            ctk.CTkButton(button_grid, text="🎲 Generate Strong Password",
+                        command=self.show_password_generator,
+                        height=45, font=ctk.CTkFont(size=14)).grid(row=0, column=1, padx=5, sticky="ew")
+            
+            ctk.CTkButton(button_grid, text="💾 Create Backup",
+                        command=self.show_backup_dialog,
+                        height=45, font=ctk.CTkFont(size=14)).grid(row=0, column=2, padx=5, sticky="ew")
+            
         except Exception as e:
-            ctk.CTkLabel(content, text=self.lang_manager.get_string("report_error_template", error=str(e)), 
-                         text_color="#FF4444").pack(pady=20)
+            error_frame = ctk.CTkFrame(content, fg_color=("gray90", "gray15"))
+            error_frame.pack(fill="both", expand=True, padx=20, pady=20)
+            
+            ctk.CTkLabel(error_frame, 
+                        text=f"❌ Error generating security report:\n\n{str(e)}", 
+                        font=ctk.CTkFont(size=14),
+                        text_color="#FF4444",
+                        justify="center").pack(pady=50)
 
+    def fix_weak_passwords(self, weak_passwords_list):
+        """Helper method to guide user through fixing weak passwords"""
+        if not weak_passwords_list:
+            self.show_message("info", "No weak passwords to fix!", msg_type="info")
+            return
+        
+        # Show dialog with list of accounts to fix
+        dialog = ThemedToplevel(self.root)
+        dialog.title("Fix Weak Passwords")
+        dialog.geometry("600x500")
+        dialog.grab_set()
+        
+        main_frame = ctk.CTkFrame(dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        ctk.CTkLabel(main_frame, text="🔧 Fix Weak Passwords", 
+                    font=ctk.CTkFont(size=20, weight="bold")).pack(pady=(0, 10))
+        
+        ctk.CTkLabel(main_frame, 
+                    text=f"You have {len(weak_passwords_list)} account(s) with weak passwords.\n"
+                        "Click on any account below to update its password.",
+                    font=ctk.CTkFont(size=12),
+                    justify="center").pack(pady=(0, 20))
+        
+        # Scrollable list of accounts
+        accounts_frame = ctk.CTkScrollableFrame(main_frame, height=300)
+        accounts_frame.pack(fill="both", expand=True, pady=(0, 15))
+        
+        for name, strength, score, recommendations in weak_passwords_list:
+            account_item = ctk.CTkFrame(accounts_frame, fg_color=("gray85", "gray20"), corner_radius=8)
+            account_item.pack(fill="x", pady=5, padx=5)
+            
+            def make_edit_wrapper(acc_name):
+                def edit_this_account():
+                    dialog.destroy()
+                    # Find and edit the account
+                    metadata_conn = sqlite3.connect(self.database.metadata_db)
+                    cursor = metadata_conn.execute("SELECT id, name, email, url, notes FROM accounts WHERE name=?", (acc_name,))
+                    row = cursor.fetchone()
+                    metadata_conn.close()
+                    
+                    if row:
+                        account_id, name, email, url, notes = row
+                        username, password = self.database.get_account_credentials(account_id)
+                        account = {
+                            'id': account_id,
+                            'name': name,
+                            'username': username,
+                            'email': email,
+                            'url': url,
+                            'notes': notes
+                        }
+                        self.show_account_dialog(account)
+                return edit_this_account
+            
+            btn = ctk.CTkButton(account_item, text=f"📝 {name} ({strength} - {score}%)",
+                                command=make_edit_wrapper(name),
+                                height=40,
+                                anchor="w",
+                                fg_color="transparent",
+                                hover_color=("gray75", "gray30"))
+            btn.pack(fill="x", padx=10, pady=8)
+        
+        ctk.CTkButton(main_frame, text="Close", command=dialog.destroy,
+                    width=120, height=40).pack(pady=(10, 0))
+        
+        
     def show_update_checker(self):
         for widget in self.main_panel.winfo_children():
             widget.destroy()
