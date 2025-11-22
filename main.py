@@ -348,7 +348,13 @@ class DatabaseManager:
                     created_at TEXT,
                     updated_at TEXT,
                     tags TEXT,
-                    security_level INTEGER
+                    security_level INTEGER,
+                    recovery_email TEXT,
+                    phone_number TEXT,
+                    account_type TEXT,
+                    category TEXT,
+                    two_factor_enabled INTEGER,
+                    last_password_change TEXT
                 )
             """)
             metadata_conn.execute("""
@@ -878,6 +884,64 @@ class DatabaseManager:
 
     def get_metadata_connection(self):
         return sqlite3.connect(self.metadata_db)
+
+    def get_account_by_id(self, account_id: str) -> Optional[dict]:
+        """Fetches a single account's complete data from the metadata table by its ID."""
+        try:
+            conn = sqlite3.connect(self.metadata_db)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT * FROM accounts WHERE id = ?", (account_id,))
+            row = cursor.fetchone()
+            
+            if row:
+                # Convert row to a dictionary
+                return dict(row)
+            return None
+            
+        except sqlite3.Error as e:
+            logger.error(f"Database error while fetching account by ID '{account_id}': {e}")
+            return None
+        finally:
+            if conn:
+                conn.close()
+
+    def migrate_schema(self):
+        """Check for and add missing columns to the accounts table."""
+        try:
+            conn = sqlite3.connect(self.metadata_db)
+            cursor = conn.cursor()
+            
+            # Get existing table info
+            cursor.execute("PRAGMA table_info(accounts)")
+            columns = [info[1] for info in cursor.fetchall()]
+            
+            # Define new columns and their types
+            new_columns = {
+                "recovery_email": "TEXT",
+                "phone_number": "TEXT",
+                "account_type": "TEXT",
+                "category": "TEXT",
+                "two_factor_enabled": "INTEGER",
+                "last_password_change": "TEXT"
+            }
+            
+            # Add missing columns
+            for col_name, col_type in new_columns.items():
+                if col_name not in columns:
+                    logger.info(f"Adding missing column '{col_name}' to 'accounts' table.")
+                    cursor.execute(f"ALTER TABLE accounts ADD COLUMN {col_name} {col_type}")
+            
+            conn.commit()
+            logger.info("Schema migration check completed successfully.")
+            
+        except sqlite3.Error as e:
+            logger.error(f"Database error during schema migration: {e}")
+        finally:
+            if conn:
+                conn.close()
+
 
 class SecurityQuestionsDialog(ThemedToplevel):
     def __init__(self, parent, db_manager, crypto_manager, lang_manager):
@@ -1488,6 +1552,7 @@ class ModernPasswordManagerGUI:
         auth_success = self.database.authenticate(master_password)
         
         if auth_success:
+            self.database.migrate_schema()
             # IMPORTANT: Set encryption key BEFORE reloading settings
             self.secure_file_manager.encryption_key = self.database.encryption_key
             logger.info(f"Encryption key set on secure_file_manager after login. Key is set: {self.secure_file_manager.encryption_key is not None}")
@@ -4774,7 +4839,7 @@ class ModernPasswordManagerGUI:
         button_frame = ctk.CTkFrame(parent, fg_color="transparent")
         button_frame.pack()
         buttons = [
-            (self.lang_manager.get_string("view_action"), lambda: self.view_account_details(account)),
+            (self.lang_manager.get_string("view_action"), lambda: self.view_account_details(account['id'])),
             (self.lang_manager.get_string("edit_action"), lambda: self.show_account_dialog(account)),
             (self.lang_manager.get_string("copy_password_action"), lambda: self.copy_password_to_clipboard(account)),
             (self.lang_manager.get_string("delete_action"), lambda: self.delete_account(account))
@@ -4805,42 +4870,81 @@ class ModernPasswordManagerGUI:
             except Exception as e:
                 self.show_message("error", "delete_failed_message", msg_type="error", error=str(e))
 
-    def view_account_details(self, account):
-        # Re-authentication for sensitive action
+    def view_account_details(self, account_id):
         if not self.verify_master_password_dialog():
             return
+        
+        account = self.database.get_account_by_id(account_id)
+        if not account:
+            self.show_message("error", "account_not_found", msg_type="error")
+            return
 
-        username, password = self.database.get_account_credentials(account["id"])
+        username, password = self.database.get_account_credentials(account_id)
+        
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("account_details_title", account_name=account['name']))
-        dialog.geometry("500x770")
-        dialog.resizable(0,0)
+        dialog.geometry("600x800")
+        dialog.resizable(True, True)
         dialog.grab_set()
-        main_frame = ctk.CTkFrame(dialog)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        main_frame = ctk.CTkScrollableFrame(dialog)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header_frame.pack(fill="x", padx=10, pady=10)
         
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("view_details_title", account_name=account['name']),
-                     font=ctk.CTkFont(size=22, weight="bold")).pack(pady=15)
+        ctk.CTkLabel(header_frame, text=account['name'], font=ctk.CTkFont(size=24, weight="bold")).pack(anchor="w")
+        ctk.CTkLabel(header_frame, text=f"Type: {account.get('account_type', 'N/A')}", font=ctk.CTkFont(size=14, weight="bold"), text_color="gray").pack(anchor="w")
+
+        # --- Credentials Section ---
+        self._create_form_section(main_frame, "🔑 Credentials", "Login Information")
+        self.create_detail_field(main_frame, "Username", username or "Not set")
+        self.create_detail_field(main_frame, "Password", password or "Not set", is_password=True)
+        self.create_detail_field(main_frame, "Website URL", account.get('url') or "Not set")
         
-        details = [
-            (self.lang_manager.get_string("account_name_label"), account['name']),
-            (self.lang_manager.get_string("username_label"), username or self.lang_manager.get_string("not_set")),
-            (self.lang_manager.get_string("email_label"), account.get('email', self.lang_manager.get_string("not_set"))),
-            (self.lang_manager.get_string("website_label"), account.get('url', self.lang_manager.get_string("not_set"))),
-            (self.lang_manager.get_string("password_label"), password or self.lang_manager.get_string("not_available"))
-        ]
+        # --- Security Section ---
+        self._create_form_section(main_frame, "🛡️ Security", "Security Status")
+        score, strength, _ = self.password_generator.assess_strength(password or "")
+        strength_color = self.get_strength_color(strength)
+        ctk.CTkLabel(main_frame, text=f"Password Strength: {strength} ({score}%)", font=ctk.CTkFont(size=14, weight="bold"), text_color=strength_color).pack(anchor="w", padx=25, pady=5)
         
-        for label, value in details:
-            self.create_detail_field(main_frame, label, value, is_password=label == self.lang_manager.get_string("password_label"))
+        two_factor_status = "Enabled" if account.get('two_factor_enabled') else "Disabled"
+        two_factor_color = "green" if account.get('two_factor_enabled') else "red"
+        ctk.CTkLabel(main_frame, text=f"2FA Status: {two_factor_status}", font=ctk.CTkFont(size=14), text_color=two_factor_color).pack(anchor="w", padx=25, pady=5)
+        ctk.CTkLabel(main_frame, text=f"Security Category: {account.get('category', 'N/A')}", font=ctk.CTkFont(size=14)).pack(anchor="w", padx=25, pady=5)
         
-        self.create_detail_field(main_frame, self.lang_manager.get_string("notes_label"), account.get('notes', self.lang_manager.get_string("no_notes_available")))
+        # --- Recovery Information ---
+        self._create_form_section(main_frame, "📧 Recovery Information", "Contact Details")
+        self.create_detail_field(main_frame, "Recovery Email", account.get('recovery_email') or "Not set")
+        self.create_detail_field(main_frame, "Phone Number", account.get('phone_number') or "Not set")
         
-        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        button_frame.pack(pady=20)
+        # --- Metadata Section ---
+        self._create_form_section(main_frame, "ℹ️ Metadata", "Account History")
         
-        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("copy_password_button"),
-                      command=lambda: self.copy_password_to_clipboard(account), width=150).pack(side="left", padx=10)
-        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("close_button_label"), command=dialog.destroy, width=100).pack(side="right", padx=10)
+        def format_timestamp(ts):
+            try:
+                return datetime.fromisoformat(ts).strftime("%Y-%m-%d %H:%M:%S")
+            except (ValueError, TypeError):
+                return "N/A"
+
+        self.create_detail_field(main_frame, "Date Created", format_timestamp(account.get('created_at')))
+        self.create_detail_field(main_frame, "Last Modified", format_timestamp(account.get('updated_at')))
+        self.create_detail_field(main_frame, "Last Password Change", format_timestamp(account.get('last_password_change')))
+
+        # --- Notes Section ---
+        if account.get('notes'):
+            self._create_form_section(main_frame, "📝 Notes", "Additional Information")
+            notes_text = ctk.CTkTextbox(main_frame, height=100)
+            notes_text.pack(fill="x", padx=25, pady=10)
+            notes_text.insert("1.0", account.get('notes', ''))
+            notes_text.configure(state="disabled")
+
+        button_frame = ctk.CTkFrame(dialog, fg_color=("gray90", "gray15"), height=60)
+        button_frame.pack(fill="x", side="bottom", padx=0, pady=0)
+        button_frame.pack_propagate(False)
+
+        close_btn = ctk.CTkButton(button_frame, text="Close", command=dialog.destroy, width=100, height=40)
+        close_btn.pack(side="right", padx=20, pady=10)
 
     def create_detail_field(self, parent, label, value, is_password=False):
         detail_frame = ctk.CTkFrame(parent)
@@ -4950,7 +5054,8 @@ class ModernPasswordManagerGUI:
         
         # Bind mousewheel scrolling
         def _on_mousewheel(event):
-            scrollable_frame._parent_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            if scrollable_frame.winfo_exists():
+                scrollable_frame._parent_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         scrollable_frame.bind_all("<MouseWheel>", _on_mousewheel)
         
         # Create form sections
