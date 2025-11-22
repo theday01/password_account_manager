@@ -983,9 +983,20 @@ class ModernPasswordManagerGUI:
         self.root.withdraw()
         # Start the asyncio event loop manager
         asyncio_manager.start()
+        
+        # Set the icon immediately
+        set_icon(self.root)
+        
+        # Start the asyncio event loop manager
+        asyncio_manager.start()
         self.root.title(self.lang_manager.get_string("app_title"))
         self.root.geometry("1200x800")
+        
+        # Set icon again after window properties are set
         set_icon(self.root)
+        
+        # Schedule another icon setting after event loop starts
+        self.root.after(100, lambda: set_icon(self.root))
         
         self.show_loading_screen()
 

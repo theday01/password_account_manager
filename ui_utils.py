@@ -7,32 +7,45 @@ from PIL import Image, ImageTk
 def set_icon(window):
     """
     Sets the icon for a given tkinter window.
-    It looks for 'main.ico' in the 'icons' folder.
+    It looks for 'icon.png' in the 'icons' folder and sets it for both the window and taskbar.
     """
     try:
         # Get the absolute path to the icon file
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icons', 'main.ico')
-
-        if os.path.exists(icon_path):
-            window.iconbitmap(icon_path)
+        icon_path_png = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icons', 'icon.png')
+        
+        if os.path.exists(icon_path_png):
+            # Load the icon image
+            img = Image.open(icon_path_png)
+            
+            # Convert to PhotoImage
+            photo = ImageTk.PhotoImage(img)
+            
+            # Set the icon for the window
+            window.iconphoto(True, photo)
+            
+            # Store reference to prevent garbage collection
+            if not hasattr(window, '_icon_photo'):
+                window._icon_photo = photo
+            
+            # For Windows taskbar icon, also try to set iconbitmap if .ico exists
+            icon_path_ico = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icons', 'icon.ico')
+            if os.path.exists(icon_path_ico):
+                try:
+                    window.iconbitmap(icon_path_ico)
+                except tk.TclError:
+                    # If iconbitmap fails, iconphoto should still work for taskbar
+                    pass
         else:
-            print(f"Warning: Icon file not found at {icon_path}")
+            print(f"Warning: Icon file not found at {icon_path_png}")
+            
+            # Fallback to old icon paths
+            icon_path_main = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icons', 'main.ico')
+            if os.path.exists(icon_path_main):
+                try:
+                    window.iconbitmap(icon_path_main)
+                except tk.TclError as e:
+                    print(f"Failed to set fallback icon: {e}")
 
-    except tk.TclError:
-        # Fallback for systems that have trouble with .ico files
-        try:
-            icon_path_png = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icons', 'load.png')
-            if os.path.exists(icon_path_png):
-                img = Image.open(icon_path_png)
-                photo = ImageTk.PhotoImage(img)
-                window.wm_iconphoto(True, photo)
-                # Store reference to prevent garbage collection
-                if not hasattr(window, '_icon_photo'):
-                    window._icon_photo = photo
-            else:
-                print(f"Warning: Fallback PNG icon not found at {icon_path_png}")
-        except Exception as pil_e:
-            print(f"Failed to set icon using PIL: {pil_e}")
     except Exception as e:
         print(f"An unexpected error occurred while setting the icon: {e}")
 
@@ -42,8 +55,11 @@ class ThemedToplevel(ctk.CTkToplevel):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Set icon immediately
         set_icon(self)
-
+        # Schedule icon setting after window is fully initialized
+        self.after(10, lambda: set_icon(self))
+        
 class CustomMessageBox:
     """Wrapper class to use standard tkinter messageboxes with consistent interface"""
     
