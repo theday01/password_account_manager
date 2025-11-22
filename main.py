@@ -1324,11 +1324,18 @@ class ModernPasswordManagerGUI:
         self.main_frame.pack(fill="both", expand=True, padx=10, pady=10)
         if self.check_startup_lockout():
             return
-        # --- Verification Bypass ---
+        
+        # Check if vault is initialized BEFORE attempting authentication
+        if not self.is_vault_initialized():
+            logger.info("Vault not initialized, showing setup wizard")
+            self.show_login_screen()
+            self.update_login_button_states()
+            return
+        
+        # --- Verification Bypass --- (only if vault exists)
         self.authenticated = True
         master_password = "a_very_secret_dev_password_for_testing_only"
         
-        # Part of the logic from authenticate_user
         if self.secure_file_manager:
             self.secure_file_manager.initialize_encryption(master_password)
             self.secure_file_manager.load_files_to_temp()
@@ -1346,11 +1353,10 @@ class ModernPasswordManagerGUI:
             # If auth fails, show login to avoid crashing
             self.show_login_screen()
             self.update_login_button_states()
-        # --- End Verification Bypass ---
-
+        
         if not self.is_vault_initialized():
             self.root.after(100, self.show_welcome_dialog)
-
+    
     def show_login_screen(self):
         for widget in self.main_frame.winfo_children():
             widget.destroy()

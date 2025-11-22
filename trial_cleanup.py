@@ -185,6 +185,7 @@ def clean_all_artifacts(secure_mode=False):
             settings_manager=settings_manager,
             restart_callback=None
         )
+        
         search_locations = {
             "Anchor File(s)": {"prefix": "sv-anchor-", "dir": os.path.dirname(anchor.anchor_path)},
             "Backup Anchor File(s)": {"prefix": "sv-ts-validation-", "dir": os.path.dirname(anchor.backup_anchor_path)},
@@ -195,22 +196,158 @@ def clean_all_artifacts(secure_mode=False):
         total_deleted += deleted
         total_failed += failed
 
+        # Clean the secure vault directory
+        secure_vault_dir = "secure_vault"
+        if os.path.exists(secure_vault_dir):
+            print(f"[INFO] Cleaning secure vault directory: {secure_vault_dir}")
+            if secure_mode:
+                # Securely delete all files in the directory
+                for root, dirs, files in os.walk(secure_vault_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        if secure_delete(file_path):
+                            print(f"[SUCCESS] Securely deleted: {file_path}")
+                            total_deleted += 1
+                        else:
+                            print(f"[ERROR] Failed to securely delete: {file_path}")
+                            total_failed += 1
+                
+                # Remove empty directories
+                try:
+                    import shutil
+                    shutil.rmtree(secure_vault_dir)
+                    print(f"[SUCCESS] Removed secure vault directory: {secure_vault_dir}")
+                    total_deleted += 1
+                except Exception as e:
+                    print(f"[ERROR] Failed to remove secure vault directory: {e}")
+                    total_failed += 1
+            else:
+                # Regular delete
+                try:
+                    import shutil
+                    shutil.rmtree(secure_vault_dir)
+                    print(f"[SUCCESS] Deleted secure vault directory: {secure_vault_dir}")
+                    total_deleted += 1
+                except Exception as e:
+                    print(f"[ERROR] Failed to delete secure vault directory: {e}")
+                    total_failed += 1
+
+        # Clean any legacy database files in current directory
+        legacy_files = [
+            "manageyouraccount_metadata.db",
+            "manageyouraccount_sensitive.db", 
+            "manageyouraccount_salt",
+            "manageyouraccount_integrity",
+            "metadata.db",
+            "sensitive.db",
+            "salt_file",
+            "integrity_file",
+            "settings.json"
+        ]
+        
+        print("\n[INFO] Cleaning legacy database files...")
+        for fname in legacy_files:
+            if os.path.exists(fname):
+                try:
+                    if secure_mode:
+                        if secure_delete(fname):
+                            print(f"[SUCCESS] Securely deleted legacy file: {fname}")
+                            total_deleted += 1
+                        else:
+                            print(f"[ERROR] Failed to securely delete legacy file: {fname}")
+                            total_failed += 1
+                    else:
+                        os.remove(fname)
+                        print(f"[SUCCESS] Deleted legacy file: {fname}")
+                        total_deleted += 1
+                except Exception as e:
+                    print(f"[ERROR] Failed to delete legacy file {fname}: {e}")
+                    total_failed += 1
+
+        # Clean backup directory
+        backups_dir = "backups"
+        if os.path.exists(backups_dir):
+            print(f"\n[INFO] Cleaning backups directory: {backups_dir}")
+            try:
+                if secure_mode:
+                    for root, dirs, files in os.walk(backups_dir):
+                        for file in files:
+                            file_path = os.path.join(root, file)
+                            if secure_delete(file_path):
+                                print(f"[SUCCESS] Securely deleted backup: {file_path}")
+                                total_deleted += 1
+                            else:
+                                print(f"[ERROR] Failed to securely delete backup: {file_path}")
+                                total_failed += 1
+                    
+                    import shutil
+                    shutil.rmtree(backups_dir)
+                    print(f"[SUCCESS] Removed backups directory: {backups_dir}")
+                    total_deleted += 1
+                else:
+                    import shutil
+                    shutil.rmtree(backups_dir)
+                    print(f"[SUCCESS] Deleted backups directory: {backups_dir}")
+                    total_deleted += 1
+            except Exception as e:
+                print(f"[ERROR] Failed to clean backups directory: {e}")
+                total_failed += 1
+
         # Clean registry-based artifacts on Windows
         if platform.system() == "Windows":
+            print("\n[INFO] Cleaning Windows registry artifacts...")
             deleted, failed = clean_registry_artifacts()
             total_deleted += deleted
             total_failed += failed
 
-        print("\n--- Cleanup Summary ---")
+        # Clean WAL and SHM files (SQLite temporary files)
+        print("\n[INFO] Cleaning SQLite temporary files...")
+        sqlite_temp_files = [
+            "metadata.db-wal",
+            "metadata.db-shm",
+            "sensitive.db-wal",
+            "sensitive.db-shm",
+            "manageyouraccount_metadata.db-wal",
+            "manageyouraccount_metadata.db-shm",
+            "manageyouraccount_sensitive.db-wal",
+            "manageyouraccount_sensitive.db-shm"
+        ]
+        
+        for fname in sqlite_temp_files:
+            if os.path.exists(fname):
+                try:
+                    if secure_mode:
+                        if secure_delete(fname):
+                            print(f"[SUCCESS] Securely deleted SQLite temp file: {fname}")
+                            total_deleted += 1
+                        else:
+                            print(f"[ERROR] Failed to securely delete SQLite temp file: {fname}")
+                            total_failed += 1
+                    else:
+                        os.remove(fname)
+                        print(f"[SUCCESS] Deleted SQLite temp file: {fname}")
+                        total_deleted += 1
+                except Exception as e:
+                    print(f"[ERROR] Failed to delete SQLite temp file {fname}: {e}")
+                    total_failed += 1
+
+        print("\n" + "="*60)
+        print("--- Cleanup Summary ---")
+        print("="*60)
         if total_failed > 0:
             print(f"🔴 FAILED to delete {total_failed} artifact(s). Please review the errors above and take manual action.")
+            print(f"✅ Successfully deleted {total_deleted} artifact(s).")
         else:
             print(f"🟢 Successfully deleted {total_deleted} artifact(s).")
+        print("="*60)
         print("The system should now be in a clean state.")
+        print("You can now restart the program and set up a new vault.\n")
 
     except Exception as e:
-        print(f"\nAn unexpected error occurred during cleanup: {e}")
+        print(f"\n❌ An unexpected error occurred during cleanup: {e}")
         print("Please ensure all application modules are available and paths are correct.")
+        import traceback
+        traceback.print_exc()
 
 def main():
     """
@@ -239,28 +376,45 @@ def main():
     parser.add_argument(
         '--secure',
         action='store_true',
-        help='Perform a secure scan, overwriting files before deletion.'
+        help='Perform a secure deletion, overwriting files before deletion (slower but more secure).'
     )
     
+    print("\n" + "="*60)
     print("*"*60)
     print("WARNING: This is a developer-only tool.")
-    print("Running this will permanently delete all trial data.")
+    print("Running this will PERMANENTLY delete all trial data.")
     print("*"*60)
+    print("="*60 + "\n")
 
     try:
         args = parser.parse_args()
         if args.password.strip() == DEV_PASSWORD:
-            print("\nDeveloper password accepted.")
+            print("✅ Developer password accepted.\n")
+            print("Starting cleanup process...")
+            if args.secure:
+                print("Using SECURE mode (files will be overwritten before deletion)\n")
+            else:
+                print("Using NORMAL mode (standard deletion)\n")
+            
             clean_all_artifacts(secure_mode=args.secure)
+            
+            print("\n" + "="*60)
+            print("Cleanup completed!")
+            print("You can now restart the application.")
+            print("="*60 + "\n")
         else:
-            print("\n[ACCESS DENIED] Incorrect developer password.")
+            print("\n[ACCESS DENIED] ❌ Incorrect developer password.")
+            print("Access denied. The password provided is incorrect.\n")
             sys.exit(1)
     except SystemExit as e:
         if e.code != 0:
-             print("\nTo use this script, you must provide the correct password.")
-             print(f"Example: python {sys.argv[0]} --password={DEV_PASSWORD}")
+            print("\nTo use this script, you must provide the correct password.")
+            print(f"Example: python {sys.argv[0]} --password=YOUR_PASSWORD")
+            print(f"Example with secure mode: python {sys.argv[0]} --password=YOUR_PASSWORD --secure\n")
     except Exception as e:
-        print(f"An error occurred: {e}")
-
+        print(f"\n❌ An error occurred: {e}")
+        import traceback
+        traceback.print_exc()
+        
 if __name__ == "__main__":
     main()
