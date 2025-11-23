@@ -38,6 +38,7 @@ from password_reminder import PasswordReminder
 from asyncio_manager import asyncio_manager
 from tamper_manager import TamperManager
 from auth_guardian import AuthGuardian
+from machine_id_utils import generate_machine_id
 from typing import List
 import secrets
 from pathlib import Path
@@ -3047,14 +3048,14 @@ class ModernPasswordManagerGUI:
         # Create modern activation dialog
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("activation"))
-        #dialog.resizable(False, False)
         dialog.grab_set()
         
         # Center the dialog
         dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (250)
-        y = (dialog.winfo_screenheight() // 2) - (175)
-        dialog.geometry(f"650x430+{x}+{y}")
+        x = (dialog.winfo_screenwidth() // 2) - (325)
+        y = (dialog.winfo_screenheight() // 2) - (265)
+        dialog.geometry(f"650x480+{x}+{y}")
+        dialog.resizable(False, False)
         
         result = {"license_key": None}
         
@@ -3064,9 +3065,8 @@ class ModernPasswordManagerGUI:
         
         # Header section
         header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        header_frame.pack(fill="x", pady=(20, 30))
+        header_frame.pack(fill="x", pady=(20, 15))
         
-        # Icon and title
         title_label = ctk.CTkLabel(
             header_frame,
             text="🔑 " + self.lang_manager.get_string("activation"),
@@ -3084,7 +3084,48 @@ class ModernPasswordManagerGUI:
         
         # Content section
         content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        content_frame.pack(fill="both", expand=True, padx=30, pady=20)
+        content_frame.pack(fill="both", expand=True, padx=30, pady=10)
+        
+        # Machine ID Section
+        machine_id_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        machine_id_frame.pack(fill="x", pady=(10, 15))
+        
+        machine_id_label = ctk.CTkLabel(
+            machine_id_frame,
+            text="Your Machine ID:",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            anchor="w"
+        )
+        machine_id_label.pack(fill="x", pady=(0, 5))
+        
+        machine_id = generate_machine_id()
+        
+        machine_id_entry_frame = ctk.CTkFrame(machine_id_frame, fg_color="transparent")
+        machine_id_entry_frame.pack(fill="x")
+        
+        machine_id_entry = ctk.CTkEntry(
+            machine_id_entry_frame,
+            height=45,
+            font=ctk.CTkFont(size=12)
+        )
+        machine_id_entry.insert(0, machine_id)
+        machine_id_entry.configure(state="readonly")
+        machine_id_entry.pack(side="left", fill="x", expand=True)
+
+        def copy_machine_id():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(machine_id)
+            copy_button.configure(text="Copied!")
+            dialog.after(2000, lambda: copy_button.configure(text="Copy"))
+
+        copy_button = ctk.CTkButton(
+            machine_id_entry_frame,
+            text="Copy",
+            command=copy_machine_id,
+            width=80,
+            height=45
+        )
+        copy_button.pack(side="left", padx=(10, 0))
         
         # License key input
         input_label = ctk.CTkLabel(
@@ -3093,19 +3134,17 @@ class ModernPasswordManagerGUI:
             font=ctk.CTkFont(size=16, weight="bold"),
             anchor="w"
         )
-        input_label.pack(fill="x", pady=(0, 10))
+        input_label.pack(fill="x", pady=(10, 10))
         
-        # License key entry with modern styling
         license_entry = ctk.CTkEntry(
             content_frame,
             placeholder_text="Enter your license key here...",
             width=400,
             height=45
         )
-        license_entry.pack(fill="x", pady=(0, 20))
+        license_entry.pack(fill="x", pady=(0, 15))
         license_entry.focus()
         
-        # Info text
         info_text = ctk.CTkLabel(
             content_frame,
             text="Your license key was provided when you purchased SecureVault Pro.\nIf you don't have a license key, contact our support team.",
@@ -3113,7 +3152,7 @@ class ModernPasswordManagerGUI:
             text_color=("gray50", "gray50"),
             justify="center"
         )
-        info_text.pack(pady=(0, 30))
+        info_text.pack(pady=(0, 20))
         
         def on_ok():
             license_key = license_entry.get().strip()
@@ -3128,11 +3167,9 @@ class ModernPasswordManagerGUI:
             result["license_key"] = None
             dialog.destroy()
         
-        # Button section
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
         button_frame.pack(fill="x", padx=30, pady=(0, 20))
         
-        # Cancel button
         cancel_btn = ctk.CTkButton(
             button_frame,
             text=self.lang_manager.get_string("cancel_button"),
@@ -3145,7 +3182,6 @@ class ModernPasswordManagerGUI:
         )
         cancel_btn.pack(side="left")
         
-        # OK button
         ok_btn = ctk.CTkButton(
             button_frame,
             text=self.lang_manager.get_string("ok_button"),
@@ -3158,11 +3194,9 @@ class ModernPasswordManagerGUI:
         )
         ok_btn.pack(side="right")
         
-        # Bind Enter key to OK button
         dialog.bind('<Return>', lambda e: on_ok())
         dialog.bind('<Escape>', lambda e: on_cancel())
         
-        # Wait for user action
         dialog.wait_window()
         license_key = result["license_key"]
 
@@ -3184,7 +3218,7 @@ class ModernPasswordManagerGUI:
                         attempts_left=attempts_left
                     )
                 else:
-                    self.show_activation_dialog() # This will now show the lockout message
+                    self.show_activation_dialog()
                     
     def handle_sidebar_click(self, command, button_text):
         clicked_button = next((btn for btn in self.sidebar_buttons if btn.cget("text") == button_text), None)

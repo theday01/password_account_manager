@@ -4,7 +4,7 @@ remove copy and paste password from the clipboard to avoid tampering
 load screen should be enhanced in UI and make it real professional
 
 
-
+should remove "audit.log" from finall version
 
 
 pleae add security path to make hacker difficult to reach the database file
