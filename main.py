@@ -2569,7 +2569,7 @@ class ModernPasswordManagerGUI:
         win = tk.Toplevel(self.root)
         set_icon(win)
         win.title(self.lang_manager.get_string("restore_dialog_title"))
-        win.geometry("820x520")  # Increased height from 480 to 520
+        win.geometry("820x520")
         win.resizable(True, True)
 
         top_frame = tk.Frame(win)
@@ -2775,7 +2775,7 @@ class ModernPasswordManagerGUI:
             code_dialog = tk.Toplevel(win)
             set_icon(code_dialog)
             code_dialog.title(self.lang_manager.get_string("backup_code_prompt_restore"))
-            code_dialog.geometry("420x200")  # Increased height from 150 to 200
+            code_dialog.geometry("420x200")
             code_dialog.resizable(False, False)
             code_dialog.grab_set()
             
@@ -2897,22 +2897,30 @@ class ModernPasswordManagerGUI:
 
                 shutil.rmtree(tempdir, ignore_errors=True)
                 status_var.set(self.lang_manager.get_string("restore_complete_status"))
-                message = self.lang_manager.get_string("restore_complete_message", moved="\n".join(os.path.basename(p) for p in moved), backups="\n".join(backups_created))
-
-                if self.show_message("restore_complete_message_title", message, ask="yesno"):
-                    try:
-                        try:
-                            self.root.destroy()
-                        except Exception:
-                            pass
-                        sys.exit(0)
-                    except SystemExit:
-                        raise
-                    except Exception as e:
-                        self.show_message("exit_failed_error", "exit_failed_error", e=e)
-                else:
-                    self.show_message("restore_complete_info", "restore_complete_info")
+                
+                # ===== UPDATED: Show manual restart message instead of automatic restart =====
+                message = self.lang_manager.get_string(
+                    "restore_complete_message", 
+                    moved="\n".join(os.path.basename(p) for p in moved), 
+                    backups="\n".join(backups_created)
+                )
+                
+                restore_complete_message = (
+                    f"{message}\n\n"
+                    f"✅ Backup restored successfully!\n\n"
+                    f"🔄 IMPORTANT: You must restart the application manually for all changes to take effect.\n\n"
+                    f"Please close this application and restart it to complete the restoration process."
+                )
+                
+                self.show_message(
+                    "restore_complete_message_title", 
+                    restore_complete_message, 
+                    msg_type="info"
+                )
+                
+                # Close the restore dialog but don't restart the application
                 win.destroy()
+                
             except Exception as e:
                 self.show_message("restore_error_title", "restore_error_message", msg_type="error", e=e)
                 status_var.set("")
@@ -2936,7 +2944,7 @@ class ModernPasswordManagerGUI:
         win.transient(self.root)
         win.grab_set()
         win.focus_force()
-            
+                    
     def show_backup_dialog(self):
         """Enhanced backup dialog with password generator button"""
         import tkinter.simpledialog as simpledialog

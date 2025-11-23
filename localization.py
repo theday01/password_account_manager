@@ -290,7 +290,7 @@ _THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025_
         "restore_failed_error": "Failed to decrypt/restore backup: {be}",
         "unexpected_restore_error": "Unexpected error while restoring: {e}",
         "restore_complete_status": "Restore complete",
-        "restore_complete_message_title": "Restore complete - Exit now?",
+        "restore_complete_message_title": "Restore complete",
         "restore_complete_message": "Restore complete.\\n\\nRestored files:\\n{moved}\\n\\nBackups of previous files:\\n{backups}\\n\\nIMPORTANT: The program must be restarted for changes to take full effect.\\nPlease save your work. Do you want to exit the program now?",
         "exit_failed_error": "Automatic exit failed: {e}\\nPlease close the program manually.",
         "restore_complete_info": "Restore complete. Please restart the program later for changes to take effect.",
