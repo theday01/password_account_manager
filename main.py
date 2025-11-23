@@ -2071,6 +2071,49 @@ class ModernPasswordManagerGUI:
         
         return all(checks.values())
 
+    def validate_backup_password_realtime(self, password):
+        # Define validation checks
+        checks = {
+            "length": len(password) >= 16,
+            "uppercase": any(c.isupper() for c in password),
+            "lowercase": any(c.islower() for c in password),
+            "number": any(c.isdigit() for c in password),
+            "symbol": any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password),
+        }
+
+        all_met = all(checks.values())
+        
+        # If all requirements are met, show success message and hide checklist
+        if all_met and hasattr(self, 'backup_success_label'):
+            # Get password strength
+            score, strength, _ = self.password_generator.assess_strength(password)
+            
+            # Show success message
+            success_msg = f"✅ Password generated: {len(password)} chars | Strength: {strength} ({score}%)"
+            self.backup_success_label.configure(text=success_msg, text_color="#10B981")
+            
+            # Hide all requirement labels
+            for label in self.backup_req_labels.values():
+                label.pack_forget()
+        else:
+            # Show checklist and hide success message
+            if hasattr(self, 'backup_success_label'):
+                self.backup_success_label.configure(text="")
+            
+            # Update labels based on checks
+            for key, is_met in checks.items():
+                if key in self.backup_req_labels:
+                    label = self.backup_req_labels[key]
+                    base_text = self.lang_manager.get_string(f"password_req_{key}")
+                    if is_met:
+                        label.configure(text=f"✅ {base_text}", text_color="green")
+                        label.pack(anchor="w")
+                    else:
+                        label.configure(text=f"❌ {base_text}", text_color="gray")
+                        label.pack(anchor="w")
+        
+        return all_met
+
     def toggle_password_visibility(self, entry, button):
         if entry.cget("show") == "*":
             entry.configure(show="")
@@ -2526,7 +2569,7 @@ class ModernPasswordManagerGUI:
         win = tk.Toplevel(self.root)
         set_icon(win)
         win.title(self.lang_manager.get_string("restore_dialog_title"))
-        win.geometry("820x480")
+        win.geometry("820x520")  # Increased height from 480 to 520
         win.resizable(True, True)
 
         top_frame = tk.Frame(win)
@@ -2584,7 +2627,6 @@ class ModernPasswordManagerGUI:
                 filetypes=[(self.lang_manager.get_string("secure_vault_backups_filetype"), "*.svbk"), (self.lang_manager.get_string("all_files_filetype"), "*.*")]
             )
             if filepath:
-                # Always add to the top of the list, even if not in backups folder
                 if filepath not in backups:
                     backups.insert(0, filepath)
                     listbox.insert(0, self.lang_manager.get_string("external_backup_label", index=len(backups), filename=os.path.basename(filepath)))
@@ -2592,7 +2634,6 @@ class ModernPasswordManagerGUI:
                     idx = backups.index(filepath)
                     listbox.selection_clear(0, "end")
                     listbox.selection_set(idx)
-                # Select the newly added file
                 listbox.selection_clear(0, "end")
                 listbox.selection_set(0)
                 on_selection()
@@ -2608,7 +2649,75 @@ class ModernPasswordManagerGUI:
             idx = sel[0]
             backup_path = backups[idx]
 
-            code = ask_string(self.lang_manager.get_string("backup_code_prompt_preview"), self.lang_manager.get_string("backup_code_prompt_preview"), show="*")
+            # Enhanced password dialog with show/hide button for preview
+            preview_code_dialog = tk.Toplevel(win)
+            set_icon(preview_code_dialog)
+            preview_code_dialog.title(self.lang_manager.get_string("backup_code_prompt_preview"))
+            preview_code_dialog.geometry("420x200")
+            preview_code_dialog.resizable(False, False)
+            preview_code_dialog.grab_set()
+            
+            # Center the dialog
+            preview_code_dialog.update_idletasks()
+            x = (preview_code_dialog.winfo_screenwidth() // 2) - (420 // 2)
+            y = (preview_code_dialog.winfo_screenheight() // 2) - (200 // 2)
+            preview_code_dialog.geometry(f"420x200+{x}+{y}")
+            
+            result = {"code": None}
+            
+            # Main frame
+            preview_main_frame = tk.Frame(preview_code_dialog, padx=20, pady=20)
+            preview_main_frame.pack(fill="both", expand=True)
+            
+            # Title
+            preview_title_label = tk.Label(preview_main_frame, text="Enter the backup code to preview this backup:", 
+                                font=("TkDefaultFont", 11, "bold"))
+            preview_title_label.pack(pady=(0, 15))
+            
+            # Password entry frame with show/hide button
+            preview_entry_frame = tk.Frame(preview_main_frame)
+            preview_entry_frame.pack(fill="x", pady=(0, 15))
+            
+            preview_code_entry = tk.Entry(preview_entry_frame, show="*", width=30, font=("TkDefaultFont", 10))
+            preview_code_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+            preview_code_entry.focus()
+            
+            def toggle_preview_password_visibility():
+                if preview_code_entry.cget("show") == "*":
+                    preview_code_entry.config(show="")
+                    preview_toggle_btn.config(text="🙈 Hide")
+                else:
+                    preview_code_entry.config(show="*")
+                    preview_toggle_btn.config(text="👁️ Show")
+            
+            preview_toggle_btn = tk.Button(preview_entry_frame, text="👁️ Show", width=10, command=toggle_preview_password_visibility)
+            preview_toggle_btn.pack(side="left")
+            
+            # Button frame
+            preview_button_frame = tk.Frame(preview_main_frame)
+            preview_button_frame.pack(fill="x", pady=(10, 0))
+            
+            def on_preview_ok():
+                result["code"] = preview_code_entry.get()
+                preview_code_dialog.destroy()
+            
+            def on_preview_cancel():
+                result["code"] = None
+                preview_code_dialog.destroy()
+            
+            preview_cancel_btn = tk.Button(preview_button_frame, text="Cancel", width=10, command=on_preview_cancel)
+            preview_cancel_btn.pack(side="left", padx=(0, 5))
+            
+            preview_ok_btn = tk.Button(preview_button_frame, text="OK", width=10, command=on_preview_ok, default="active")
+            preview_ok_btn.pack(side="left")
+            
+            # Bind Enter key to OK
+            preview_code_entry.bind("<Return>", lambda e: on_preview_ok())
+            preview_code_dialog.bind("<Escape>", lambda e: on_preview_cancel())
+            
+            preview_code_dialog.wait_window()
+            code = result["code"]
+            
             if code is None:
                 return
 
@@ -2662,8 +2771,76 @@ class ModernPasswordManagerGUI:
             idx = sel[0]
             backup_path = backups[idx]
 
-            code = ask_string(self.lang_manager.get_string("backup_code_prompt_restore"), self.lang_manager.get_string("backup_code_prompt_restore"), show="*")
-            if code is None:
+            # Enhanced password dialog with show/hide button
+            code_dialog = tk.Toplevel(win)
+            set_icon(code_dialog)
+            code_dialog.title(self.lang_manager.get_string("backup_code_prompt_restore"))
+            code_dialog.geometry("420x200")  # Increased height from 150 to 200
+            code_dialog.resizable(False, False)
+            code_dialog.grab_set()
+            
+            # Center the dialog
+            code_dialog.update_idletasks()
+            x = (code_dialog.winfo_screenwidth() // 2) - (420 // 2)
+            y = (code_dialog.winfo_screenheight() // 2) - (200 // 2)
+            code_dialog.geometry(f"420x200+{x}+{y}")
+            
+            result = {"code": None}
+            
+            # Main frame
+            main_frame = tk.Frame(code_dialog, padx=20, pady=20)
+            main_frame.pack(fill="both", expand=True)
+            
+            # Title
+            title_label = tk.Label(main_frame, text="Enter the backup code for this file", 
+                                font=("TkDefaultFont", 11, "bold"))
+            title_label.pack(pady=(0, 15))
+            
+            # Password entry frame with show/hide button
+            entry_frame = tk.Frame(main_frame)
+            entry_frame.pack(fill="x", pady=(0, 15))
+            
+            code_entry = tk.Entry(entry_frame, show="*", width=30, font=("TkDefaultFont", 10))
+            code_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+            code_entry.focus()
+            
+            def toggle_password_visibility():
+                if code_entry.cget("show") == "*":
+                    code_entry.config(show="")
+                    toggle_btn.config(text="🙈 Hide")
+                else:
+                    code_entry.config(show="*")
+                    toggle_btn.config(text="👁️ Show")
+            
+            toggle_btn = tk.Button(entry_frame, text="👁️ Show", width=10, command=toggle_password_visibility)
+            toggle_btn.pack(side="left")
+            
+            # Button frame
+            button_frame = tk.Frame(main_frame)
+            button_frame.pack(fill="x", pady=(10, 0))
+            
+            def on_ok():
+                result["code"] = code_entry.get()
+                code_dialog.destroy()
+            
+            def on_cancel():
+                result["code"] = None
+                code_dialog.destroy()
+            
+            cancel_btn = tk.Button(button_frame, text="Cancel", width=10, command=on_cancel)
+            cancel_btn.pack(side="left", padx=(0, 5))
+            
+            ok_btn = tk.Button(button_frame, text="OK", width=10, command=on_ok, default="active")
+            ok_btn.pack(side="left")
+            
+            # Bind Enter key to OK
+            code_entry.bind("<Return>", lambda e: on_ok())
+            code_dialog.bind("<Escape>", lambda e: on_cancel())
+            
+            code_dialog.wait_window()
+            code = result["code"]
+            
+            if not code:
                 return
 
             proceed = self.show_message("confirm_restore_title", "confirm_restore_message", ask="yesno")
@@ -2759,7 +2936,7 @@ class ModernPasswordManagerGUI:
         win.transient(self.root)
         win.grab_set()
         win.focus_force()
-
+            
     def show_backup_dialog(self):
         """Enhanced backup dialog with password generator button"""
         import tkinter.simpledialog as simpledialog
@@ -2769,33 +2946,39 @@ class ModernPasswordManagerGUI:
 
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("backup_dialog_title"))
-        dialog.geometry("630x730")
+        dialog.geometry("1000x590")
         dialog.grab_set()
         dialog.resizable(False, False)
 
-        main_frame = ctk.CTkFrame(dialog)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        main_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        main_frame.pack(fill="both", expand=True)
 
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("create_encrypted_backup_title"), 
+        left_frame = ctk.CTkFrame(main_frame, width=400, fg_color="#470500")
+        left_frame.pack(side="left", fill="both", expand=True, padx=(20, 10), pady=20)
+
+        right_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        right_frame.pack(side="right", fill="both", expand=True, padx=(10, 20), pady=20)
+
+        ctk.CTkLabel(right_frame, text=self.lang_manager.get_string("create_encrypted_backup_title"), 
                     font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(20, 10))
 
-        warning_frame = ctk.CTkFrame(main_frame, fg_color="#2b1515")  # Dark red background
-        warning_frame.pack(fill="x", padx=10, pady=15)
+        warning_frame = left_frame
+        warning_frame.configure(fg_color="#470500")
 
         ctk.CTkLabel(warning_frame, text=self.lang_manager.get_string("critical_security_warnings_title"), 
                     font=ctk.CTkFont(size=18, weight="bold"), 
-                    text_color="#ff4444").pack(pady=(15, 10))
+                    text_color=("#FFFFFF", "#FFFFFF")).pack(pady=(15, 10))
 
         warnings_text = self.lang_manager.get_string("backup_warnings_text")
 
         warning_label = ctk.CTkLabel(warning_frame, text=warnings_text, 
                                     font=ctk.CTkFont(size=12), 
-                                    text_color="#ff6666",
+                                    text_color=("#FFFFFF", "#FFCCCC"),
                                     justify="left")
         warning_label.pack(padx=15, pady=(0, 15))
 
-        code_frame = ctk.CTkFrame(main_frame)
-        code_frame.pack(fill="x", padx=10, pady=10)
+        code_frame = ctk.CTkFrame(right_frame, width=400, height=400)
+        code_frame.pack(expand=True, padx=10, pady=10)
 
         ctk.CTkLabel(code_frame, text=self.lang_manager.get_string("enter_backup_code_label"), 
                     font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(15, 5))
@@ -2804,9 +2987,64 @@ class ModernPasswordManagerGUI:
                     font=ctk.CTkFont(size=12), 
                     text_color="#ff4444").pack(pady=(0, 10))
 
-        code_entry = ctk.CTkEntry(code_frame, width=400, height=40, show="*",
-                                placeholder_text=self.lang_manager.get_string("backup_code_placeholder"))
-        code_entry.pack(pady=(0, 10))
+        # Code entry with copy button
+        code_input_frame = ctk.CTkFrame(code_frame, fg_color="transparent")
+        code_input_frame.pack(pady=(0, 10), fill="x")
+
+        code_entry = ctk.CTkEntry(code_input_frame, width=320, height=50, show="*",
+                                placeholder_text=self.lang_manager.get_string("backup_code_placeholder"),
+                                font=ctk.CTkFont(size=14))
+        code_entry.pack(side="left", padx=(0, 10))
+
+        def copy_backup_code():
+            code = code_entry.get()
+            if code:
+                dialog.clipboard_clear()
+                dialog.clipboard_append(code)
+                copy_code_btn.configure(text="✅ Copied!")
+                dialog.after(2000, lambda: copy_code_btn.configure(text="📋 Copy"))
+            else:
+                copy_code_btn.configure(text="❌ Empty")
+                dialog.after(1000, lambda: copy_code_btn.configure(text="📋 Copy"))
+
+        copy_code_btn = ctk.CTkButton(
+            code_input_frame,
+            text="📋 Copy",
+            command=copy_backup_code,
+            width=70,
+            height=50,
+            font=ctk.CTkFont(size=12)
+        )
+        copy_code_btn.pack(side="left")
+
+        # --- Password Requirements Checklist / Success Message ---
+        checklist_frame = ctk.CTkFrame(code_frame, fg_color="transparent", width=450)
+        checklist_frame.pack(pady=10, padx=20, anchor="w", fill="x")
+
+        # Success message label (initially hidden)
+        self.backup_success_label = ctk.CTkLabel(
+            checklist_frame, 
+            text="", 
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#10B981",
+            wraplength=400,
+            justify="left"
+        )
+        self.backup_success_label.pack(anchor="w", pady=5)
+
+        self.backup_req_labels = {}
+        requirements = {
+            "length": self.lang_manager.get_string("password_req_length"),
+            "uppercase": self.lang_manager.get_string("password_req_uppercase"),
+            "lowercase": self.lang_manager.get_string("password_req_lowercase"),
+            "number": self.lang_manager.get_string("password_req_number"),
+            "symbol": self.lang_manager.get_string("password_req_symbol"),
+        }
+
+        for key, text in requirements.items():
+            label = ctk.CTkLabel(checklist_frame, text=f"❌ {text}", text_color="gray", font=ctk.CTkFont(size=12))
+            label.pack(anchor="w")
+            self.backup_req_labels[key] = label
 
         # Button container for Show/Hide and Generate buttons
         button_container = ctk.CTkFrame(code_frame, fg_color="transparent")
@@ -2828,65 +3066,106 @@ class ModernPasswordManagerGUI:
         def generate_strong_password():
             """Generate a random password with minimum 50 characters"""
             try:
-                # Generate a very strong password (50-64 characters)
-                password_length = 50  # Minimum 50 characters
+                password_length = 50
                 generated_password = self.password_generator.generate_password(
                     length=password_length,
                     use_uppercase=True,
                     use_lowercase=True,
                     use_digits=True,
                     use_symbols=True,
-                    exclude_ambiguous=True  # Exclude confusing characters for better copying
+                    exclude_ambiguous=True
                 )
                 
-                # Clear current entry and insert the generated password
                 code_entry.delete(0, 'end')
                 code_entry.insert(0, generated_password)
                 
-                # Temporarily show the password
                 code_entry.configure(show="")
                 show_btn.configure(text=self.lang_manager.get_string("hide_button"))
                 
-                # Show success feedback
                 generate_btn.configure(text="✓ Generated!", fg_color="#4CAF50")
                 dialog.after(2000, lambda: generate_btn.configure(
                     text="🎲 Generate Strong Password", 
                     fg_color="#10B981"
                 ))
                 
-                # Assess and display strength
                 score, strength, _ = self.password_generator.assess_strength(generated_password)
                 strength_info = f"Password generated: {password_length} chars | Strength: {strength} ({score}%)"
                 
-                # Update the warning label temporarily with strength info
                 original_text = warning_label.cget("text")
-                warning_label.configure(text=f"🔐 {strength_info}", text_color="#4CAF50")
+                warning_label.configure(text=f"🔒 {strength_info}", text_color="#4CAF50")
                 dialog.after(5000, lambda: warning_label.configure(text=original_text, text_color="#ff6666"))
+                
+                # Trigger validation to enable button
+                validate_password_realtime()
                 
             except Exception as e:
                 self.show_message("error", f"Failed to generate password: {str(e)}", msg_type="error")
 
-        # Add the generate button with green color
         generate_btn = ctk.CTkButton(
             button_container, 
             text="🎲 Generate Strong Password", 
             width=200, 
             height=30,
             command=generate_strong_password,
-            fg_color="#10B981",  # Green color
-            hover_color="#059669"  # Darker green on hover
+            fg_color="#10B981",
+            hover_color="#059669"
         )
         generate_btn.pack(side="left", padx=5)
 
+        # VALIDATION FUNCTION - Enable/disable button based on password strength
+        def validate_password_realtime(event=None):
+            password = code_entry.get()
+            
+            checks = {
+                "length": len(password) >= 16,
+                "uppercase": any(c.isupper() for c in password),
+                "lowercase": any(c.islower() for c in password),
+                "number": any(c.isdigit() for c in password),
+                "symbol": any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password),
+            }
+
+            all_met = all(checks.values())
+            
+            # Update requirement labels
+            if all_met and hasattr(self, 'backup_success_label'):
+                score, strength, _ = self.password_generator.assess_strength(password)
+                success_msg = f"✅ Password generated: {len(password)} chars | Strength: {strength} ({score}%)"
+                self.backup_success_label.configure(text=success_msg, text_color="#10B981")
+                
+                for label in self.backup_req_labels.values():
+                    label.pack_forget()
+            else:
+                if hasattr(self, 'backup_success_label'):
+                    self.backup_success_label.configure(text="")
+                
+                for key, is_met in checks.items():
+                    if key in self.backup_req_labels:
+                        label = self.backup_req_labels[key]
+                        base_text = self.lang_manager.get_string(f"password_req_{key}")
+                        if is_met:
+                            label.configure(text=f"✅ {base_text}", text_color="green")
+                            label.pack(anchor="w")
+                        else:
+                            label.configure(text=f"❌ {base_text}", text_color="gray")
+                            label.pack(anchor="w")
+            
+            # ENABLE/DISABLE CREATE BACKUP BUTTON
+            if all_met:
+                create_backup_btn.configure(state="normal", fg_color="#4CAF50", hover_color="#45A049")
+            else:
+                create_backup_btn.configure(state="disabled", fg_color="gray", hover_color="gray")
+            
+            return all_met
+
+        # Bind validation to password entry
+        code_entry.bind("<KeyRelease>", validate_password_realtime)
+
         def create_backup():
             code = code_entry.get().strip()
-            if not code:
-                self.show_message("error", "backup_code_required_error", msg_type="error")
+            if not validate_password_realtime():
+                self.show_message("error", "password_requirements_not_met", msg_type="error")
                 return
 
-            if len(code) < 8:
-                self.show_message("error", "backup_code_min_length_error", msg_type="error")
-                return
             confirm_msg = self.lang_manager.get_string("final_backup_confirmation_message", code_length=len(code))
 
             if not self.show_message("final_backup_confirmation_title", confirm_msg, ask="yesno"):
@@ -2911,17 +3190,32 @@ class ModernPasswordManagerGUI:
             except Exception as e:
                 self.show_message("backup_failed_title", "backup_failed_message", msg_type="error", error=str(e))
 
-        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame = ctk.CTkFrame(right_frame, fg_color="transparent")
         button_frame.pack(pady=20)
+        
         ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), 
                     command=dialog.destroy, 
                     width=120, height=45).pack(side="left", padx=15)
-        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("create_backup_button"), 
-                    command=create_backup,
-                    width=180, height=45, 
-                    font=ctk.CTkFont(size=16, weight="bold")).pack(side="right", padx=15)
+        
+        # CREATE BACKUP BUTTON - Initially disabled
+        create_backup_btn = ctk.CTkButton(
+            button_frame, 
+            text=self.lang_manager.get_string("create_backup_button"), 
+            command=create_backup,
+            width=180, 
+            height=45, 
+            font=ctk.CTkFont(size=16, weight="bold"),
+            state="disabled",  # Initially disabled
+            fg_color="gray",   # Gray when disabled
+            hover_color="gray"
+        )
+        create_backup_btn.pack(side="right", padx=15)
+        
         code_entry.focus()
-
+        
+        # Initial validation check
+        validate_password_realtime()
+        
     def create_sidebar(self, parent):
         self.sidebar = ctk.CTkFrame(parent, width=280)
         self.sidebar.pack(side="left", fill="y", padx=10, pady=10)

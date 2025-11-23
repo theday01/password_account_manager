@@ -7,6 +7,11 @@ load screen should be enhanced in UI and make it real professional
 should remove "audit.log" from finall version
 
 
+
+detect if program alredy running and stoped 
+
+
+
 pleae add security path to make hacker difficult to reach the database file
 for example : C:\Users\Username\AppData\Local\Programs\SecureFileManager\
 and also to make him not able to find it by searching for "secure" or "password" or "vault" in the disk search
