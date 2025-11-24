@@ -12,6 +12,13 @@ detect if program alredy running and stoped
 
 
 
+بعد عمل الباكاب قاعدة البيانات لم تعد مشفرة يجب اعادة تشفير القاعدة
+
+
+
+
+
+
 pleae add security path to make hacker difficult to reach the database file
 for example : C:\Users\Username\AppData\Local\Programs\SecureFileManager\
 and also to make him not able to find it by searching for "secure" or "password" or "vault" in the disk search

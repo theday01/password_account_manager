@@ -2843,66 +2843,36 @@ class ModernPasswordManagerGUI:
             if not code:
                 return
 
+            master_password = ask_string("Master Password", "Please enter your master password to re-encrypt the restored vault.", parent=win)
+            if not master_password:
+                self.show_message("error", "master_password_required", msg_type="error")
+                return
+
             proceed = self.show_message("confirm_restore_title", "confirm_restore_message", ask="yesno")
             if not proceed:
                 return
 
             status_var.set(self.lang_manager.get_string("restoring_backup_status"))
             win.update_idletasks()
-            tempdir = tempfile.mkdtemp(prefix="sv_restore_")
+            
             try:
-                bm = BackupManager(
-                    metadata_db_path=getattr(self.database, "metadata_db", os.path.join(os.getcwd(), "metadata.db")),
-                    sensitive_db_path=getattr(self.database, "sensitive_db", os.path.join(os.getcwd(), "sensitive.db")),
-                    salt_path=getattr(self.database, "salt_path", os.path.join(os.getcwd(), "salt_file")),
-                    integrity_path=getattr(self.database, "integrity_path", os.path.join(os.getcwd(), "integrity_file")),
-                    backups_dir=backup_folder
-                )
-
-                try:
-                    restored = bm.restore_backup(backup_path, code, restore_to_dir=tempdir)
-                except BackupError as be:
-                    shutil.rmtree(tempdir, ignore_errors=True)
-                    self.show_message("restore_failed_error", "restore_failed_error", msg_type="error", be=be)
-                    status_var.set("")
-                    return
-                except Exception as e:
-                    shutil.rmtree(tempdir, ignore_errors=True)
-                    self.show_message("restore_failed_error", "unexpected_restore_error", msg_type="error", e=e)
-                    status_var.set("")
-                    return
-
+                from restore_helper import restore_backup_into_vault
+                
                 metadata_db_path = getattr(self.database, "metadata_db", None)
                 if metadata_db_path:
                     vault_dir = os.path.dirname(metadata_db_path) or os.getcwd()
                 else:
                     vault_dir = os.path.join(os.getcwd(), "secure_vault")
-                os.makedirs(vault_dir, exist_ok=True)
 
-                timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-                backups_created = []
-                moved = []
-
-                for fpath in restored:
-                    base = os.path.basename(fpath)
-                    if base == "backup_manifest.json":
-                        continue
-                    dest = os.path.join(vault_dir, base)
-                    if os.path.exists(dest):
-                        bak_name = f"{dest}.bak.{timestamp}"
-                        shutil.move(dest, bak_name)
-                        backups_created.append(bak_name)
-                    shutil.move(fpath, dest)
-                    moved.append(dest)
-
-                shutil.rmtree(tempdir, ignore_errors=True)
+                result = restore_backup_into_vault(backup_path, code, vault_dir, master_password)
+                
                 status_var.set(self.lang_manager.get_string("restore_complete_status"))
                 
                 # ===== UPDATED: Show manual restart message instead of automatic restart =====
                 message = self.lang_manager.get_string(
                     "restore_complete_message", 
-                    moved="\n".join(os.path.basename(p) for p in moved), 
-                    backups="\n".join(backups_created)
+                    moved="\n".join(os.path.basename(p) for p in result.get("restored_to", [])), 
+                    backups="\n".join(result.get("backups_created", []))
                 )
                 
                 restore_complete_message = (
@@ -2924,10 +2894,6 @@ class ModernPasswordManagerGUI:
             except Exception as e:
                 self.show_message("restore_error_title", "restore_error_message", msg_type="error", e=e)
                 status_var.set("")
-                try:
-                    shutil.rmtree(tempdir, ignore_errors=True)
-                except Exception:
-                    pass
 
         browse_btn = tk.Button(btn_frame, text=self.lang_manager.get_string("browse_button"), command=browse_for_backup, width=12)
         browse_btn.pack(side="left", padx=(0,8))
