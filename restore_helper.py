@@ -5,7 +5,6 @@ from datetime import datetime
 import logging
 import json
 from backup_manager import BackupManager, BackupError
-from secure_file_manager import SecureFileManager
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +14,13 @@ def restore_backup_into_vault(backup_path: str, backup_code: str, vault_dir: str
                               salt_name="salt_file", integrity_name="integrity_file"):
     """
     Restore from backup_path using backup_code into vault_dir.
-    - Restores to a temporary directory first.
-    - Backs up any existing target files in vault_dir by renaming them with .bak.TIMESTAMP
-    - Moves restored files into vault_dir.
+    
+    CRITICAL: This function restores files AS-IS without re-encryption, because:
+    - Backup files are encrypted with the backup's original salt
+    - The salt file in the backup defines the correct key derivation context
+    - Re-encrypting with a different salt would break the encrypted data
+    - The master_password on restart will work with the restored salt file
+    
     Returns dict with details about restored and backed-up files.
     """
     logger.info(f"Attempting to restore backup from {backup_path} into vault {vault_dir}")
@@ -28,6 +31,7 @@ def restore_backup_into_vault(backup_path: str, backup_code: str, vault_dir: str
     os.makedirs(vault_dir, exist_ok=True)
     tempdir = tempfile.mkdtemp(prefix="sv_restore_")
     logger.info(f"Created temporary directory for restore: {tempdir}")
+    
     bm = BackupManager(
         metadata_db_path=os.path.join(vault_dir, metadata_name),
         sensitive_db_path=os.path.join(vault_dir, sensitive_name),
@@ -44,31 +48,13 @@ def restore_backup_into_vault(backup_path: str, backup_code: str, vault_dir: str
         shutil.rmtree(tempdir, ignore_errors=True)
         raise
 
-    if master_password:
-        logger.info("Master password provided, proceeding with re-encryption of restored files.")
-        try:
-            sfm = SecureFileManager(secure_dir=tempdir)
-            sfm.initialize_encryption(master_password)
-            settings_path_in_temp = os.path.join(tempdir, "settings.json")
-            if os.path.exists(settings_path_in_temp):
-                logger.info("Found settings.json in restored files, re-encrypting it now.")
-                with open(settings_path_in_temp, "r") as f:
-                    settings_data = json.load(f)
-                if not sfm.write_settings(settings_data):
-                    raise Exception("Failed to write encrypted settings.")
-                logger.info("Successfully re-encrypted settings.json.")
-            else:
-                logger.info("No settings.json found in the backup, skipping re-encryption for it.")
-            logger.info("Rotating integrity signature for the newly restored and encrypted files.")
-            if not sfm.rotate_integrity_signature():
-                raise Exception("Failed to rotate integrity signature after restore.")
-            logger.info("Integrity signature updated successfully.")
-        except Exception as e:
-            logger.error(f"A critical error occurred during re-encryption: {e}", exc_info=True)
-            shutil.rmtree(tempdir, ignore_errors=True)
-            raise BackupError(f"Failed to re-encrypt restored files: {e}") from e
-    else:
-        logger.warning("No master password provided. Restored files will NOT be re-encrypted.")
+    # CRITICAL: Do NOT re-encrypt the backup files
+    # The restored databases are already encrypted with the backup's original salt
+    # If we re-encrypt them, they become unreadable with the restored salt file
+    logger.info("Skipping re-encryption of backup files.")
+    logger.info("The backup files are already properly encrypted with their original salt.")
+    logger.info("The restored salt file will be used for key derivation on next login.")
+
     timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
     moved = []
     backups_created = []
@@ -77,7 +63,8 @@ def restore_backup_into_vault(backup_path: str, backup_code: str, vault_dir: str
     for f in restored_files:
         basename = os.path.basename(f)
         if basename == "backup_manifest.json":
-            # optional: read manifest if you need metadata
+            # Skip manifest file - it's just metadata
+            logger.debug(f"Skipping manifest file: {basename}")
             continue
 
         dest = os.path.join(vault_dir, basename)
@@ -90,14 +77,31 @@ def restore_backup_into_vault(backup_path: str, backup_code: str, vault_dir: str
         logger.info(f"Moving {f} to {dest}")
         shutil.move(f, dest)
         moved.append(dest)
+    
+    # IMPORTANT: Verify all critical files are in place
+    critical_files = [
+        os.path.join(vault_dir, metadata_name),
+        os.path.join(vault_dir, sensitive_name),
+        os.path.join(vault_dir, salt_name)
+    ]
+    
+    for crit_file in critical_files:
+        if not os.path.exists(crit_file):
+            logger.error(f"CRITICAL: Required file missing after restore: {crit_file}")
+            shutil.rmtree(tempdir, ignore_errors=True)
+            raise FileNotFoundError(f"Critical file missing after restore: {crit_file}")
+        logger.info(f"✓ Verified file exists: {os.path.basename(crit_file)}")
 
-    # cleanup any remaining files in tempdir
+    # cleanup temporary directory
     try:
         logger.info(f"Cleaning up temporary directory: {tempdir}")
         shutil.rmtree(tempdir)
-    except Exception:
-        logger.warning(f"Failed to clean up temporary directory: {tempdir}", exc_info=True)
+    except Exception as e:
+        logger.warning(f"Failed to clean up temporary directory: {tempdir}: {e}")
         pass
     
     logger.info(f"Restore complete. Moved {len(moved)} files, created {len(backups_created)} backups.")
+    logger.info("IMPORTANT: The application must be restarted for the restored data to be loaded.")
+    logger.info("On next login, use the same master password with the restored salt file.")
+    
     return {"restored_to": moved, "backups_created": backups_created}
