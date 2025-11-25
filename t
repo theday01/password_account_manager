@@ -37,3 +37,10 @@ and also make the program use a strong hashing algorithm to hash the user passwo
 123456789hamzaSAADI@A
 
 K<6Y>f=UU8D-kL}BkQdv;AK{ooMJf;9Sa>._8R[?x=PD[=(<G5
+
+
+
+
+2025-11-25 11:46:05,077 - backup_manager - ERROR - Restore failed: Invalid backup fiza\Desktop\scripts\3 - Control Ur PassWord & Gen\backup_manager.py", line 173, in restore_backup
+    raise BackupError("Invalid backup file (bad header)")
+backup_manager.BackupError: Invalid backup file (bad header)

@@ -2848,7 +2848,22 @@ class ModernPasswordManagerGUI:
                 self.show_message("error", "master_password_required", msg_type="error")
                 return
 
-            proceed = self.show_message("confirm_restore_title", "confirm_restore_message", ask="yesno")
+            # ===== UPDATED WARNING DIALOG =====
+            # Warn user that stored accounts will be replaced
+            warning_message = (
+                "⚠️ WARNING ⚠️\n\n"
+                "Restoring this backup will:\n\n"
+                "✓ Keep your master account login (unchanged)\n"
+                "✓ Keep your current master password\n"
+                "✗ DELETE all accounts in 'Your Accounts' tab\n"
+                "✗ REPLACE them with accounts from the backup\n\n"
+                "🚨 Current accounts will be backed up with timestamp suffix,\n"
+                "but will be replaced by backup data.\n\n"
+                "Your master account and login credentials remain safe.\n\n"
+                "Are you sure you want to proceed?"
+            )
+            
+            proceed = self.show_message("⚠️ RESTORE BACKUP", warning_message, ask="yesno", msg_type="warning")
             if not proceed:
                 return
 
@@ -2864,22 +2879,59 @@ class ModernPasswordManagerGUI:
                 else:
                     vault_dir = os.path.join(os.getcwd(), "secure_vault")
 
+                # ===== DELETE ONLY ACCOUNT DATABASES (NOT MASTER ACCOUNT) =====
+                secure_vault_path = os.path.join(os.getcwd(), "secure_vault")
+                
+                if os.path.exists(secure_vault_path):
+                    # List of account database files to delete (NOT master account files)
+                    account_db_files = [
+                        "metadata.db",
+                        "sensitive.db",
+                        "integrity_file"
+                    ]
+                    
+                    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+                    
+                    for db_file in account_db_files:
+                        file_path = os.path.join(secure_vault_path, db_file)
+                        if os.path.exists(file_path):
+                            try:
+                                # Create backup before deletion
+                                backup_path = f"{file_path}.bak.{timestamp}"
+                                shutil.copy2(file_path, backup_path)
+                                logger.info(f"Backed up {db_file} to {backup_path}")
+                                
+                                # Delete the account database file
+                                os.remove(file_path)
+                                logger.info(f"Deleted account database: {db_file}")
+                                
+                            except Exception as delete_error:
+                                logger.error(f"Failed to delete {db_file}: {delete_error}")
+                                self.show_message("error", f"Failed to delete account database:\n\n{delete_error}\n\nRestore aborted.", msg_type="error")
+                                status_var.set("")
+                                return
+                        else:
+                            logger.info(f"Account database {db_file} does not exist, skipping")
+                else:
+                    logger.info(f"secure_vault folder does not exist, proceeding with fresh restore")
+                    os.makedirs(secure_vault_path, exist_ok=True)
+                
+                # ===== PROCEED WITH RESTORE =====
                 result = restore_backup_into_vault(backup_path, code, vault_dir, master_password)
                 
                 status_var.set(self.lang_manager.get_string("restore_complete_status"))
                 
-                # ===== UPDATED: Show manual restart message instead of automatic restart =====
-                message = self.lang_manager.get_string(
-                    "restore_complete_message", 
-                    moved="\n".join(os.path.basename(p) for p in result.get("restored_to", [])), 
-                    backups="\n".join(result.get("backups_created", []))
-                )
-                
+                # ===== SHOW SUCCESS MESSAGE =====
                 restore_complete_message = (
-                    f"{message}\n\n"
                     f"✅ Backup restored successfully!\n\n"
-                    f"🔄 IMPORTANT: You must restart the application manually for all changes to take effect.\n\n"
-                    f"Please close this application and restart it to complete the restoration process."
+                    f"✓ Master account: Unchanged\n"
+                    f"✓ Master password: Still works\n"
+                    f"✓ Accounts restored from backup\n"
+                    f"✓ Old accounts backed up with .bak.{timestamp} suffix\n\n"
+                    f"🔄 IMPORTANT: You must restart the application manually\n"
+                    f"for all changes to take effect.\n\n"
+                    f"Please close and restart the application.\n"
+                    f"Login with your current master password."
                 )
                 
                 self.show_message(
@@ -2892,8 +2944,9 @@ class ModernPasswordManagerGUI:
                 win.destroy()
                 
             except Exception as e:
-                self.show_message("restore_error_title", "restore_error_message", msg_type="error", e=e)
+                self.show_message("restore_error_title", f"Restore failed:\n\n{str(e)}", msg_type="error")
                 status_var.set("")
+                
 
         browse_btn = tk.Button(btn_frame, text=self.lang_manager.get_string("browse_button"), command=browse_for_backup, width=12)
         browse_btn.pack(side="left", padx=(0,8))
