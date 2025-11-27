@@ -27,8 +27,9 @@ def restore_backup_into_vault(backup_path: str, backup_code: str, vault_dir: str
     
     Returns dict with details about restored and backed-up files.
     """
+
     logger.info(f"Attempting to restore backup from {backup_path} into vault {vault_dir}")
-    
+
     if not os.path.exists(backup_path):
         logger.error(f"Backup file not found: {backup_path}")
         raise FileNotFoundError(f"Backup file not found: {backup_path}")

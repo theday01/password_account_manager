@@ -23,7 +23,7 @@ from tkinter import filedialog
 import customtkinter as ctk
 from ui_utils import set_icon, ThemedToplevel, CustomMessageBox, ask_string
 from secure_file_manager import SecureFileManager, SecureVaultSetup, SecurityMonitor, setup_secure_vault
-from backup_manager import BackupManager
+from backup_manager import BackupManager, BackupError
 from PIL import Image, ImageTk
 import logging
 from audit_logger import setup_logging
@@ -2551,7 +2551,6 @@ class ModernPasswordManagerGUI:
         if hasattr(self, 'trial_timer_id') and self.trial_timer_id:
             self.root.after_cancel(self.trial_timer_id)
             self.trial_timer_id = None
-                        
     def show_restore_dialog(self):
         import glob, os, tempfile, shutil, json, sys
         from datetime import datetime
@@ -2942,7 +2941,10 @@ class ModernPasswordManagerGUI:
                 
                 # Close the restore dialog but don't restart the application
                 win.destroy()
-                
+            except BackupError as be:
+                # Specifically catch the bad header error
+                self.show_message("invalid_backup_file_title", "invalid_backup_file_header_message", msg_type="error")
+                status_var.set("")
             except Exception as e:
                 self.show_message("restore_error_title", f"Restore failed:\n\n{str(e)}", msg_type="error")
                 status_var.set("")

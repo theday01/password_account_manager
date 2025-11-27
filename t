@@ -36,11 +36,16 @@ and also make the program use a strong hashing algorithm to hash the user passwo
 
 123456789hamzaSAADI@A
 
-K<6Y>f=UU8D-kL}BkQdv;AK{ooMJf;9Sa>._8R[?x=PD[=(<G5
+6GH#kqz8S@bTip[2(qd({LdutvBbnGZ,f482_;=n^gifyo(d8Z
 
 
 
 
-2025-11-25 11:46:05,077 - backup_manager - ERROR - Restore failed: Invalid backup fiza\Desktop\scripts\3 - Control Ur PassWord & Gen\backup_manager.py", line 173, in restore_backup
+
+2025-11-27 19:53:59,979 - backup_manager - ERROR - Restore failed: Invalid backup file header.
+2025-11-27 19:53:59,980 - restore_helper - ERROR - Failed to restore backup: Invalid backup file (bad header)Traceback (most recent call last):
+  File "c:\Users\Hamza\Desktop\scripts\3 - Control Ur PassWord & Gen\restore_helper.py", line 53, in restore_backup_into_vault
+    restored_files = bm.restore_backup(backup_path, backup_code, restore_to_dir=tempdir)
+  File "c:\Users\Hamza\Desktop\scripts\3 - Control Ur PassWord & Gen\backup_manager.py", line 173, in restore_backup
     raise BackupError("Invalid backup file (bad header)")
 backup_manager.BackupError: Invalid backup file (bad header)
