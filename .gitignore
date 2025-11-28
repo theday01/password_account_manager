@@ -10,6 +10,9 @@ problms
 t
 /t
 .t
+t.txt
+/t.txt
+.t.txt
 
 
 
@@ -35,4 +38,5 @@ ____validate_backups.py
 .icons
 /icons
 icons
-
+/icons/
+icons/
