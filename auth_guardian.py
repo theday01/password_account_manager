@@ -554,7 +554,7 @@ class AuthGuardian:
         return self._save_state()
     
     def verify_tfa_code(self, code: str) -> bool:
-        """Verify a TOTP code or backup code."""
+        """Verify a TOTP code."""
         if not PYOTP_AVAILABLE:
             return False
         if not self.is_tfa_enabled():
@@ -562,17 +562,6 @@ class AuthGuardian:
         if self.is_tfa_locked_out():
             logger.warning("2FA verification attempted while locked out")
             return False
-        
-        # Check backup codes first
-        backup_codes = self._settings.get('tfa_backup_codes', [])
-        if code in backup_codes:
-            # Remove used backup code
-            backup_codes.remove(code)
-            self._settings['tfa_backup_codes'] = backup_codes
-            self._save_state()
-            logger.info("2FA backup code used successfully")
-            return True
-        
         # Verify TOTP code
         try:
             totp = pyotp.TOTP(self._settings['tfa_secret'])
@@ -636,17 +625,6 @@ class AuthGuardian:
         self.consecutive_tfa_lockouts = 0
         self._save_state()
     
-    def generate_backup_codes(self, count: int = 10) -> list:
-        """Generate backup codes for 2FA recovery."""
-        codes = []
-        for _ in range(count):
-            # Generate 8-character alphanumeric codes
-            code = ''.join(secrets.choice('ABCDEFGHJKLMNPQRSTUVWXYZ23456789') for _ in range(8))
-            codes.append(code)
-        self._settings['tfa_backup_codes'] = codes
-        self._save_state()
-        return codes
-
     def reload_settings(self):
         """Reloads settings from the settings manager."""
         new_settings = self._settings_manager.read_settings() or {}

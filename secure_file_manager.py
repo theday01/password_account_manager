@@ -94,7 +94,7 @@ class SecureFileManager:
     - create/initialize vault files and salt
     - derive key from master password
     - compute and verify integrity HMAC
-    - staging (load to temp), sync and backups
+    - staging (load to temp), sync
     - permission hardening
     """
 
@@ -524,49 +524,6 @@ class SecureFileManager:
             return True
         except Exception:
             LOG.exception("sync_all_files failed")
-            return False
-
-    # --- backups & restore ---
-    def create_backup(self, backup_dir: str) -> str:
-        """Create a timestamped backup directory containing copies of vault files.
-
-        Returns the path to the backup directory.
-        """
-        LOG.info(f"Creating backup in directory: {backup_dir}")
-        _ensure_dir_exists(backup_dir)
-        ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-        dest = os.path.join(backup_dir, f"vault_backup_{ts}")
-        shutil.copytree(self.secure_dir, dest)
-        LOG.info(f"Backup created at: {dest}")
-        return dest
-
-    def restore_backup(self, backup_path: str, overwrite: bool = False) -> bool:
-        """Restore vault files from backup_path into secure_dir.
-
-        When overwrite=True, existing files will be replaced. Otherwise missing files are added only.
-        """
-        LOG.info(f"Restoring backup from {backup_path} to {self.secure_dir} (overwrite={overwrite})")
-        try:
-            if not os.path.exists(backup_path):
-                LOG.error(f"Backup path not found: {backup_path}")
-                raise FileNotFoundError(backup_path)
-            for root, dirs, files in os.walk(backup_path):
-                rel = os.path.relpath(root, backup_path)
-                target_root = os.path.join(self.secure_dir, rel) if rel != "." else self.secure_dir
-                _ensure_dir_exists(target_root)
-                for f in files:
-                    src = os.path.join(root, f)
-                    dst = os.path.join(target_root, f)
-                    if os.path.exists(dst) and not overwrite:
-                        LOG.info(f"Skipping existing file: {dst}")
-                        continue
-                    LOG.info(f"Restoring file {src} to {dst}")
-                    shutil.copy2(src, dst)
-            self.rotate_integrity_signature()
-            LOG.info("Backup restored successfully.")
-            return True
-        except Exception:
-            LOG.exception("restore_backup failed")
             return False
 
     # --- permissions / hardening ---

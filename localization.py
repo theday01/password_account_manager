@@ -35,8 +35,6 @@ LANGUAGES = {
         "integrity_fix_error": "Failed to fix integrity issue: {error}",
         "settings": "Settings",
         "about": "About",
-        "backup": "Backup",
-        "restore_old_backup": "Restore old backup",
         "logout": "Logout",
         "language_settings": "Language Settings",
         "language": "Language",
@@ -200,105 +198,10 @@ This design ensures that even if someone gains access to your computer's files, 
 ### Security Best Practices
 
 *   **Use a Strong Master Password:** Make it long, complex, and something you have never used anywhere else.
-*   **Keep Backup Codes Safe:** Write down your backup codes and store them in a secure physical location, separate from your computer and your backup files.
-*   **Create Regular Backups:** Store your backup files in a safe place, such as an external hard drive or a secure cloud storage service.
-
 ---
 _THIS SYSTEM WAS DEVELOPED BY HAMZA SAADI FROM _EAGLESHADOW 2025_
 """,
         "close_button": "Close",
-        "backup_dialog_title": "Create Secure Backup",
-        "create_encrypted_backup_title": "🔐 Create Encrypted Backup",
-        "critical_security_warnings_title": "⚠️ CRITICAL SECURITY WARNINGS",
-        "backup_warnings_text": """🚨 BACKUP CODE IS EXTREMELY IMPORTANT:
-    • If you LOSE your backup code, your backup is PERMANENTLY UNUSABLE
-    • Write down your backup code on PAPER and store it SAFELY
-    • DO NOT store the backup code digitally on the same device
-    • Consider storing the code in multiple SECURE physical locations
-
-    🔒 BACKUP SECURITY BEST PRACTICES:
-    • Use a STRONG, UNIQUE backup code (minimum 12 characters)
-    • Include uppercase, lowercase, numbers, and symbols
-    • NEVER share your backup code with anyone
-    • Store backups and codes in SEPARATE secure locations
-
-    💾 BACKUP FILE SAFETY:
-    • Store backup files (.svbk) in secure, encrypted storage
-    • Make multiple copies in different safe locations
-    • Test your backup restoration periodically
-    • Keep backup codes separate from backup files""",
-        "enter_backup_code_label": "Enter Backup Code:",
-        "remember_backup_code_warning": "⚠️ Remember: This code is required to restore your backup!",
-        "backup_code_placeholder": "Enter a strong backup code...",
-        "show_button": "👁️ Show",
-        "hide_button": "🙈 Hide",
-        "backup_code_required_error": "⚠️ Backup code is required!",
-        "backup_code_min_length_error": "⚠️ Backup code must be at least 8 characters long!",
-        "final_backup_confirmation_title": "🔐 Final Backup Confirmation",
-        "final_backup_confirmation_message": """⚠️ FINAL CONFIRMATION ⚠️
-
-    You are about to create an encrypted backup with the code you entered.
-
-    🚨 CRITICAL REMINDERS:
-    • Have you written down your backup code on PAPER?
-    • Have you stored it in a SAFE, SECURE location?
-    • Do you understand that WITHOUT this code, your backup is USELESS?
-
-    Backup code length: {code_length} characters
-
-    Are you absolutely sure you want to proceed?""",
-        "backup_complete_title": "🎉 Backup Complete",
-        "backup_complete_message": """✅ Backup Created Successfully!
-
-    📁 Backup saved to: {out_path}
-
-    🚨 IMPORTANT NEXT STEPS:
-    1. ✍️ Write your backup code on PAPER immediately
-    2. 🏦 Store the code in a SECURE location (safe, bank vault, etc.)
-    3. 💾 Copy the backup file to MULTIPLE secure locations
-    4. 🧪 Test your backup by attempting to restore it
-    5. 🔄 Create regular backups and update storage locations
-
-    ⚠️ Remember: Your backup is only as secure as your backup code storage!""",
-        "backup_failed_title": "❌ Backup Failed",
-        "backup_failed_message": "Failed to create backup:\\n\\n{error}\\n\\nPlease check your permissions and try again.",
-        "create_backup_button": "🔐 Create Backup",
-        "restore_dialog_title": "Restore Backup",
-        "available_backups_label": "Available backups (most recent first):",
-        "select_backup_details": "Select a backup to see details",
-        "preview_manifest_label": "Preview / Manifest (enter code to view):",
-        "backup_file_details_template": "File: {filename}\\nPath: {path}\\nSize: {size:,} bytes\\nLast modified (UTC): {mtime}\\n\\nTip: Use 'Preview contents' to view the manifest (requires backup code).",
-        "error_reading_file_info": "Error reading file info: {e}",
-        "select_backup_file_title": "Select a backup file",
-        "secure_vault_backups_filetype": "SecureVault Backups",
-        "all_files_filetype": "All files",
-        "external_backup_label": "{index}. {filename} (external)",
-        "no_selection_error": "No selection",
-        "select_backup_to_preview_error": "Please select a backup to preview.",
-        "backup_code_prompt_preview": "Enter the backup code to preview this backup:",
-        "previewing_backup_status": "Previewing backup (decrypting)... this may take a moment",
-        "preview_failed_error": "Failed to decrypt/preview backup: {be}",
-        "unexpected_preview_error": "Unexpected error during preview: {e}",
-        "failed_to_read_manifest": "Failed to read manifest: {e}\\n\\nFiles restored to temp dir:\\n{files}",
-        "no_manifest_found": "No manifest found. Files contained:\\n{files}",
-        "preview_complete_status": "Preview complete",
-        "select_backup_to_restore_error": "Please select a backup to restore.",
-        "backup_code_prompt_restore": "Enter the backup code for this file:",
-        "confirm_restore_title": "Confirm restore",
-        "confirm_restore_message": "Restoring will overwrite the active vault files. A backup of existing files will be created (suffix .bak.TIMESTAMP). Proceed?",
-        "restoring_backup_status": "Restoring backup... please wait",
-        "restore_failed_error": "Failed to decrypt/restore backup: {be}",
-        "unexpected_restore_error": "Unexpected error while restoring: {e}",
-        "restore_complete_status": "Restore complete",
-        "restore_complete_message_title": "Restore complete",
-        "restore_complete_message": "Restore complete.\\n\\nRestored files:\\n{moved}\\n\\nBackups of previous files:\\n{backups}\\n\\nIMPORTANT: The program must be restarted for changes to take full effect.\\nPlease save your work. Do you want to exit the program now?",
-        "exit_failed_error": "Automatic exit failed: {e}\\nPlease close the program manually.",
-        "restore_complete_info": "Restore complete. Please restart the program later for changes to take effect.",
-        "restore_error_title": "Restore error",
-        "restore_error_message": "An error occurred during restore: {e}",
-        "browse_button": "Browse...",
-        "preview_contents_button": "Preview contents",
-        "restore_selected_backup_button": "Restore Selected Backup",
         "tutorial_title": "Tutorial",
         "tutorial_step_1_title": "Welcome to SecureVault Pro",
         "tutorial_step_1_text": """This short tutorial will walk you through the essential features of SecureVault Pro.
@@ -317,8 +220,7 @@ Please choose a strong, memorable password and keep it safe.""",
 
 • **Manage Accounts:** Securely add, edit, and delete your login credentials for websites and applications.
 • **Password Generator:** Create strong, random, and customizable passwords to protect your accounts.
-• **Security Report:** The app analyzes your passwords and alerts you to any that are weak or have been reused across multiple accounts.
-• **Secure Backup:** Create encrypted backup files of your vault. This is crucial for disaster recovery.""",
+• **Security Report:** The app analyzes your passwords and alerts you to any that are weak or have been reused across multiple accounts.""",
         "tutorial_step_4_title": "Adding and Managing Your Accounts",
         "tutorial_step_4_text": """To get started, click the '➕ Add New Account' button on the main screen.
 
@@ -329,8 +231,7 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "tutorial_step_5_text": """To get the most out of SecureVault Pro and keep your digital life secure, follow these best practices:
 
 • **Use a Strong Master Password:** Make it long, complex, and unique.
-• **Generate Strong Passwords:** Use the password generator for all your accounts. Avoid using simple or easily guessable passwords.
-• **Create Regular Backups:** Regularly back up your vault and store the backup file in a safe, separate location.""",
+• **Generate Strong Passwords:** Use the password generator for all your accounts. Avoid using simple or easily guessable passwords.""",
         "tutorial_step_6_title": "All Done!",
         "tutorial_step_6_text": "You're now ready to use SecureVault Pro to manage your passwords and enhance your online security.",
         "tutorial_step_7_title": "FINALLY, REMEMBER...",
@@ -362,14 +263,9 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "2fa_disable_confirm_title": "Disable Two-Factor Authentication",
         "2fa_disable_confirm_message": "Are you sure you want to disable Two-Factor Authentication? This will reduce the security of your account.",
         "2fa_disabled_success": "Two-Factor Authentication has been disabled.",
-        "2fa_backup_codes_title": "Backup Codes",
-        "2fa_backup_codes_description": "Save these backup codes in a safe place. You can use them to access your account if you lose access to your authenticator app.",
-        "2fa_backup_codes_warning": "⚠️ These codes will only be shown once. Make sure to save them securely!",
-        "2fa_backup_codes_saved": "I have saved my backup codes",
         "2fa_login_required": "Two-Factor Authentication Required",
         "2fa_login_code_label": "Enter the 6-digit code from your authenticator app:",
         "2fa_login_code_placeholder": "000000",
-        "2fa_login_backup_code_label": "Or enter a backup code:",
         "2fa_login_verify_button": "Verify",
         "2fa_login_invalid_code": "Invalid code. Please try again.",
         "2fa_login_locked_out": "Too many failed attempts. 2FA is locked for {minutes} minutes.",

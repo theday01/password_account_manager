@@ -188,7 +188,6 @@ def clean_all_artifacts(secure_mode=False):
         
         search_locations = {
             "Anchor File(s)": {"prefix": "sv-anchor-", "dir": os.path.dirname(anchor.anchor_path)},
-            "Backup Anchor File(s)": {"prefix": "sv-ts-validation-", "dir": os.path.dirname(anchor.backup_anchor_path)},
             "Observer File(s)": {"prefix": "sv-observer-", "dir": os.path.dirname(observer.observer_path)},
             "License File(s)": {"prefix": "sv-license-" if platform.system() == "Windows" else ".sv-license-", "dir": os.path.dirname(trial_manager.LICENSE_FILE)}
         }
@@ -263,35 +262,6 @@ def clean_all_artifacts(secure_mode=False):
                 except Exception as e:
                     print(f"[ERROR] Failed to delete legacy file {fname}: {e}")
                     total_failed += 1
-
-        # Clean backup directory
-        backups_dir = "backups"
-        if os.path.exists(backups_dir):
-            print(f"\n[INFO] Cleaning backups directory: {backups_dir}")
-            try:
-                if secure_mode:
-                    for root, dirs, files in os.walk(backups_dir):
-                        for file in files:
-                            file_path = os.path.join(root, file)
-                            if secure_delete(file_path):
-                                print(f"[SUCCESS] Securely deleted backup: {file_path}")
-                                total_deleted += 1
-                            else:
-                                print(f"[ERROR] Failed to securely delete backup: {file_path}")
-                                total_failed += 1
-                    
-                    import shutil
-                    shutil.rmtree(backups_dir)
-                    print(f"[SUCCESS] Removed backups directory: {backups_dir}")
-                    total_deleted += 1
-                else:
-                    import shutil
-                    shutil.rmtree(backups_dir)
-                    print(f"[SUCCESS] Deleted backups directory: {backups_dir}")
-                    total_deleted += 1
-            except Exception as e:
-                print(f"[ERROR] Failed to clean backups directory: {e}")
-                total_failed += 1
 
         # Clean registry-based artifacts on Windows
         if platform.system() == "Windows":

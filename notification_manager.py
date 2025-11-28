@@ -78,10 +78,6 @@ async def _periodic_sender(is_trial_active: bool):
     An async function that sends a notification every 4 minutes, unless in trial.
     Enhanced with better error handling and system compatibility checks.
     """
-    if is_trial_active:
-        logger.info("Trial mode active - backup notifications disabled")
-        return
-
     # Initial delay to let the app fully start
     await asyncio.sleep(30)
     
@@ -109,19 +105,6 @@ async def _periodic_sender(is_trial_active: bool):
         try:
             await asyncio.sleep(240)  # 4 minutes
             
-            success = await send_safe_notification(
-                "Backup Reminder",
-                "It's time to back up your data to keep everything safe and secure.",
-                icon_path
-            )
-            
-            if success:
-                notification_count += 1
-                logger.info(f"Backup reminder #{notification_count} sent successfully")
-            else:
-                logger.warning(f"Failed to send backup reminder #{notification_count + 1}")
-                # Don't increment counter for failed notifications
-                
         except asyncio.CancelledError:
             logger.info("Periodic notification sender was cancelled")
             break

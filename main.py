@@ -23,7 +23,6 @@ from tkinter import filedialog
 import customtkinter as ctk
 from ui_utils import set_icon, ThemedToplevel, CustomMessageBox, ask_string
 from secure_file_manager import SecureFileManager, SecureVaultSetup, SecurityMonitor, setup_secure_vault
-from backup_manager import BackupManager, BackupError
 from PIL import Image, ImageTk
 import logging
 from audit_logger import setup_logging
@@ -45,10 +44,6 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-restore_icon = ctk.CTkImage(
-    light_image=Image.open("icons/backup.png"),   # path to your icon
-    size=(24, 24)  # adjust size
-)
 log = ctk.CTkImage(
     light_image=Image.open("icons/load.png"),   # path to your icon
     size=(24, 24)  # adjust size
@@ -2071,49 +2066,6 @@ class ModernPasswordManagerGUI:
         
         return all(checks.values())
 
-    def validate_backup_password_realtime(self, password):
-        # Define validation checks
-        checks = {
-            "length": len(password) >= 16,
-            "uppercase": any(c.isupper() for c in password),
-            "lowercase": any(c.islower() for c in password),
-            "number": any(c.isdigit() for c in password),
-            "symbol": any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password),
-        }
-
-        all_met = all(checks.values())
-        
-        # If all requirements are met, show success message and hide checklist
-        if all_met and hasattr(self, 'backup_success_label'):
-            # Get password strength
-            score, strength, _ = self.password_generator.assess_strength(password)
-            
-            # Show success message
-            success_msg = f"✅ Password generated: {len(password)} chars | Strength: {strength} ({score}%)"
-            self.backup_success_label.configure(text=success_msg, text_color="#10B981")
-            
-            # Hide all requirement labels
-            for label in self.backup_req_labels.values():
-                label.pack_forget()
-        else:
-            # Show checklist and hide success message
-            if hasattr(self, 'backup_success_label'):
-                self.backup_success_label.configure(text="")
-            
-            # Update labels based on checks
-            for key, is_met in checks.items():
-                if key in self.backup_req_labels:
-                    label = self.backup_req_labels[key]
-                    base_text = self.lang_manager.get_string(f"password_req_{key}")
-                    if is_met:
-                        label.configure(text=f"✅ {base_text}", text_color="green")
-                        label.pack(anchor="w")
-                    else:
-                        label.configure(text=f"❌ {base_text}", text_color="gray")
-                        label.pack(anchor="w")
-        
-        return all_met
-
     def toggle_password_visibility(self, entry, button):
         if entry.cget("show") == "*":
             entry.configure(show="")
@@ -2145,7 +2097,6 @@ class ModernPasswordManagerGUI:
             "Security Tip: Use different passwords for personal, work, and financial accounts to limit cross-account compromise.",
             "Security Tip: Verify presence of HTTPS and a valid certificate before entering sensitive information on websites.",
             "Security Tip: Limit what you share on social media; information there can be used for social engineering attacks.",
-            "Security Tip: Back up important data regularly to multiple locations (offline and cloud) and test restore procedures.",
             "Security Tip: Use a firewall to block unwanted incoming traffic and monitor for suspicious connections.",
             "Security Tip: Be skeptical of offers that seem too good to be true — they are often scams or phishing attempts.",
             "Security Tip: Cover your webcam when not in use and disable or manage camera access for apps.",
@@ -2183,14 +2134,12 @@ class ModernPasswordManagerGUI:
             "Security Tip: Segment your network (guest vs. trusted) to reduce lateral movement from compromised devices.",
             "Security Tip: Disable unused services and close unnecessary ports on networked devices to reduce attack surface.",
             "Security Tip: Use full-disk encryption (e.g., BitLocker, FileVault) to protect data at rest on lost or stolen devices.",
-            "Security Tip: Securely store MFA backup codes or recovery keys offline (paper or secure hardware) in a safe place.",
             "Security Tip: Regularly audit third-party app access to your accounts and revoke access that is no longer required.",
             "Security Tip: Be cautious installing browser extensions — only install trusted extensions and review their permissions.",
             "Security Tip: Maintain a separate non-admin account for daily work and reserve an admin account for elevated tasks.",
             "Security Tip: Keep device firmware (router, NAS, IoT) current and change default management ports and credentials.",
             "Security Tip: Verify downloads by checking cryptographic checksums or digital signatures when available.",
             "Security Tip: Use DMARC, DKIM, and SPF on your email domain to reduce email spoofing and phishing impact.",
-            "Security Tip: Implement immutable or offline backups to protect against ransomware and ensure recoverability.",
             "Security Tip: Use passkeys (platform-backed credentials) where supported to simplify authentication and reduce phishing.",
             "Security Tip: Rotate API keys, secrets, and certificates periodically and remove unused credentials.",
             "Security Tip: Store highly sensitive data encrypted using strong, vetted encryption libraries and manage keys securely.",
@@ -2204,7 +2153,6 @@ class ModernPasswordManagerGUI:
             "Security Tip: Use network segmentation and VLANs for critical infrastructure to limit potential wide-spread compromise.",
             "Security Tip: Use hardware-backed secure enclaves (TPM/SE) and enable Secure Boot where available.",
             "Security Tip: Use certificate pinning or strict TLS validation in apps that handle sensitive data.",
-            "Security Tip: Test your backups regularly by performing full restores to ensure integrity and process accuracy.",
             "Security Tip: Avoid mixing personal devices with corporate systems for privileged or sensitive tasks.",
             "Security Tip: Consider endpoint detection and response (EDR) for business-critical systems to improve detection.",
             "Security Tip: Establish a change control process to review and approve configuration changes to infrastructure.",
@@ -2435,35 +2383,6 @@ class ModernPasswordManagerGUI:
             font=ctk.CTkFont(size=18)
         ).pack(side="right", padx=10, pady=8)
 
-        # Determine state for backup/restore buttons based on trial status
-        backup_restore_state = "disabled"
-        if self.trial_manager and self.trial_manager.status == 'FULL':
-            backup_restore_state = "normal"
-
-        ctk.CTkButton(
-            toolbar,
-            text=self.lang_manager.get_string("backup"),
-            width=120,
-            height=55,
-            image=save,
-            compound="left",
-            command=self.show_backup_dialog,
-            font=ctk.CTkFont(size=18),
-            state=backup_restore_state
-        ).pack(side="right", padx=10, pady=8)
-
-        ctk.CTkButton(
-            toolbar,
-            text=self.lang_manager.get_string("restore_old_backup"),
-            width=160,
-            height=55,
-            image=restore_icon,
-            compound="left",
-            command=self.show_restore_dialog,
-            font=ctk.CTkFont(size=16),
-            state=backup_restore_state
-        ).pack(side="right", padx=8, pady=8)
-        
         content_frame = ctk.CTkFrame(self.main_frame)
         content_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
@@ -2551,785 +2470,6 @@ class ModernPasswordManagerGUI:
         if hasattr(self, 'trial_timer_id') and self.trial_timer_id:
             self.root.after_cancel(self.trial_timer_id)
             self.trial_timer_id = None
-    def show_restore_dialog(self):
-        import glob, os, tempfile, shutil, json, sys
-        from datetime import datetime
-        import tkinter as tk
-        from backup_manager import BackupManager, BackupError
-
-        if not getattr(self, "database", None):
-            self.show_message("error", "database_not_available_error", msg_type="error")
-            return
-
-        backup_folder = os.path.join(os.getcwd(), "backups")
-        os.makedirs(backup_folder, exist_ok=True)
-        backups = sorted(glob.glob(os.path.join(backup_folder, "*.svbk")), reverse=True)
-
-        win = tk.Toplevel(self.root)
-        set_icon(win)
-        win.title(self.lang_manager.get_string("restore_dialog_title"))
-        win.geometry("820x520")
-        win.resizable(True, True)
-
-        top_frame = tk.Frame(win)
-        top_frame.pack(fill="x", padx=12, pady=(12,6))
-
-        tk.Label(top_frame, text=self.lang_manager.get_string("available_backups_label"), anchor="w", font=("TkDefaultFont", 10, "bold")).pack(anchor="w")
-
-        info_label = tk.Label(top_frame, text=self.lang_manager.get_string("select_backup_details"), anchor="w", justify="left")
-        info_label.pack(fill="x", pady=(6,0))
-
-        listbox_frame = tk.Frame(win)
-        listbox_frame.pack(fill="both", expand=False, padx=12, pady=(8,6))
-
-        scrollbar = tk.Scrollbar(listbox_frame)
-        scrollbar.pack(side="right", fill="y")
-
-        listbox = tk.Listbox(listbox_frame, yscrollcommand=scrollbar.set, width=120, height=10)
-        for i, path in enumerate(backups):
-            fname = os.path.basename(path)
-            listbox.insert("end", f"{i+1}. {fname}")
-        listbox.pack(side="left", fill="both", expand=True)
-        scrollbar.config(command=listbox.yview)
-
-        preview_lbl = tk.Label(win, text=self.lang_manager.get_string("preview_manifest_label"), anchor="w")
-        preview_lbl.pack(fill="x", padx=12)
-        preview_text = tk.Text(win, height=10, wrap="word")
-        preview_text.pack(fill="both", padx=12, pady=(4,8), expand=True)
-        preview_text.configure(state="disabled")
-
-        btn_frame = tk.Frame(win)
-        btn_frame.pack(fill="x", padx=12, pady=(6,12))
-
-        status_var = tk.StringVar(value="")
-        status_label = tk.Label(win, textvariable=status_var, anchor="w", fg="blue")
-        status_label.pack(fill="x", padx=12, pady=(0,8))
-
-        def on_selection(event=None):
-            sel = listbox.curselection()
-            if not sel:
-                info_label.config(text=self.lang_manager.get_string("select_backup_details"))
-                return
-            idx = sel[0]
-            path = backups[idx]
-            try:
-                size = os.path.getsize(path)
-                mtime = datetime.utcfromtimestamp(os.path.getmtime(path)).strftime("%Y-%m-%d %H:%M:%SZ")
-                info_text = self.lang_manager.get_string("backup_file_details_template", filename=os.path.basename(path), path=path, size=size, mtime=mtime)
-                info_label.config(text=info_text)
-            except Exception as e:
-                info_label.config(text=self.lang_manager.get_string("error_reading_file_info", e=e))
-        
-        def browse_for_backup():
-            filepath = filedialog.askopenfilename(
-                title=self.lang_manager.get_string("select_backup_file_title"),
-                filetypes=[(self.lang_manager.get_string("secure_vault_backups_filetype"), "*.svbk"), (self.lang_manager.get_string("all_files_filetype"), "*.*")]
-            )
-            if filepath:
-                # Warn if the file doesn't have .svbk extension
-                if not filepath.lower().endswith('.svbk'):
-                    warning_msg = (
-                        f"⚠️ WARNING: Non-standard file selected\\n\\n"
-                        f"Selected file: {os.path.basename(filepath)}\\n\\n"
-                        f"SecureVault backup files should have the .svbk extension.\\n"
-                        f"This file may not be a valid backup.\\n\\n"
-                        f"Do you want to continue anyway?"
-                    )
-                    if not self.show_message("Non-Standard File", warning_msg, ask="yesno", msg_type="warning"):
-                        return
-                
-                if filepath not in backups:
-                    backups.insert(0, filepath)
-                    listbox.insert(0, self.lang_manager.get_string("external_backup_label", index=len(backups), filename=os.path.basename(filepath)))
-                else:
-                    idx = backups.index(filepath)
-                    listbox.selection_clear(0, "end")
-                    listbox.selection_set(idx)
-                listbox.selection_clear(0, "end")
-                listbox.selection_set(0)
-                on_selection()
-
-        listbox.bind("<<ListboxSelect>>", on_selection)
-        on_selection()
-
-        def preview_contents():
-            sel = listbox.curselection()
-            if not sel:
-                self.show_message("no_selection_error", "select_backup_to_preview_error", msg_type="error")
-                return
-            idx = sel[0]
-            backup_path = backups[idx]
-            
-            # Validate backup file BEFORE asking for password
-            try:
-                bm_validator = BackupManager(
-                    metadata_db_path=getattr(self.database, "metadata_db", os.path.join(os.getcwd(), "metadata.db")),
-                    sensitive_db_path=getattr(self.database, "sensitive_db", os.path.join(os.getcwd(), "sensitive.db")),
-                    salt_path=getattr(self.database, "salt_path", os.path.join(os.getcwd(), "salt_file")),
-                    integrity_path=getattr(self.database, "integrity_path", os.path.join(os.getcwd(), "integrity_file")),
-                    backups_dir=backup_folder
-                )
-                
-                # Check if file has valid header
-                header_result = bm_validator._get_backup_header_and_offset(backup_path)
-                if not header_result:
-                    error_msg = (
-                        f"❌ Invalid Backup File\\n\\n"
-                        f"The selected file is not a valid SecureVault backup:\\n"
-                        f"📁 {os.path.basename(backup_path)}\\n\\n"
-                        f"This file may be:\\n"
-                        f"• Corrupted or incomplete\\n"
-                        f"• Not a .svbk backup file\\n"
-                        f"• Created with incompatible software\\n\\n"
-                        f"Please select a different backup file.\\n\\n"
-                        f"💡 Tip: Check the application logs for details."
-                    )
-                    self.show_message("Invalid Backup File", error_msg, msg_type="error")
-                    return
-                    
-                # File is valid, get backup info
-                backup_info = bm_validator.get_backup_info(backup_path)
-                logger.info(f"Previewing backup: {backup_info['version']} format, {backup_info['file_size']} bytes")
-                
-            except Exception as validation_error:
-                logger.error(f"Failed to validate backup file: {validation_error}", exc_info=True)
-                self.show_message("Validation Error", f"Could not validate backup file:\\n\\n{str(validation_error)}", msg_type="error")
-                return
-
-
-            # Enhanced password dialog with show/hide button for preview
-            preview_code_dialog = tk.Toplevel(win)
-            set_icon(preview_code_dialog)
-            preview_code_dialog.title(self.lang_manager.get_string("backup_code_prompt_preview"))
-            preview_code_dialog.geometry("420x200")
-            preview_code_dialog.resizable(False, False)
-            preview_code_dialog.grab_set()
-            
-            # Center the dialog
-            preview_code_dialog.update_idletasks()
-            x = (preview_code_dialog.winfo_screenwidth() // 2) - (420 // 2)
-            y = (preview_code_dialog.winfo_screenheight() // 2) - (200 // 2)
-            preview_code_dialog.geometry(f"420x200+{x}+{y}")
-            
-            result = {"code": None}
-            
-            # Main frame
-            preview_main_frame = tk.Frame(preview_code_dialog, padx=20, pady=20)
-            preview_main_frame.pack(fill="both", expand=True)
-            
-            # Title
-            preview_title_label = tk.Label(preview_main_frame, text="Enter the backup code to preview this backup:", 
-                                font=("TkDefaultFont", 11, "bold"))
-            preview_title_label.pack(pady=(0, 15))
-            
-            # Password entry frame with show/hide button
-            preview_entry_frame = tk.Frame(preview_main_frame)
-            preview_entry_frame.pack(fill="x", pady=(0, 15))
-            
-            preview_code_entry = tk.Entry(preview_entry_frame, show="*", width=30, font=("TkDefaultFont", 10))
-            preview_code_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
-            preview_code_entry.focus()
-            
-            def toggle_preview_password_visibility():
-                if preview_code_entry.cget("show") == "*":
-                    preview_code_entry.config(show="")
-                    preview_toggle_btn.config(text="🙈 Hide")
-                else:
-                    preview_code_entry.config(show="*")
-                    preview_toggle_btn.config(text="👁️ Show")
-            
-            preview_toggle_btn = tk.Button(preview_entry_frame, text="👁️ Show", width=10, command=toggle_preview_password_visibility)
-            preview_toggle_btn.pack(side="left")
-            
-            # Button frame
-            preview_button_frame = tk.Frame(preview_main_frame)
-            preview_button_frame.pack(fill="x", pady=(10, 0))
-            
-            def on_preview_ok():
-                result["code"] = preview_code_entry.get()
-                preview_code_dialog.destroy()
-            
-            def on_preview_cancel():
-                result["code"] = None
-                preview_code_dialog.destroy()
-            
-            preview_cancel_btn = tk.Button(preview_button_frame, text="Cancel", width=10, command=on_preview_cancel)
-            preview_cancel_btn.pack(side="left", padx=(0, 5))
-            
-            preview_ok_btn = tk.Button(preview_button_frame, text="OK", width=10, command=on_preview_ok, default="active")
-            preview_ok_btn.pack(side="left")
-            
-            # Bind Enter key to OK
-            preview_code_entry.bind("<Return>", lambda e: on_preview_ok())
-            preview_code_dialog.bind("<Escape>", lambda e: on_preview_cancel())
-            
-            preview_code_dialog.wait_window()
-            code = result["code"]
-            
-            if code is None:
-                return
-
-            status_var.set(self.lang_manager.get_string("previewing_backup_status"))
-            win.update_idletasks()
-            tempdir = tempfile.mkdtemp(prefix="sv_preview_")
-            try:
-                bm = BackupManager(
-                    metadata_db_path=getattr(self.database, "metadata_db", os.path.join(os.getcwd(), "metadata.db")),
-                    sensitive_db_path=getattr(self.database, "sensitive_db", os.path.join(os.getcwd(), "sensitive.db")),
-                    salt_path=getattr(self.database, "salt_path", os.path.join(os.getcwd(), "salt_file")),
-                    integrity_path=getattr(self.database, "integrity_path", os.path.join(os.getcwd(), "integrity_file")),
-                    backups_dir=backup_folder
-                )
-                try:
-                    restored = bm.restore_backup(backup_path, code, restore_to_dir=tempdir)
-                except BackupError as be:
-                    self.show_message("preview_failed_error", "preview_failed_error", msg_type="error", be=be)
-                    return
-                except Exception as e:
-                    self.show_message("preview_failed_error", "unexpected_preview_error", msg_type="error", e=e)
-                    return
-
-                manifest_path = os.path.join(tempdir, "backup_manifest.json")
-                preview_text.configure(state="normal")
-                preview_text.delete("1.0", "end")
-                if os.path.exists(manifest_path):
-                    try:
-                        with open(manifest_path, "r", encoding="utf-8") as mf:
-                            manifest = json.load(mf)
-                        pretty = json.dumps(manifest, indent=2, ensure_ascii=False)
-                        preview_text.insert("1.0", pretty)
-                    except Exception as e:
-                        preview_text.insert("1.0", self.lang_manager.get_string("failed_to_read_manifest", e=e, files="\n".join(os.path.basename(p) for p in restored)))
-                else:
-                    preview_text.insert("1.0", self.lang_manager.get_string("no_manifest_found", files="\n".join(os.path.basename(p) for p in restored)))
-
-                preview_text.configure(state="disabled")
-            finally:
-                try:
-                    shutil.rmtree(tempdir)
-                except Exception:
-                    pass
-                status_var.set(self.lang_manager.get_string("preview_complete_status"))
-
-        def perform_restore():
-            sel = listbox.curselection()
-            if not sel:
-                self.show_message("no_selection_error", "select_backup_to_restore_error", msg_type="error")
-                return
-            idx = sel[0]
-            backup_path = backups[idx]
-            
-            # Validate backup file BEFORE asking for password
-            try:
-                bm_validator = BackupManager(
-                    metadata_db_path=getattr(self.database, "metadata_db", os.path.join(os.getcwd(), "metadata.db")),
-                    sensitive_db_path=getattr(self.database, "sensitive_db", os.path.join(os.getcwd(), "sensitive.db")),
-                    salt_path=getattr(self.database, "salt_path", os.path.join(os.getcwd(), "salt_file")),
-                    integrity_path=getattr(self.database, "integrity_path", os.path.join(os.getcwd(), "integrity_file")),
-                    backups_dir=backup_folder
-                )
-                
-                # Check if file has valid header
-                header_result = bm_validator._get_backup_header_and_offset(backup_path)
-                if not header_result:
-                    error_msg = (
-                        f"❌ Invalid Backup File\\n\\n"
-                        f"The selected file is not a valid SecureVault backup:\\n"
-                        f"📁 {os.path.basename(backup_path)}\\n\\n"
-                        f"This file may be:\\n"
-                        f"• Corrupted or incomplete\\n"
-                        f"• Not a .svbk backup file\\n"
-                        f"• Created with incompatible software\\n\\n"
-                        f"Please select a different backup file.\\n\\n"
-                        f"💡 Tip: Check the application logs for details."
-                    )
-                    self.show_message("Invalid Backup File", error_msg, msg_type="error")
-                    return
-                    
-                # File is valid, get backup info
-                backup_info = bm_validator.get_backup_info(backup_path)
-                logger.info(f"Validated backup: {backup_info['version']} format, {backup_info['file_size']} bytes")
-                
-            except Exception as validation_error:
-                logger.error(f"Failed to validate backup file: {validation_error}", exc_info=True)
-                self.show_message("Validation Error", f"Could not validate backup file:\\n\\n{str(validation_error)}", msg_type="error")
-                return
-
-            # Enhanced password dialog with show/hide button
-            code_dialog = tk.Toplevel(win)
-            set_icon(code_dialog)
-            code_dialog.title(self.lang_manager.get_string("backup_code_prompt_restore"))
-            code_dialog.geometry("420x200")
-            code_dialog.resizable(False, False)
-            code_dialog.grab_set()
-            
-            # Center the dialog
-            code_dialog.update_idletasks()
-            x = (code_dialog.winfo_screenwidth() // 2) - (420 // 2)
-            y = (code_dialog.winfo_screenheight() // 2) - (200 // 2)
-            code_dialog.geometry(f"420x200+{x}+{y}")
-            
-            result = {"code": None}
-            
-            # Main frame
-            main_frame = tk.Frame(code_dialog, padx=20, pady=20)
-            main_frame.pack(fill="both", expand=True)
-            
-            # Title
-            title_label = tk.Label(main_frame, text="Enter the backup code for this file", 
-                                font=("TkDefaultFont", 11, "bold"))
-            title_label.pack(pady=(0, 15))
-            
-            # Password entry frame with show/hide button
-            entry_frame = tk.Frame(main_frame)
-            entry_frame.pack(fill="x", pady=(0, 15))
-            
-            code_entry = tk.Entry(entry_frame, show="*", width=30, font=("TkDefaultFont", 10))
-            code_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
-            code_entry.focus()
-            
-            def toggle_password_visibility():
-                if code_entry.cget("show") == "*":
-                    code_entry.config(show="")
-                    toggle_btn.config(text="🙈 Hide")
-                else:
-                    code_entry.config(show="*")
-                    toggle_btn.config(text="👁️ Show")
-            
-            toggle_btn = tk.Button(entry_frame, text="👁️ Show", width=10, command=toggle_password_visibility)
-            toggle_btn.pack(side="left")
-            
-            # Button frame
-            button_frame = tk.Frame(main_frame)
-            button_frame.pack(fill="x", pady=(10, 0))
-            
-            def on_ok():
-                result["code"] = code_entry.get()
-                code_dialog.destroy()
-            
-            def on_cancel():
-                result["code"] = None
-                code_dialog.destroy()
-            
-            cancel_btn = tk.Button(button_frame, text="Cancel", width=10, command=on_cancel)
-            cancel_btn.pack(side="left", padx=(0, 5))
-            
-            ok_btn = tk.Button(button_frame, text="OK", width=10, command=on_ok, default="active")
-            ok_btn.pack(side="left")
-            
-            # Bind Enter key to OK
-            code_entry.bind("<Return>", lambda e: on_ok())
-            code_dialog.bind("<Escape>", lambda e: on_cancel())
-            
-            code_dialog.wait_window()
-            code = result["code"]
-            
-            if not code:
-                return
-
-            master_password = ask_string("Master Password", "Please enter your master password to re-encrypt the restored vault.", parent=win)
-            if not master_password:
-                self.show_message("error", "master_password_required", msg_type="error")
-                return
-
-            # ===== UPDATED WARNING DIALOG =====
-            # Warn user that stored accounts will be replaced
-            warning_message = (
-                "⚠️ WARNING ⚠️\n\n"
-                "Restoring this backup will:\n\n"
-                "✓ Keep your master account login (unchanged)\n"
-                "✓ Keep your current master password\n"
-                "✗ DELETE all accounts in 'Your Accounts' tab\n"
-                "✗ REPLACE them with accounts from the backup\n\n"
-                "🚨 Current accounts will be backed up with timestamp suffix,\n"
-                "but will be replaced by backup data.\n\n"
-                "Your master account and login credentials remain safe.\n\n"
-                "Are you sure you want to proceed?"
-            )
-            
-            proceed = self.show_message("⚠️ RESTORE BACKUP", warning_message, ask="yesno", msg_type="warning")
-            if not proceed:
-                return
-
-            status_var.set(self.lang_manager.get_string("restoring_backup_status"))
-            win.update_idletasks()
-            
-            try:
-                from restore_helper import restore_backup_into_vault
-                
-                metadata_db_path = getattr(self.database, "metadata_db", None)
-                if metadata_db_path:
-                    vault_dir = os.path.dirname(metadata_db_path) or os.getcwd()
-                else:
-                    vault_dir = os.path.join(os.getcwd(), "secure_vault")
-
-                # ===== DELETE ONLY ACCOUNT DATABASES (NOT MASTER ACCOUNT) =====
-                secure_vault_path = os.path.join(os.getcwd(), "secure_vault")
-                
-                if os.path.exists(secure_vault_path):
-                    # List of account database files to delete (NOT master account files)
-                    account_db_files = [
-                        "metadata.db",
-                        "sensitive.db",
-                        "integrity_file"
-                    ]
-                    
-                    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-                    
-                    for db_file in account_db_files:
-                        file_path = os.path.join(secure_vault_path, db_file)
-                        if os.path.exists(file_path):
-                            try:
-                                # Create backup before deletion
-                                backup_path = f"{file_path}.bak.{timestamp}"
-                                shutil.copy2(file_path, backup_path)
-                                logger.info(f"Backed up {db_file} to {backup_path}")
-                                
-                                # Delete the account database file
-                                os.remove(file_path)
-                                logger.info(f"Deleted account database: {db_file}")
-                                
-                            except Exception as delete_error:
-                                logger.error(f"Failed to delete {db_file}: {delete_error}")
-                                self.show_message("error", f"Failed to delete account database:\n\n{delete_error}\n\nRestore aborted.", msg_type="error")
-                                status_var.set("")
-                                return
-                        else:
-                            logger.info(f"Account database {db_file} does not exist, skipping")
-                else:
-                    logger.info(f"secure_vault folder does not exist, proceeding with fresh restore")
-                    os.makedirs(secure_vault_path, exist_ok=True)
-                
-                # ===== PROCEED WITH RESTORE =====
-                result = restore_backup_into_vault(backup_path, code, vault_dir, master_password)
-                
-                status_var.set(self.lang_manager.get_string("restore_complete_status"))
-                
-                # ===== SHOW SUCCESS MESSAGE =====
-                restore_complete_message = (
-                    f"✅ Backup restored successfully!\n\n"
-                    f"✓ Master account: Unchanged\n"
-                    f"✓ Master password: Still works\n"
-                    f"✓ Accounts restored from backup\n"
-                    f"✓ Old accounts backed up with .bak.{timestamp} suffix\n\n"
-                    f"🔄 IMPORTANT: You must restart the application manually\n"
-                    f"for all changes to take effect.\n\n"
-                    f"Please close and restart the application.\n"
-                    f"Login with your current master password."
-                )
-                
-                self.show_message(
-                    "restore_complete_message_title", 
-                    restore_complete_message, 
-                    msg_type="info"
-                )
-                
-                # Close the restore dialog but don't restart the application
-                win.destroy()
-            except BackupError as be:
-                # Specifically catch the bad header error
-                self.show_message("invalid_backup_file_title", "invalid_backup_file_header_message", msg_type="error")
-                status_var.set("")
-            except Exception as e:
-                self.show_message("restore_error_title", f"Restore failed:\n\n{str(e)}", msg_type="error")
-                status_var.set("")
-                
-
-        browse_btn = tk.Button(btn_frame, text=self.lang_manager.get_string("browse_button"), command=browse_for_backup, width=12)
-        browse_btn.pack(side="left", padx=(0,8))
-
-        preview_btn = tk.Button(btn_frame, text=self.lang_manager.get_string("preview_contents_button"), command=preview_contents, width=18)
-        preview_btn.pack(side="left", padx=(0,8))
-
-        restore_btn = tk.Button(btn_frame, text=self.lang_manager.get_string("restore_selected_backup_button"), command=perform_restore, width=22)
-        restore_btn.pack(side="left", padx=(0,8))
-
-        close_btn = tk.Button(btn_frame, text=self.lang_manager.get_string("close_button"), command=win.destroy, width=12)
-        close_btn.pack(side="right")
-
-        win.transient(self.root)
-        win.grab_set()
-        win.focus_force()
-                    
-    def show_backup_dialog(self):
-        """Enhanced backup dialog with password generator button"""
-        import tkinter.simpledialog as simpledialog
-        if not self.database:
-            self.show_message("error", "database_not_available_error", msg_type="error")
-            return
-
-        dialog = ThemedToplevel(self.root)
-        dialog.title(self.lang_manager.get_string("backup_dialog_title"))
-        dialog.geometry("1000x590")
-        dialog.grab_set()
-        dialog.resizable(False, False)
-
-        main_frame = ctk.CTkFrame(dialog, fg_color="transparent")
-        main_frame.pack(fill="both", expand=True)
-
-        left_frame = ctk.CTkFrame(main_frame, width=400, fg_color="#470500")
-        left_frame.pack(side="left", fill="both", expand=True, padx=(20, 10), pady=20)
-
-        right_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        right_frame.pack(side="right", fill="both", expand=True, padx=(10, 20), pady=20)
-
-        ctk.CTkLabel(right_frame, text=self.lang_manager.get_string("create_encrypted_backup_title"), 
-                    font=ctk.CTkFont(size=24, weight="bold")).pack(pady=(20, 10))
-
-        warning_frame = left_frame
-        warning_frame.configure(fg_color="#470500")
-
-        ctk.CTkLabel(warning_frame, text=self.lang_manager.get_string("critical_security_warnings_title"), 
-                    font=ctk.CTkFont(size=18, weight="bold"), 
-                    text_color=("#FFFFFF", "#FFFFFF")).pack(pady=(15, 10))
-
-        warnings_text = self.lang_manager.get_string("backup_warnings_text")
-
-        warning_label = ctk.CTkLabel(warning_frame, text=warnings_text, 
-                                    font=ctk.CTkFont(size=12), 
-                                    text_color=("#FFFFFF", "#FFCCCC"),
-                                    justify="left")
-        warning_label.pack(padx=15, pady=(0, 15))
-
-        code_frame = ctk.CTkFrame(right_frame, width=400, height=400)
-        code_frame.pack(expand=True, padx=10, pady=10)
-
-        ctk.CTkLabel(code_frame, text=self.lang_manager.get_string("enter_backup_code_label"), 
-                    font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(15, 5))
-
-        ctk.CTkLabel(code_frame, text=self.lang_manager.get_string("remember_backup_code_warning"), 
-                    font=ctk.CTkFont(size=12), 
-                    text_color="#ff4444").pack(pady=(0, 10))
-
-        # Code entry with copy button
-        code_input_frame = ctk.CTkFrame(code_frame, fg_color="transparent")
-        code_input_frame.pack(pady=(0, 10), fill="x")
-
-        code_entry = ctk.CTkEntry(code_input_frame, width=320, height=50, show="*",
-                                placeholder_text=self.lang_manager.get_string("backup_code_placeholder"),
-                                font=ctk.CTkFont(size=14))
-        code_entry.pack(side="left", padx=(0, 10))
-
-        def copy_backup_code():
-            code = code_entry.get()
-            if code:
-                dialog.clipboard_clear()
-                dialog.clipboard_append(code)
-                copy_code_btn.configure(text="✅ Copied!")
-                dialog.after(2000, lambda: copy_code_btn.configure(text="📋 Copy"))
-            else:
-                copy_code_btn.configure(text="❌ Empty")
-                dialog.after(1000, lambda: copy_code_btn.configure(text="📋 Copy"))
-
-        copy_code_btn = ctk.CTkButton(
-            code_input_frame,
-            text="📋 Copy",
-            command=copy_backup_code,
-            width=70,
-            height=50,
-            font=ctk.CTkFont(size=12)
-        )
-        copy_code_btn.pack(side="left")
-
-        # --- Password Requirements Checklist / Success Message ---
-        checklist_frame = ctk.CTkFrame(code_frame, fg_color="transparent", width=450)
-        checklist_frame.pack(pady=10, padx=20, anchor="w", fill="x")
-
-        # Success message label (initially hidden)
-        self.backup_success_label = ctk.CTkLabel(
-            checklist_frame, 
-            text="", 
-            font=ctk.CTkFont(size=13, weight="bold"),
-            text_color="#10B981",
-            wraplength=400,
-            justify="left"
-        )
-        self.backup_success_label.pack(anchor="w", pady=5)
-
-        self.backup_req_labels = {}
-        requirements = {
-            "length": self.lang_manager.get_string("password_req_length"),
-            "uppercase": self.lang_manager.get_string("password_req_uppercase"),
-            "lowercase": self.lang_manager.get_string("password_req_lowercase"),
-            "number": self.lang_manager.get_string("password_req_number"),
-            "symbol": self.lang_manager.get_string("password_req_symbol"),
-        }
-
-        for key, text in requirements.items():
-            label = ctk.CTkLabel(checklist_frame, text=f"❌ {text}", text_color="gray", font=ctk.CTkFont(size=12))
-            label.pack(anchor="w")
-            self.backup_req_labels[key] = label
-
-        # Button container for Show/Hide and Generate buttons
-        button_container = ctk.CTkFrame(code_frame, fg_color="transparent")
-        button_container.pack(pady=(0, 15))
-
-        def toggle_code_visibility():
-            if code_entry.cget("show") == "*":
-                code_entry.configure(show="")
-                show_btn.configure(text=self.lang_manager.get_string("hide_button"))
-            else:
-                code_entry.configure(show="*")
-                show_btn.configure(text=self.lang_manager.get_string("show_button"))
-
-        show_btn = ctk.CTkButton(button_container, text=self.lang_manager.get_string("show_button"), 
-                                width=80, height=30,
-                                command=toggle_code_visibility)
-        show_btn.pack(side="left", padx=5)
-
-        def generate_strong_password():
-            """Generate a random password with minimum 50 characters"""
-            try:
-                password_length = 50
-                generated_password = self.password_generator.generate_password(
-                    length=password_length,
-                    use_uppercase=True,
-                    use_lowercase=True,
-                    use_digits=True,
-                    use_symbols=True,
-                    exclude_ambiguous=True
-                )
-                
-                code_entry.delete(0, 'end')
-                code_entry.insert(0, generated_password)
-                
-                code_entry.configure(show="")
-                show_btn.configure(text=self.lang_manager.get_string("hide_button"))
-                
-                generate_btn.configure(text="✓ Generated!", fg_color="#4CAF50")
-                dialog.after(2000, lambda: generate_btn.configure(
-                    text="🎲 Generate Strong Password", 
-                    fg_color="#10B981"
-                ))
-                
-                score, strength, _ = self.password_generator.assess_strength(generated_password)
-                strength_info = f"Password generated: {password_length} chars | Strength: {strength} ({score}%)"
-                
-                original_text = warning_label.cget("text")
-                warning_label.configure(text=f"🔒 {strength_info}", text_color="#4CAF50")
-                dialog.after(5000, lambda: warning_label.configure(text=original_text, text_color="#ff6666"))
-                
-                # Trigger validation to enable button
-                validate_password_realtime()
-                
-            except Exception as e:
-                self.show_message("error", f"Failed to generate password: {str(e)}", msg_type="error")
-
-        generate_btn = ctk.CTkButton(
-            button_container, 
-            text="🎲 Generate Strong Password", 
-            width=200, 
-            height=30,
-            command=generate_strong_password,
-            fg_color="#10B981",
-            hover_color="#059669"
-        )
-        generate_btn.pack(side="left", padx=5)
-
-        # VALIDATION FUNCTION - Enable/disable button based on password strength
-        def validate_password_realtime(event=None):
-            password = code_entry.get()
-            
-            checks = {
-                "length": len(password) >= 16,
-                "uppercase": any(c.isupper() for c in password),
-                "lowercase": any(c.islower() for c in password),
-                "number": any(c.isdigit() for c in password),
-                "symbol": any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password),
-            }
-
-            all_met = all(checks.values())
-            
-            # Update requirement labels
-            if all_met and hasattr(self, 'backup_success_label'):
-                score, strength, _ = self.password_generator.assess_strength(password)
-                success_msg = f"✅ Password generated: {len(password)} chars | Strength: {strength} ({score}%)"
-                self.backup_success_label.configure(text=success_msg, text_color="#10B981")
-                
-                for label in self.backup_req_labels.values():
-                    label.pack_forget()
-            else:
-                if hasattr(self, 'backup_success_label'):
-                    self.backup_success_label.configure(text="")
-                
-                for key, is_met in checks.items():
-                    if key in self.backup_req_labels:
-                        label = self.backup_req_labels[key]
-                        base_text = self.lang_manager.get_string(f"password_req_{key}")
-                        if is_met:
-                            label.configure(text=f"✅ {base_text}", text_color="green")
-                            label.pack(anchor="w")
-                        else:
-                            label.configure(text=f"❌ {base_text}", text_color="gray")
-                            label.pack(anchor="w")
-            
-            # ENABLE/DISABLE CREATE BACKUP BUTTON
-            if all_met:
-                create_backup_btn.configure(state="normal", fg_color="#4CAF50", hover_color="#45A049")
-            else:
-                create_backup_btn.configure(state="disabled", fg_color="gray", hover_color="gray")
-            
-            return all_met
-
-        # Bind validation to password entry
-        code_entry.bind("<KeyRelease>", validate_password_realtime)
-
-        def create_backup():
-            code = code_entry.get().strip()
-            if not validate_password_realtime():
-                self.show_message("error", "password_requirements_not_met", msg_type="error")
-                return
-
-            confirm_msg = self.lang_manager.get_string("final_backup_confirmation_message", code_length=len(code))
-
-            if not self.show_message("final_backup_confirmation_title", confirm_msg, ask="yesno"):
-                return
-            try:
-                if self.secure_file_manager:
-                    self.secure_file_manager.sync_all_files()
-
-                bm = BackupManager(
-                    metadata_db_path=self.database.metadata_db,
-                    sensitive_db_path=self.database.sensitive_db,
-                    salt_path=self.database.salt_path,
-                    integrity_path=self.database.integrity_path,
-                    backups_dir="backups"
-                )
-                out_path = bm.create_backup(code)
-                
-                success_msg = self.lang_manager.get_string("backup_complete_message", out_path=out_path)
-                
-                self.show_message("backup_complete_title", success_msg)
-                dialog.destroy()
-            except Exception as e:
-                self.show_message("backup_failed_title", "backup_failed_message", msg_type="error", error=str(e))
-
-        button_frame = ctk.CTkFrame(right_frame, fg_color="transparent")
-        button_frame.pack(pady=20)
-        
-        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), 
-                    command=dialog.destroy, 
-                    width=120, height=45).pack(side="left", padx=15)
-        
-        # CREATE BACKUP BUTTON - Initially disabled
-        create_backup_btn = ctk.CTkButton(
-            button_frame, 
-            text=self.lang_manager.get_string("create_backup_button"), 
-            command=create_backup,
-            width=180, 
-            height=45, 
-            font=ctk.CTkFont(size=16, weight="bold"),
-            state="disabled",  # Initially disabled
-            fg_color="gray",   # Gray when disabled
-            hover_color="gray"
-        )
-        create_backup_btn.pack(side="right", padx=15)
-        
-        code_entry.focus()
-        
-        # Initial validation check
-        validate_password_realtime()
-        
     def create_sidebar(self, parent):
         self.sidebar = ctk.CTkFrame(parent, width=280)
         self.sidebar.pack(side="left", fill="y", padx=10, pady=10)
@@ -4282,15 +3422,13 @@ class ModernPasswordManagerGUI:
                         status_label.configure(text="✅ Code verified successfully!", text_color="#4CAF50")
                         # Permanently enable 2FA
                         if self.auth_guardian.enable_tfa(secret):
-                            # Generate backup codes
-                            backup_codes = self.auth_guardian.generate_backup_codes()
-                            status_label.configure(text="✅ 2FA enabled! Loading backup codes...", text_color="#4CAF50")
+                            status_label.configure(text="✅ 2FA enabled! Please restart the application.", text_color="#4CAF50")
                             
                             # Close settings window if open
                             if hasattr(self, 'settings_window') and self.settings_window and self.settings_window.winfo_exists():
                                 self.settings_window.destroy()
                             
-                            setup_dialog.after(800, lambda: (setup_dialog.destroy(), self.show_backup_codes_dialog(backup_codes)))
+                            setup_dialog.after(800, lambda: (setup_dialog.destroy()))
                         else:
                             status_label.configure(text="❌ Failed to enable 2FA", text_color="#FF4444")
                             verify_btn.configure(state="normal")
@@ -4338,150 +3476,6 @@ class ModernPasswordManagerGUI:
         except Exception as e:
             logger.error(f"Error in enable_2fa_dialog: {e}")
             self.show_message("error", f"Error setting up 2FA: {str(e)}", msg_type="error")
-    
-    def show_backup_codes_dialog(self, backup_codes):
-        """Show backup codes to the user with enhanced UI."""
-        dialog = ThemedToplevel(self.root)
-        dialog.title(self.lang_manager.get_string("2fa_backup_codes_title"))
-        dialog.geometry("650x750")
-        dialog.grab_set()
-        dialog.resizable(False, False)
-        
-        # Main container
-        main_container = ctk.CTkFrame(dialog, fg_color="transparent")
-        main_container.pack(fill="both", expand=True)
-        
-        # Header frame
-        header_frame = ctk.CTkFrame(main_container, fg_color=("#FF9800", "#B8860B"), height=80)
-        header_frame.pack(fill="x", padx=0, pady=0)
-        header_frame.pack_propagate(False)
-        
-        header_content = ctk.CTkFrame(header_frame, fg_color="transparent")
-        header_content.pack(fill="both", expand=True, padx=20, pady=15)
-        
-        title_frame = ctk.CTkFrame(header_content, fg_color="transparent")
-        title_frame.pack(anchor="w", fill="x")
-        
-        ctk.CTkLabel(title_frame, text="🔑", font=ctk.CTkFont(size=28)).pack(side="left", padx=(0, 10))
-        ctk.CTkLabel(title_frame, text=self.lang_manager.get_string("2fa_backup_codes_title"),
-                    font=ctk.CTkFont(size=20, weight="bold"), text_color="white").pack(side="left", anchor="w")
-        
-        ctk.CTkLabel(header_content, text="Save these codes in a secure location for account recovery",
-                    font=ctk.CTkFont(size=12), text_color="white").pack(anchor="w", pady=(5, 0))
-        
-        # Content frame
-        content_frame = ctk.CTkFrame(main_container, fg_color="transparent")
-        content_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        # Warning box
-        warning_frame = ctk.CTkFrame(content_frame, fg_color=("#FFF3E0", "#3E2723"), border_width=2, border_color="#FF9800", corner_radius=8)
-        warning_frame.pack(fill="x", pady=(0, 15))
-        
-        warning_content = ctk.CTkFrame(warning_frame, fg_color="transparent")
-        warning_content.pack(fill="both", expand=True, padx=15, pady=12)
-        
-        ctk.CTkLabel(warning_content, text="⚠️ IMPORTANT SECURITY WARNING",
-                    font=ctk.CTkFont(size=12, weight="bold"), text_color="#E65100").pack(anchor="w")
-        
-        ctk.CTkLabel(warning_content, 
-                    text="• These backup codes are your only way to access your account if you lose your authenticator\n"
-                         "• Save them in a SECURE, SEPARATE location from your backup files\n"
-                         "• Each code can only be used ONCE\n"
-                         "• Do NOT share these codes with anyone",
-                    font=ctk.CTkFont(size=11),
-                    justify="left",
-                    text_color="#BF360C").pack(anchor="w", pady=(8, 0))
-        
-        # Codes display section
-        codes_label_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        codes_label_frame.pack(anchor="w", pady=(10, 5), fill="x")
-        
-        ctk.CTkLabel(codes_label_frame, text="Your Backup Codes:", 
-                    font=ctk.CTkFont(size=13, weight="bold")).pack(anchor="w")
-        
-        # Codes text box with monospace font
-        codes_frame = ctk.CTkFrame(content_frame, fg_color=("#F5F5F5", "#2E2E2E"), border_width=2, border_color="#444444", corner_radius=8)
-        codes_frame.pack(fill="both", expand=True, pady=10)
-        
-        codes_text = ctk.CTkTextbox(codes_frame, height=200, font=ctk.CTkFont(size=12, family="monospace"),
-                                   fg_color=("#F5F5F5", "#2E2E2E"))
-        codes_text.pack(fill="both", expand=True, padx=15, pady=15)
-        
-        # Format codes with better styling
-        codes_display = "\n".join([f"{i+1:2d}.  {code}" for i, code in enumerate(backup_codes)])
-        codes_text.insert("1.0", codes_display)
-        codes_text.configure(state="disabled")
-        
-        # Copy button
-        def copy_codes():
-            import pyperclip
-            try:
-                pyperclip.copy(codes_display)
-                copy_btn.configure(text="✓ Copied to Clipboard!")
-                dialog.after(2000, lambda: copy_btn.configure(text="📋 Copy All Codes"))
-            except:
-                # Fallback to tkinter clipboard
-                dialog.clipboard_clear()
-                dialog.clipboard_append(codes_display)
-                copy_btn.configure(text="✓ Copied to Clipboard!")
-                dialog.after(2000, lambda: copy_btn.configure(text="📋 Copy All Codes"))
-        
-        copy_btn = ctk.CTkButton(content_frame, text="📋 Copy All Codes", command=copy_codes,
-                               height=40, font=ctk.CTkFont(size=12, weight="bold"),
-                               fg_color="#2196F3", hover_color="#1976D2", corner_radius=8)
-        copy_btn.pack(fill="x", pady=5)
-        
-        # Download and close buttons frame
-        button_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        button_frame.pack(fill="x", pady=10)
-        
-        def download_codes():
-            """Download backup codes to a text file."""
-            try:
-                # Use filedialog to let user choose save location
-                file_path = filedialog.asksaveasfilename(
-                    defaultextension=".txt",
-                    initialfile="securevault -backup keys.txt",
-                    filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")],
-                    parent=dialog
-                )
-                
-                if file_path:
-                    # Write codes to file
-                    with open(file_path, 'w') as f:
-                        f.write("SecureVault Pro - Backup Recovery Codes\n")
-                        f.write("=" * 50 + "\n\n")
-                        f.write("IMPORTANT SECURITY INFORMATION:\n")
-                        f.write("- Store these codes in a secure location\n")
-                        f.write("- Each code can only be used ONCE\n")
-                        f.write("- Do NOT share these codes with anyone\n")
-                        f.write("- These are your only recovery option if you lose your authenticator\n\n")
-                        f.write("Your Backup Codes:\n")
-                        f.write("-" * 50 + "\n\n")
-                        for i, code in enumerate(backup_codes, 1):
-                            f.write(f"{i:2d}.  {code}\n")
-                        f.write("\n" + "-" * 50 + "\n")
-                        f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                    
-                    download_btn.configure(text="✓ Downloaded Successfully!")
-                    dialog.after(2000, lambda: download_btn.configure(text="📥 Download Codes"))
-                    
-            except Exception as e:
-                logger.error(f"Error downloading backup codes: {e}")
-                messagebox.showerror("Download Error", f"Failed to download backup codes: {str(e)}", parent=dialog)
-        
-        download_btn = ctk.CTkButton(button_frame, text="📥 Download Codes", command=download_codes,
-                                    height=45, font=ctk.CTkFont(size=13, weight="bold"),
-                                    fg_color="#FF9800", hover_color="#F57C00", corner_radius=8)
-        download_btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
-        
-        # Close button
-        close_btn = ctk.CTkButton(button_frame, text="✓ Done",
-                                 command=dialog.destroy, height=45,
-                                 font=ctk.CTkFont(size=13, weight="bold"),
-                                 fg_color="#4CAF50", hover_color="#45A049",
-                                 corner_radius=8)
-        close_btn.pack(side="left", fill="x", expand=True, padx=(5, 0))
     
     def disable_2fa_dialog(self):
         """Dialog to disable Two-Factor Authentication."""
@@ -4549,21 +3543,11 @@ class ModernPasswordManagerGUI:
         
         status_label = ctk.CTkLabel(main_frame, text="", font=ctk.CTkFont(size=12))
         status_label.pack(pady=5)
-        
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("2fa_login_backup_code_label"),
-                    font=ctk.CTkFont(size=12), text_color="#AAAAAA").pack(pady=5)
-        
-        backup_entry = ctk.CTkEntry(main_frame, placeholder_text="Backup code",
-                                   width=200, font=ctk.CTkFont(size=14))
-        backup_entry.pack(pady=5)
-        
         verified = [False]
         
         def verify_code():
             code = code_entry.get().strip()
-            backup_code = backup_entry.get().strip()
             
-            # Try TOTP code first, then backup code
             if code and len(code) == 6 and code.isdigit():
                 if self.auth_guardian.verify_tfa_code(code):
                     verified[0] = True
@@ -4573,19 +3557,8 @@ class ModernPasswordManagerGUI:
                     status_label.configure(text=self.lang_manager.get_string("2fa_login_invalid_code"), text_color="#FF4444")
                     code_entry.focus()
                     code_entry.select_range(0, tk.END)
-            
-            # Try backup code
-            elif backup_code:
-                if self.auth_guardian.verify_tfa_code(backup_code):
-                    verified[0] = True
-                    verify_dialog.destroy()
-                    return
-                else:
-                    status_label.configure(text=self.lang_manager.get_string("2fa_login_invalid_code"), text_color="#FF4444")
-                    backup_entry.focus()
-                    backup_entry.select_range(0, tk.END)
             else:
-                status_label.configure(text="Please enter a 6-digit code or backup code", text_color="#FF4444")
+                status_label.configure(text="Please enter a 6-digit code", text_color="#FF4444")
         
         verify_btn = ctk.CTkButton(main_frame, text=self.lang_manager.get_string("2fa_login_verify_button"),
                                   command=verify_code, height=40)
@@ -4593,7 +3566,6 @@ class ModernPasswordManagerGUI:
         
         code_entry.focus()
         code_entry.bind("<Return>", lambda e: verify_code())
-        backup_entry.bind("<Return>", lambda e: verify_code())
         
         # Handle window close event
         def on_closing():
@@ -6988,7 +5960,6 @@ class ModernPasswordManagerGUI:
                 ("🔐 Best Practice", "Use passwords with at least 16 characters", "#3B82F6"),
                 ("🎲 Best Practice", "Use the password generator for stronger passwords", "#3B82F6"),
                 ("✅ Best Practice", "Enable 2FA on all accounts that support it", "#10B981"),
-                ("💾 Best Practice", "Create regular encrypted backups of your vault", "#10B981"),
             ]
             
             # Add 2-3 general tips
@@ -7030,10 +6001,6 @@ class ModernPasswordManagerGUI:
             ctk.CTkButton(button_grid, text="🎲 Generate Strong Password",
                         command=self.show_password_generator,
                         height=45, font=ctk.CTkFont(size=14)).grid(row=0, column=1, padx=5, sticky="ew")
-            
-            ctk.CTkButton(button_grid, text="💾 Create Backup",
-                        command=self.show_backup_dialog,
-                        height=45, font=ctk.CTkFont(size=14)).grid(row=0, column=2, padx=5, sticky="ew")
             
         except Exception as e:
             error_frame = ctk.CTkFrame(content, fg_color=("gray90", "gray15"))
