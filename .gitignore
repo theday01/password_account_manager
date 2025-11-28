@@ -40,3 +40,9 @@ ____validate_backups.py
 icons
 /icons/
 icons/
+
+
+secure_vault
+.secure_vault
+/secure_vault/
+/secure_vault

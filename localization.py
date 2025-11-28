@@ -328,7 +328,11 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "filter_show_all": "Show All",
         "filter_weak_passwords": "Weak Passwords",
         "filter_expired_passwords": "Expired Passwords",
-        "filter_by_label": "Filter by:"
+        "filter_by_label": "Filter by:",
+        "backup": "Backup",
+        "restore": "Restore",
+        "restore_confirm_title": "Confirm Restore",
+        "restart_title": "Restart Required"
     }
 }
 

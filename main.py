@@ -41,6 +41,10 @@ from machine_id_utils import generate_machine_id
 from typing import List
 import secrets
 from pathlib import Path
+import threading
+from datetime import datetime
+from backup import BackupManager
+
 
 logger = logging.getLogger(__name__)
 
@@ -1060,6 +1064,8 @@ class ModernPasswordManagerGUI:
         
         self.show_loading_screen()
 
+        self.backup_manager = None
+
     def show_message(self, title_key: str, message_key: str, msg_type: str = "info", ask: str = None, **kwargs) -> bool:
         current_lang = self.lang_manager.language
         self.lang_manager.set_language("English")
@@ -1563,6 +1569,14 @@ class ModernPasswordManagerGUI:
             logger.info("Recording login attempt after settings reload...")
             self.auth_guardian.record_login_attempt(success=auth_success)
             logger.info("Login attempt recorded")
+
+             # Initialize backup manager
+            self.backup_manager = BackupManager(
+                self.database,
+                self.secure_file_manager,
+                self.crypto
+            )
+            logger.info("Backup manager initialized")
         else:
             # For failed login, we can't reload settings (no encryption key yet)
             # But we still need to record the failed attempt
@@ -2371,6 +2385,32 @@ class ModernPasswordManagerGUI:
             justify="left",
             anchor="w"
         ).pack(anchor="w", pady=(5, 0))
+       
+        # Add Backup button (before About button)
+        backup_icon = ctk.CTkImage(Image.open("icons/uploadbk.png"), size=(24, 24))  # You'll need this icon
+        ctk.CTkButton(
+            toolbar,
+            text=self.lang_manager.get_string("backup"),
+            width=120,
+            height=55,
+            image=backup_icon,
+            compound="left",
+            command=self.show_backup_window,
+            font=ctk.CTkFont(size=18)
+        ).pack(side="right", padx=10, pady=8)
+        
+        # Add Restore button
+        restore_icon = ctk.CTkImage(Image.open("icons/backup.png"), size=(24, 24))  # You'll need this icon
+        ctk.CTkButton(
+            toolbar,
+            text=self.lang_manager.get_string("restore"),
+            width=120,
+            height=55,
+            image=restore_icon,
+            compound="left",
+            command=self.show_restore_window,
+            font=ctk.CTkFont(size=18)
+        ).pack(side="right", padx=10, pady=8)
         
         ctk.CTkButton(
             toolbar,
@@ -2421,6 +2461,461 @@ class ModernPasswordManagerGUI:
         # Schedule deferred tasks after a short delay to allow UI to render
         # Using a longer delay (500ms) to ensure UI is fully visible before heavy work
         self.root.after(500, deferred_startup_tasks)
+
+
+    # 5. Add the backup window method
+    def show_backup_window(self):
+        """Show backup creation window"""
+        if not self.backup_manager:
+            self.show_message("error", "Backup manager not initialized", msg_type="error")
+            return
+        
+        # Verify master password first
+        if not self.verify_master_password_dialog():
+            return
+        
+        backup_window = ThemedToplevel(self.root)
+        backup_window.title("Create Backup")
+        backup_window.geometry("700x850")
+        backup_window.grab_set()
+        backup_window.resizable(False, False)
+        
+        # Main container
+        main_frame = ctk.CTkFrame(backup_window)
+        main_frame.pack(fill="both", expand=True, padx=0, pady=0)
+        
+        # Header
+        header_frame = ctk.CTkFrame(main_frame, fg_color=("#2E3440", "#1E1E1E"), height=80)
+        header_frame.pack(fill="x", padx=0, pady=0)
+        header_frame.pack_propagate(False)
+        
+        header_content = ctk.CTkFrame(header_frame, fg_color="transparent")
+        header_content.pack(fill="both", expand=True, padx=20, pady=15)
+        
+        ctk.CTkLabel(header_content, text="💾 Create Backup",
+                    font=ctk.CTkFont(size=24, weight="bold")).pack(anchor="w")
+        
+        ctk.CTkLabel(header_content, text="Secure your data with encrypted backups",
+                    font=ctk.CTkFont(size=12), text_color="#B0B0B0").pack(anchor="w", pady=(5, 0))
+        
+        # Content area
+        content_frame = ctk.CTkScrollableFrame(main_frame)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Backup Type Selection
+        type_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        type_frame.pack(fill="x", pady=(0, 20))
+        
+        ctk.CTkLabel(type_frame, text="📦 Backup Type",
+                    font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", pady=(0, 10))
+        
+        backup_type_var = tk.StringVar(value="full")
+        
+        type_options = [
+            ("full", "🔒 Full Backup", "Complete vault including all accounts, settings, and security data"),
+            ("accounts_only", "👤 Accounts Only (Recommended)", "Only account credentials and metadata - faster and more secure")
+        ]
+        
+
+        for value, title, description in type_options:
+            option_frame = ctk.CTkFrame(type_frame, fg_color=("gray90", "gray20"), corner_radius=10)
+            option_frame.pack(fill="x", pady=5)
+            
+            radio = ctk.CTkRadioButton(option_frame, text="", variable=backup_type_var, value=value)
+            radio.pack(side="left", padx=15, pady=15)
+            
+            text_frame = ctk.CTkFrame(option_frame, fg_color="transparent")
+            text_frame.pack(side="left", fill="x", expand=True, pady=15)
+            
+            ctk.CTkLabel(text_frame, text=title, font=ctk.CTkFont(size=14, weight="bold"),
+                        anchor="w").pack(anchor="w")
+            ctk.CTkLabel(text_frame, text=description, font=ctk.CTkFont(size=11),
+                        text_color="gray", anchor="w", wraplength=450).pack(anchor="w", pady=(2, 0))
+        
+        # Description
+        desc_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        desc_frame.pack(fill="x", pady=(0, 20))
+        
+        ctk.CTkLabel(desc_frame, text="📝 Description (Optional)",
+                    font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", pady=(0, 10))
+        
+        description_text = ctk.CTkTextbox(desc_frame, height=80)
+        description_text.pack(fill="x")
+        description_text.insert("1.0", f"Manual backup - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        
+        # Backup History
+        history_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        history_frame.pack(fill="x", pady=(0, 20))
+        
+        history_header = ctk.CTkFrame(history_frame, fg_color="transparent")
+        history_header.pack(fill="x", pady=(0, 10))
+        
+        ctk.CTkLabel(history_header, text="📜 Recent Backups",
+                    font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
+        
+        ctk.CTkButton(history_header, text="🔄 Refresh", width=80, height=30,
+                    command=lambda: update_backup_list()).pack(side="right")
+        
+        # Backup list
+        backup_list_frame = ctk.CTkScrollableFrame(history_frame, height=200,
+                                                fg_color=("gray90", "gray20"))
+        backup_list_frame.pack(fill="both", expand=True)
+                
+        def update_backup_list():
+            # Clear existing items
+            for widget in backup_list_frame.winfo_children():
+                widget.destroy()
+            
+            backups = self.backup_manager.get_backup_list()
+            
+            if not backups:
+                ctk.CTkLabel(backup_list_frame, text="No backups found",
+                            text_color="gray").pack(pady=20)
+                return
+            
+            for backup in backups[:5]:  # Show only 5 most recent
+                backup_item = ctk.CTkFrame(backup_list_frame, fg_color=("gray85", "gray25"),
+                                        corner_radius=8)
+                backup_item.pack(fill="x", pady=5, padx=5)
+                
+                info_frame = ctk.CTkFrame(backup_item, fg_color="transparent")
+                info_frame.pack(fill="x", padx=15, pady=10)
+                
+                # Format timestamp
+                try:
+                    timestamp = datetime.fromisoformat(backup['timestamp'])
+                    time_str = timestamp.strftime("%Y-%m-%d %H:%M")
+                except:
+                    time_str = backup.get('timestamp', 'Unknown')
+                
+                # Backup info
+                ctk.CTkLabel(info_frame, text=f"📅 {time_str}",
+                            font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w")
+                
+                details = f"Type: {backup.get('backup_type', 'unknown')} | "
+                details += f"Accounts: {backup.get('accounts_count', 0)} | "
+                details += f"Size: {backup.get('file_size', 0) / (1024*1024):.2f} MB"
+                
+                ctk.CTkLabel(info_frame, text=details, font=ctk.CTkFont(size=10),
+                            text_color="gray").pack(anchor="w")
+        
+        update_backup_list()
+        
+        # Status label
+        status_label = ctk.CTkLabel(content_frame, text="", font=ctk.CTkFont(size=12))
+        status_label.pack(pady=10)
+        
+        # Progress indicator
+        progress_bar = ctk.CTkProgressBar(content_frame, mode='indeterminate')
+        
+        # Button frame
+        button_frame = ctk.CTkFrame(main_frame, fg_color=("gray90", "gray15"), height=70)
+        button_frame.pack(fill="x", padx=0, pady=0, side="bottom")
+        button_frame.pack_propagate(False)
+        
+        buttons = ctk.CTkFrame(button_frame, fg_color="transparent")
+        buttons.pack(fill="both", expand=True, padx=20, pady=15)
+        
+        def create_backup_action():
+            backup_type = backup_type_var.get()
+            description = description_text.get("1.0", tk.END).strip()
+            
+            # Show progress
+            status_label.configure(text="Creating backup...", text_color="#3B82F6")
+            progress_bar.pack(pady=5)
+            progress_bar.start()
+            backup_window.update()
+            
+            def perform_backup():
+                success, message, backup_path = self.backup_manager.create_backup(
+                    backup_type=backup_type,
+                    description=description
+                )
+                
+                # Update UI on main thread
+                self.root.after(0, lambda: finish_backup(success, message))
+            
+            def finish_backup(success, message):
+                progress_bar.stop()
+                progress_bar.pack_forget()
+                
+                if success:
+                    status_label.configure(text="✅ Backup created successfully!",
+                                        text_color="#10B981")
+                    update_backup_list()
+                    self.show_message("success", message)
+                else:
+                    status_label.configure(text="❌ Backup failed", text_color="#EF4444")
+                    self.show_message("error", message, msg_type="error")
+            
+            # Run backup in background thread
+            threading.Thread(target=perform_backup, daemon=True).start()
+        
+        ctk.CTkButton(buttons, text="Cancel", command=backup_window.destroy,
+                    width=120, height=40,
+                    fg_color=("gray70", "gray30"),
+                    hover_color=("gray60", "gray40")).pack(side="left")
+        
+        ctk.CTkButton(buttons, text="💾 Create Backup", command=create_backup_action,
+                    width=150, height=40,
+                    font=ctk.CTkFont(size=14, weight="bold"),
+                    fg_color="#2B6CB0",
+                    hover_color="#2563EB").pack(side="right")
+
+    # 6. Add the restore window method
+    def show_restore_window(self):
+        """Show backup restore window"""
+        if not self.backup_manager:
+            self.show_message("error", "Backup manager not initialized", msg_type="error")
+            return
+        
+        # Verify master password first
+        if not self.verify_master_password_dialog():
+            return
+        
+        restore_window = ThemedToplevel(self.root)
+        restore_window.title("Restore Backup")
+        restore_window.geometry("700x750")
+        restore_window.grab_set()
+        restore_window.resizable(False, False)
+        
+        # Main container
+        main_frame = ctk.CTkFrame(restore_window)
+        main_frame.pack(fill="both", expand=True, padx=0, pady=0)
+        
+        # Header
+        header_frame = ctk.CTkFrame(main_frame, fg_color=("#2E3440", "#1E1E1E"), height=80)
+        header_frame.pack(fill="x", padx=0, pady=0)
+        header_frame.pack_propagate(False)
+        
+        header_content = ctk.CTkFrame(header_frame, fg_color="transparent")
+        header_content.pack(fill="both", expand=True, padx=20, pady=15)
+        
+        ctk.CTkLabel(header_content, text="🔄 Restore Backup",
+                    font=ctk.CTkFont(size=24, weight="bold")).pack(anchor="w")
+        
+        ctk.CTkLabel(header_content, text="Restore your vault from a previous backup",
+                    font=ctk.CTkFont(size=12), text_color="#B0B0B0").pack(anchor="w", pady=(5, 0))
+        
+        # Content area
+        content_frame = ctk.CTkScrollableFrame(main_frame)
+        content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Warning message
+        warning_frame = ctk.CTkFrame(content_frame, fg_color=("#FFE5E5", "#4A2020"), corner_radius=10)
+        warning_frame.pack(fill="x", pady=(0, 20))
+        
+        ctk.CTkLabel(warning_frame, text="⚠️ Important Warning",
+                    font=ctk.CTkFont(size=14, weight="bold"),
+                    text_color="#EF4444").pack(anchor="w", padx=15, pady=(10, 5))
+        
+        ctk.CTkLabel(warning_frame,
+                    text="Restoring a backup will replace your current data. "
+                        "Your existing data will be backed up before restoration.",
+                    font=ctk.CTkFont(size=11),
+                    text_color="#666666",
+                    wraplength=600,
+                    justify="left").pack(anchor="w", padx=15, pady=(0, 10))
+        
+        # Backup selection
+        select_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        select_frame.pack(fill="x", pady=(0, 20))
+        
+        ctk.CTkLabel(select_frame, text="📦 Select Backup to Restore",
+                    font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", pady=(0, 10))
+        
+        # Backup list
+        selected_backup = {"backup": None}
+        backup_list_frame = ctk.CTkScrollableFrame(select_frame, height=300,
+                                                fg_color=("gray90", "gray20"))
+        backup_list_frame.pack(fill="both", expand=True)
+        
+        def update_backup_list():
+            # Clear existing items
+            for widget in backup_list_frame.winfo_children():
+                widget.destroy()
+            
+            backups = self.backup_manager.get_backup_list()
+            
+            if not backups:
+                ctk.CTkLabel(backup_list_frame, text="No backups found\n\n"
+                            "You can import a backup file using the 'Import Backup' button",
+                            text_color="gray").pack(pady=40)
+                return
+            
+            for backup in backups:
+                backup_item = ctk.CTkFrame(backup_list_frame, fg_color=("gray85", "gray25"),
+                                        corner_radius=8)
+                backup_item.pack(fill="x", pady=5, padx=5)
+                
+                item_content = ctk.CTkFrame(backup_item, fg_color="transparent")
+                item_content.pack(fill="x", padx=15, pady=12)
+                
+                # Format timestamp
+                try:
+                    timestamp = datetime.fromisoformat(backup['timestamp'])
+                    time_str = timestamp.strftime("%Y-%m-%d %H:%M")
+                except:
+                    time_str = backup.get('timestamp', 'Unknown')
+                
+                # Left side - info
+                info_frame = ctk.CTkFrame(item_content, fg_color="transparent")
+                info_frame.pack(side="left", fill="x", expand=True)
+                
+                ctk.CTkLabel(info_frame, text=f"📅 {time_str}",
+                            font=ctk.CTkFont(size=13, weight="bold")).pack(anchor="w")
+                
+                details = f"Type: {backup.get('backup_type', 'unknown')} | "
+                details += f"Accounts: {backup.get('accounts_count', 0)} | "
+                details += f"Size: {backup.get('file_size', 0) / (1024*1024):.2f} MB"
+                
+                ctk.CTkLabel(info_frame, text=details, font=ctk.CTkFont(size=11),
+                            text_color="gray").pack(anchor="w", pady=(2, 0))
+                
+                # Description if available
+                if backup.get('description'):
+                    ctk.CTkLabel(info_frame, text=backup['description'],
+                            font=ctk.CTkFont(size=10, slant="italic"),
+                            text_color="gray").pack(anchor="w", pady=(2, 0))
+                
+                # Right side - actions
+                actions_frame = ctk.CTkFrame(item_content, fg_color="transparent")
+                actions_frame.pack(side="right")
+                
+                def make_select_wrapper(b):
+                    def select_action():
+                        selected_backup["backup"] = b
+                        # Visual feedback - highlight selected
+                        for widget in backup_list_frame.winfo_children():
+                            widget.configure(fg_color=("gray85", "gray25"))
+                        backup_item.configure(fg_color=("#D4E6FF", "#2B4A6B"))
+                    return select_action
+                
+                ctk.CTkButton(actions_frame, text="Select",
+                            command=make_select_wrapper(backup),
+                            width=80, height=30).pack(side="left", padx=5)
+                
+                def make_verify_wrapper(b):
+                    def verify_action():
+                        from pathlib import Path
+                        backup_path = Path(b['backup_path'])
+                        success, message = self.backup_manager.restore_backup(
+                            backup_path, verify_only=True
+                        )
+                        if success:
+                            self.show_message("success", message)
+                        else:
+                            self.show_message("error", message, msg_type="error")
+                    return verify_action
+                
+                ctk.CTkButton(actions_frame, text="Verify",
+                            command=make_verify_wrapper(backup),
+                            width=80, height=30,
+                            fg_color=("gray70", "gray30")).pack(side="left")
+        
+        update_backup_list()
+        
+        # Import backup option
+        import_frame = ctk.CTkFrame(select_frame, fg_color="transparent")
+        import_frame.pack(fill="x", pady=(10, 0))
+        
+        def import_backup():
+            from tkinter import filedialog
+            file_path = filedialog.askopenfilename(
+                title="Select Backup File",
+                filetypes=[("Backup Files", "*.svbak"), ("All Files", "*.*")]
+            )
+            
+            if file_path:
+                from pathlib import Path
+                selected_backup["backup"] = {
+                    'backup_path': file_path,
+                    'timestamp': 'Imported',
+                    'backup_type': 'unknown',
+                    'accounts_count': 0,
+                    'file_size': Path(file_path).stat().st_size
+                }
+                
+                status_label.configure(text=f"✅ Backup imported: {Path(file_path).name}",
+                                    text_color="#10B981")
+        
+        ctk.CTkButton(import_frame, text="📁 Import Backup File",
+                    command=import_backup,
+                    width=200, height=35).pack()
+        
+        # Status label
+        status_label = ctk.CTkLabel(content_frame, text="", font=ctk.CTkFont(size=12))
+        status_label.pack(pady=10)
+        
+        # Progress indicator
+        progress_bar = ctk.CTkProgressBar(content_frame, mode='indeterminate')
+        
+        # Button frame
+        button_frame = ctk.CTkFrame(main_frame, fg_color=("gray90", "gray15"), height=70)
+        button_frame.pack(fill="x", padx=0, pady=0, side="bottom")
+        button_frame.pack_propagate(False)
+        
+        buttons = ctk.CTkFrame(button_frame, fg_color="transparent")
+        buttons.pack(fill="both", expand=True, padx=20, pady=15)
+        
+        def restore_action():
+            if not selected_backup["backup"]:
+                status_label.configure(text="⚠️ Please select a backup first",
+                                    text_color="#F59E0B")
+                return
+            
+            # Confirmation dialog
+            result = self.show_message(
+                "restore_confirm_title",
+                "This will replace your current data. Continue?",
+                ask="yesno"
+            )
+            
+            if not result:
+                return
+            
+            # Show progress
+            status_label.configure(text="Restoring backup...", text_color="#3B82F6")
+            progress_bar.pack(pady=5)
+            progress_bar.start()
+            restore_window.update()
+            
+            def perform_restore():
+                from pathlib import Path
+                backup_path = Path(selected_backup["backup"]['backup_path'])
+                success, message = self.backup_manager.restore_backup(backup_path)
+                
+                # Update UI on main thread
+                self.root.after(0, lambda: finish_restore(success, message))
+            
+            def finish_restore(success, message):
+                progress_bar.stop()
+                progress_bar.pack_forget()
+                
+                if success:
+                    status_label.configure(text="✅ Restore completed!", text_color="#10B981")
+                    self.show_message("success", message)
+                    restore_window.destroy()
+                    # Suggest restart
+                    if self.show_message("restart_title", "Restart application now?", ask="yesno"):
+                        self.restart_program()
+                else:
+                    status_label.configure(text="❌ Restore failed", text_color="#EF4444")
+                    self.show_message("error", message, msg_type="error")
+            
+            # Run restore in background thread
+            threading.Thread(target=perform_restore, daemon=True).start()
+        
+        ctk.CTkButton(buttons, text="Cancel", command=restore_window.destroy,
+                    width=120, height=40,
+                    fg_color=("gray70", "gray30"),
+                    hover_color=("gray60", "gray40")).pack(side="left")
+        
+        ctk.CTkButton(buttons, text="🔄 Restore Backup", command=restore_action,
+                    width=150, height=40,
+                    font=ctk.CTkFont(size=14, weight="bold"),
+                    fg_color="#EF4444",
+                    hover_color="#DC2626").pack(side="right")
 
 
     def _start_trial_check_timer(self):
