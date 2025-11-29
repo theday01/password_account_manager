@@ -17,6 +17,7 @@ import sqlite3
 import zipfile
 import hashlib
 import logging
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List, Dict, Tuple
@@ -43,6 +44,16 @@ class BackupMetadata:
     created_by: str
 
 
+def get_program_directory():
+    """Get the directory where the program is running from"""
+    if getattr(sys, 'frozen', False):
+        # Running as compiled executable
+        return os.path.dirname(sys.executable)
+    else:
+        # Running as script
+        return os.path.dirname(os.path.abspath(__file__))
+
+
 class BackupManager:
     """Manages backup and restore operations for SecureVault Pro"""
     
@@ -59,8 +70,9 @@ class BackupManager:
         self.secure_file_manager = secure_file_manager
         self.crypto = crypto_manager
         
-        # Setup backup directories
-        self.backup_root = Path.home() / ".securevault_backups"
+        # Setup backup directories in program directory
+        program_dir = Path(get_program_directory())
+        self.backup_root = program_dir / "backups"
         self.backup_root.mkdir(parents=True, exist_ok=True)
         
         self.local_backups_dir = self.backup_root / "local"
@@ -78,7 +90,8 @@ class BackupManager:
         self.auto_backup_interval = 7  # days
         self.auto_backup_thread = None
         
-        logger.info("BackupManager initialized successfully")
+        logger.info(f"BackupManager initialized successfully")
+        logger.info(f"Backup directory: {self.backup_root}")
     
     def _load_backup_history(self) -> List[Dict]:
         """Load backup history from file"""
@@ -306,44 +319,50 @@ class BackupManager:
                     return True, verify_msg
                 
                 # Perform restoration
-                logger.info("Restoring backup files...")
+                logger.info("Restoring backup files - replacing current data...")
                 
                 backup_type = metadata['backup_type']
                 
-                # Create backup of current data before restore
-                current_backup_path = self.backup_root / f"pre_restore_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                current_backup_path.mkdir(exist_ok=True)
-                
-                # Backup current files
-                if os.path.exists(self.database.metadata_db):
-                    shutil.copy2(self.database.metadata_db, current_backup_path / "metadata.db.bak")
-                if os.path.exists(self.database.sensitive_db):
-                    shutil.copy2(self.database.sensitive_db, current_backup_path / "sensitive.db.bak")
-                if os.path.exists(self.database.salt_path):
-                    shutil.copy2(self.database.salt_path, current_backup_path / "salt_file.bak")
-                
-                # Restore database files
+                # Restore database files - directly replace existing files
                 if backup_type in ['full', 'accounts_only']:
                     metadata_src = extract_dir / "metadata.db"
                     sensitive_src = extract_dir / "sensitive.db"
                     
                     if metadata_src.exists():
+                        # Remove old file and copy new one
+                        if os.path.exists(self.database.metadata_db):
+                            os.remove(self.database.metadata_db)
                         shutil.copy2(metadata_src, self.database.metadata_db)
                         logger.info("Restored metadata database")
                     
                     if sensitive_src.exists():
+                        # Remove old file and copy new one
+                        if os.path.exists(self.database.sensitive_db):
+                            os.remove(self.database.sensitive_db)
                         shutil.copy2(sensitive_src, self.database.sensitive_db)
                         logger.info("Restored sensitive database")
                 
                 if backup_type in ['full', 'settings_only']:
                     salt_src = extract_dir / "salt_file"
                     if salt_src.exists():
+                        # Remove old file and copy new one
+                        if os.path.exists(self.database.salt_path):
+                            os.remove(self.database.salt_path)
                         shutil.copy2(salt_src, self.database.salt_path)
                         logger.info("Restored salt file")
                     
-                    # Restore secure storage files
+                    # Restore secure storage files - replace entire directory
                     secure_backup_dir = extract_dir / "secure_storage"
                     if secure_backup_dir.exists() and self.secure_file_manager:
+                        # Clear existing secure storage directory
+                        if os.path.exists(self.secure_file_manager.secure_dir):
+                            # Remove all files in secure directory
+                            for file in os.listdir(self.secure_file_manager.secure_dir):
+                                file_path = os.path.join(self.secure_file_manager.secure_dir, file)
+                                if os.path.isfile(file_path):
+                                    os.remove(file_path)
+                        
+                        # Copy all files from backup
                         for file in os.listdir(secure_backup_dir):
                             src = secure_backup_dir / file
                             dst = os.path.join(self.secure_file_manager.secure_dir, file)
@@ -355,10 +374,10 @@ class BackupManager:
                              f"Type: {backup_type}\n"
                              f"Accounts restored: {metadata['accounts_count']}\n"
                              f"From: {metadata['timestamp']}\n\n"
-                             f"Previous data backed up to:\n{current_backup_path}\n\n"
+                             f"⚠️ All current data has been replaced with backup data.\n\n"
                              f"Please restart the application for changes to take effect.")
                 
-                logger.info("Backup restore completed successfully")
+                logger.info("Backup restore completed successfully - all data replaced")
                 return True, success_msg
                 
             finally:
@@ -510,3 +529,7 @@ class BackupManager:
         except Exception as e:
             logger.error(f"Backup cleanup failed: {e}")
             return False, f"Cleanup failed: {str(e)}"
+    
+    def get_backup_directory(self) -> Path:
+        """Get the backup directory path"""
+        return self.backup_root

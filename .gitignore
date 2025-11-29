@@ -46,3 +46,11 @@ secure_vault
 .secure_vault
 /secure_vault/
 /secure_vault
+
+
+
+backups
+/backups
+/backups/
+.backups
+.backups/

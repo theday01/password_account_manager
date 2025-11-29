@@ -2512,10 +2512,14 @@ class ModernPasswordManagerGUI:
         backup_type_var = tk.StringVar(value="full")
         
         type_options = [
-            ("full", "🔒 Full Backup", "Complete vault including all accounts, settings, and security data"),
-            ("accounts_only", "👤 Accounts Only (Recommended)", "Only account credentials and metadata - faster and more secure")
+            ("full", "🔒 Full Backup", 
+            "Complete vault including all accounts, settings, and security data.\n\n"
+            "Remember: If you select this option, the program will create a full backup. "
+            "When you restore it later, the backed-up passwords, settings and accounts will "
+            "replace the current data."),
+            ("accounts_only", "👤 Accounts Only (Recommended)", 
+            "Only account credentials and metadata - faster and more secure")
         ]
-        
 
         for value, title, description in type_options:
             option_frame = ctk.CTkFrame(type_frame, fg_color=("gray90", "gray20"), corner_radius=10)
@@ -2525,13 +2529,13 @@ class ModernPasswordManagerGUI:
             radio.pack(side="left", padx=15, pady=15)
             
             text_frame = ctk.CTkFrame(option_frame, fg_color="transparent")
-            text_frame.pack(side="left", fill="x", expand=True, pady=15)
+            text_frame.pack(side="left", fill="x", expand=True, pady=15, padx=(0, 15))
             
             ctk.CTkLabel(text_frame, text=title, font=ctk.CTkFont(size=14, weight="bold"),
-                        anchor="w").pack(anchor="w")
+                        anchor="w").pack(anchor="w", fill="x")
             ctk.CTkLabel(text_frame, text=description, font=ctk.CTkFont(size=11),
-                        text_color="gray", anchor="w", wraplength=450).pack(anchor="w", pady=(2, 0))
-        
+                        text_color="gray", anchor="w", justify="left", wraplength=450).pack(anchor="w", fill="x", pady=(2, 0))
+                                
         # Description
         desc_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
         desc_frame.pack(fill="x", pady=(0, 20))
