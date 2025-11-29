@@ -36,16 +36,15 @@ and also make the program use a strong hashing algorithm to hash the user passwo
 
 123456789hamzaSAADI@A
 
-6GH#kqz8S@bTip[2(qd({LdutvBbnGZ,f482_;=n^gifyo(d8Z
+
+.oehPi_sCM*e<}J]=(7[LLUu+UuQKp7P:Sej;$aLL.CawB256>
 
 
 
 
 
-2025-11-27 19:53:59,979 - backup_manager - ERROR - Restore failed: Invalid backup file header.
-2025-11-27 19:53:59,980 - restore_helper - ERROR - Failed to restore backup: Invalid backup file (bad header)Traceback (most recent call last):
-  File "c:\Users\Hamza\Desktop\scripts\3 - Control Ur PassWord & Gen\restore_helper.py", line 53, in restore_backup_into_vault
-    restored_files = bm.restore_backup(backup_path, backup_code, restore_to_dir=tempdir)
-  File "c:\Users\Hamza\Desktop\scripts\3 - Control Ur PassWord & Gen\backup_manager.py", line 173, in restore_backup
-    raise BackupError("Invalid backup file (bad header)")
-backup_manager.BackupError: Invalid backup file (bad header)
+
+
+اريد حذف اي سطر او ملف له علاقة بالباكاب او استعادة الباكاب ، اقرأ جيدا كل سطر واحذف كل شيء له علاقة بالباكاب او استعادة الباكاب
+يجب تنظيف الكود جيدا
+

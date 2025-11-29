@@ -21,6 +21,8 @@ class BackupManager:
     HEADER_V1 = b"SVBK1"
     HEADER_V2 = b"SVBK2"  # V2 uses 12-byte IV for GCM
     HEADER = HEADER_V2  # create new backups with latest version
+    SIGNATURE_LENGTH = 32
+    HEADER_LENGTH = 5
 
     def __init__(self, metadata_db_path: str, sensitive_db_path: str, salt_path: str, integrity_path: str, backups_dir: str = "backups"):
         self.logger = logging.getLogger(__name__)
@@ -146,6 +148,67 @@ class BackupManager:
             "created": datetime.fromtimestamp(os.path.getctime(backup_file_path)).isoformat()
         }
 
+    def _get_backup_header_and_offset(self, backup_file_path: str) -> Optional[tuple[bytes, int]]:
+        """
+        Validates the backup file header and determines the content start offset.
+        This is non-destructive and does not modify the backup file.
+
+        Returns a tuple of (header, offset) on success, or None on failure.
+        Offset will be 0 for standard backups, or SIGNATURE_LENGTH for
+        backups with a prepended signature.
+        """
+        if not os.path.exists(backup_file_path):
+            self.logger.error(f"Backup file does not exist: {backup_file_path}")
+            return None
+
+        try:
+            file_size = os.path.getsize(backup_file_path)
+            self.logger.info(f"Validating backup file: {os.path.basename(backup_file_path)} (size: {file_size} bytes)")
+            
+            with open(backup_file_path, "rb") as f:
+                buffer = f.read(self.SIGNATURE_LENGTH + self.HEADER_LENGTH)
+
+            self.logger.debug(f"Read {len(buffer)} bytes from file")
+            
+            # Case 1: Standard header at the start of the file
+            header = buffer[:self.HEADER_LENGTH]
+            self.logger.debug(f"First 5 bytes (expected header): {header.hex() if header else 'empty'} (as string: {header!r})")
+            self.logger.debug(f"Expected V1 header: {self.HEADER_V1.hex()} ({self.HEADER_V1!r})")
+            self.logger.debug(f"Expected V2 header: {self.HEADER_V2.hex()} ({self.HEADER_V2!r})")
+            
+            if header in [self.HEADER_V1, self.HEADER_V2]:
+                version = "V1" if header == self.HEADER_V1 else "V2"
+                self.logger.info(f"✓ Valid {version} backup header found at offset 0")
+                return header, 0
+
+            # Case 2: Header is preceded by a signature
+            if len(buffer) >= self.SIGNATURE_LENGTH + self.HEADER_LENGTH:
+                header_with_sig = buffer[self.SIGNATURE_LENGTH:self.SIGNATURE_LENGTH + self.HEADER_LENGTH]
+                self.logger.debug(f"Bytes at offset {self.SIGNATURE_LENGTH} (checking for header after signature): {header_with_sig.hex() if header_with_sig else 'empty'} ({header_with_sig!r})")
+                
+                if header_with_sig in [self.HEADER_V1, self.HEADER_V2]:
+                    version = "V1" if header_with_sig == self.HEADER_V1 else "V2"
+                    self.logger.info(f"✓ Valid {version} backup header found at offset {self.SIGNATURE_LENGTH} (with signature)")
+                    return header_with_sig, self.SIGNATURE_LENGTH
+        
+        except IOError as e:
+            self.logger.error(f"Could not read backup file {backup_file_path}: {e}")
+            return None
+
+        # Log detailed error information
+        self.logger.error(f"❌ File '{os.path.basename(backup_file_path)}' is not a valid backup file (invalid header).")
+        self.logger.error(f"   File size: {file_size} bytes")
+        if len(buffer) >= 5:
+            self.logger.error(f"   First 5 bytes: {buffer[:5].hex()} ({buffer[:5]!r})")
+            self.logger.error(f"   This file may be:")
+            self.logger.error(f"   - A corrupted backup file")
+            self.logger.error(f"   - Not a SecureVault backup (.svbk) file")
+            self.logger.error(f"   - Created with incompatible software")
+        else:
+            self.logger.error(f"   File is too small ({len(buffer)} bytes), minimum required: {self.SIGNATURE_LENGTH + self.HEADER_LENGTH}")
+        
+        return None
+
     def restore_backup(self, backup_file_path: str, backup_code: str, restore_to_dir: Optional[str] = None) -> List[str]:
         """
         Restore backup contents to `restore_to_dir` (if provided) or to current working dir.
@@ -153,41 +216,39 @@ class BackupManager:
         Throws BackupError on failure (including wrong code).
         """
         self.logger.info(f"Restoring backup from {backup_file_path}...")
-        if not os.path.exists(backup_file_path):
-            self.logger.error(f"Restore failed: Backup file not found at {backup_file_path}")
-            raise BackupError("Backup file not found")
         if not backup_code or not backup_code.strip():
             self.logger.error("Restore failed: Backup code is required.")
             raise BackupError("Backup code is required to restore")
 
+        result = self._get_backup_header_and_offset(backup_file_path)
+        if not result:
+            raise BackupError("Invalid backup file (bad header)")
+        
+        header, offset = result
+
+        if header == self.HEADER_V2:
+            iv_len = 12
+            version = "V2"
+        else: # HEADER_V1
+            iv_len = 16
+            version = "V1"
+        
+        self.logger.info(f"Detected backup version: {version}, content offset: {offset} bytes")
+        
         with open(backup_file_path, "rb") as f:
-            header = f.read(5)
-            if header == self.HEADER_V2:
-                iv_len = 12
-                version = "V2"
-            elif header == self.HEADER_V1:
-                iv_len = 16
-                version = "V1"
-            else:
-                self.logger.error("Restore failed: Invalid backup file header.")
-                raise BackupError("Invalid backup file (bad header)")
-            
-            self.logger.info(f"Detected backup version: {version} (IV length: {iv_len} bytes)")
-            
+            f.seek(offset + self.HEADER_LENGTH)
             salt = f.read(32)
             iv = f.read(iv_len)
             tag = f.read(16)
             ciphertext = f.read()
-            
-            # Log sizes for debugging
-            self.logger.debug(f"Salt: {len(salt)} bytes, IV: {len(iv)} bytes, Tag: {len(tag)} bytes, Ciphertext: {len(ciphertext)} bytes")
+        
+        self.logger.debug(f"Salt: {len(salt)} bytes, IV: {len(iv)} bytes, Tag: {len(tag)} bytes, Ciphertext: {len(ciphertext)} bytes")
 
         key = self._derive_key(backup_code, salt)
         
         try:
             zip_bytes = self._gcm_decrypt(iv, tag, ciphertext, key)
         except Exception as e:
-            # More specific error messages
             if "InvalidTag" in str(type(e).__name__):
                 err_msg = (
                     f"Authentication failed for {version} backup. This usually means:\n"

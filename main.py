@@ -2626,6 +2626,18 @@ class ModernPasswordManagerGUI:
                 filetypes=[(self.lang_manager.get_string("secure_vault_backups_filetype"), "*.svbk"), (self.lang_manager.get_string("all_files_filetype"), "*.*")]
             )
             if filepath:
+                # Warn if the file doesn't have .svbk extension
+                if not filepath.lower().endswith('.svbk'):
+                    warning_msg = (
+                        f"⚠️ WARNING: Non-standard file selected\\n\\n"
+                        f"Selected file: {os.path.basename(filepath)}\\n\\n"
+                        f"SecureVault backup files should have the .svbk extension.\\n"
+                        f"This file may not be a valid backup.\\n\\n"
+                        f"Do you want to continue anyway?"
+                    )
+                    if not self.show_message("Non-Standard File", warning_msg, ask="yesno", msg_type="warning"):
+                        return
+                
                 if filepath not in backups:
                     backups.insert(0, filepath)
                     listbox.insert(0, self.lang_manager.get_string("external_backup_label", index=len(backups), filename=os.path.basename(filepath)))
@@ -2647,6 +2659,43 @@ class ModernPasswordManagerGUI:
                 return
             idx = sel[0]
             backup_path = backups[idx]
+            
+            # Validate backup file BEFORE asking for password
+            try:
+                bm_validator = BackupManager(
+                    metadata_db_path=getattr(self.database, "metadata_db", os.path.join(os.getcwd(), "metadata.db")),
+                    sensitive_db_path=getattr(self.database, "sensitive_db", os.path.join(os.getcwd(), "sensitive.db")),
+                    salt_path=getattr(self.database, "salt_path", os.path.join(os.getcwd(), "salt_file")),
+                    integrity_path=getattr(self.database, "integrity_path", os.path.join(os.getcwd(), "integrity_file")),
+                    backups_dir=backup_folder
+                )
+                
+                # Check if file has valid header
+                header_result = bm_validator._get_backup_header_and_offset(backup_path)
+                if not header_result:
+                    error_msg = (
+                        f"❌ Invalid Backup File\\n\\n"
+                        f"The selected file is not a valid SecureVault backup:\\n"
+                        f"📁 {os.path.basename(backup_path)}\\n\\n"
+                        f"This file may be:\\n"
+                        f"• Corrupted or incomplete\\n"
+                        f"• Not a .svbk backup file\\n"
+                        f"• Created with incompatible software\\n\\n"
+                        f"Please select a different backup file.\\n\\n"
+                        f"💡 Tip: Check the application logs for details."
+                    )
+                    self.show_message("Invalid Backup File", error_msg, msg_type="error")
+                    return
+                    
+                # File is valid, get backup info
+                backup_info = bm_validator.get_backup_info(backup_path)
+                logger.info(f"Previewing backup: {backup_info['version']} format, {backup_info['file_size']} bytes")
+                
+            except Exception as validation_error:
+                logger.error(f"Failed to validate backup file: {validation_error}", exc_info=True)
+                self.show_message("Validation Error", f"Could not validate backup file:\\n\\n{str(validation_error)}", msg_type="error")
+                return
+
 
             # Enhanced password dialog with show/hide button for preview
             preview_code_dialog = tk.Toplevel(win)
@@ -2769,6 +2818,42 @@ class ModernPasswordManagerGUI:
                 return
             idx = sel[0]
             backup_path = backups[idx]
+            
+            # Validate backup file BEFORE asking for password
+            try:
+                bm_validator = BackupManager(
+                    metadata_db_path=getattr(self.database, "metadata_db", os.path.join(os.getcwd(), "metadata.db")),
+                    sensitive_db_path=getattr(self.database, "sensitive_db", os.path.join(os.getcwd(), "sensitive.db")),
+                    salt_path=getattr(self.database, "salt_path", os.path.join(os.getcwd(), "salt_file")),
+                    integrity_path=getattr(self.database, "integrity_path", os.path.join(os.getcwd(), "integrity_file")),
+                    backups_dir=backup_folder
+                )
+                
+                # Check if file has valid header
+                header_result = bm_validator._get_backup_header_and_offset(backup_path)
+                if not header_result:
+                    error_msg = (
+                        f"❌ Invalid Backup File\\n\\n"
+                        f"The selected file is not a valid SecureVault backup:\\n"
+                        f"📁 {os.path.basename(backup_path)}\\n\\n"
+                        f"This file may be:\\n"
+                        f"• Corrupted or incomplete\\n"
+                        f"• Not a .svbk backup file\\n"
+                        f"• Created with incompatible software\\n\\n"
+                        f"Please select a different backup file.\\n\\n"
+                        f"💡 Tip: Check the application logs for details."
+                    )
+                    self.show_message("Invalid Backup File", error_msg, msg_type="error")
+                    return
+                    
+                # File is valid, get backup info
+                backup_info = bm_validator.get_backup_info(backup_path)
+                logger.info(f"Validated backup: {backup_info['version']} format, {backup_info['file_size']} bytes")
+                
+            except Exception as validation_error:
+                logger.error(f"Failed to validate backup file: {validation_error}", exc_info=True)
+                self.show_message("Validation Error", f"Could not validate backup file:\\n\\n{str(validation_error)}", msg_type="error")
+                return
 
             # Enhanced password dialog with show/hide button
             code_dialog = tk.Toplevel(win)
