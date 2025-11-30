@@ -33,18 +33,18 @@ def format_remaining_time(remaining_seconds: float) -> str:
     return parts[0] if parts else "0 seconds"
 
 
-async def trial_notification_loop(trial_manager, notification_interval_seconds: float = 120):
+async def trial_notification_loop(trial_manager, notification_interval_seconds: float = 86400):
     """
     Periodically sends a notification about trial time remaining.
     
     Args:
         trial_manager: The TrialManager instance to check trial status
-        notification_interval_seconds: How often to send notifications (default 120 = 2 minutes)
+        notification_interval_seconds: How often to send notifications (default 86400 = 1 day)
     """
     logger.info(f"Starting trial notification loop with {notification_interval_seconds}s interval")
     
     # Initial delay to let the app fully start
-    await asyncio.sleep(5)
+    await asyncio.sleep(1)
     
     icon_path = Path(__file__).parent / "icons" / "icon.png"
     notification_count = 0
@@ -113,14 +113,14 @@ async def trial_notification_loop(trial_manager, notification_interval_seconds: 
         logger.error(f"Unexpected error in trial notification loop: {outer_error}")
 
 
-def start_trial_notifications(trial_manager, asyncio_manager, notification_interval_seconds: float = 120):
+def start_trial_notifications(trial_manager, asyncio_manager, notification_interval_seconds: float = 86400):
     """
     Starts the trial notification loop using the asyncio manager.
     
     Args:
         trial_manager: The TrialManager instance
         asyncio_manager: The AsyncioEventLoopManager instance
-        notification_interval_seconds: How often to send notifications (default 120 = 2 minutes)
+        notification_interval_seconds: How often to send notifications (default 86400 = 1 day)
     
     Returns:
         The asyncio Future/Task object, or None if it couldn't be started
