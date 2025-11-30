@@ -18,24 +18,18 @@ async def send_safe_notification(title: str, message: str, icon_path: Path = Non
     Send a notification with comprehensive error handling and fallbacks.
     """
     try:
-        # Create notification object
-        notification = Notification(
-            title=title,
-            message=message,
-            app_name="SecureVault Pro"
-        )
-        
-        # Add icon if available and valid
+        # Prepare icon if available and valid
+        icon = None
         if icon_path and icon_path.exists() and icon_path.suffix.lower() in ['.ico', '.png', '.jpg', '.jpeg']:
             try:
-                notification.icon = Icon(icon_path)
+                icon = Icon(icon_path)
             except Exception as icon_error:
                 logger.warning(f"Failed to load icon {icon_path}: {icon_error}")
                 # Continue without icon
         
         # Attempt to send notification with timeout
         try:
-            await asyncio.wait_for(notifier.send(notification), timeout=10.0)
+            await asyncio.wait_for(notifier.send(title=title, message=message, icon=icon), timeout=10.0)
             logger.info(f"Notification sent successfully: {title}")
             return True
             
@@ -47,11 +41,10 @@ async def send_safe_notification(title: str, message: str, icon_path: Path = Non
             logger.error(f"Failed to send notification via primary method: {send_error}")
             
             # Fallback: Try without icon
-            if notification.icon:
+            if icon:
                 logger.info("Attempting to send notification without icon...")
-                notification.icon = None
                 try:
-                    await asyncio.wait_for(notifier.send(notification), timeout=5.0)
+                    await asyncio.wait_for(notifier.send(title=title, message=message, icon=None), timeout=5.0)
                     logger.info("Notification sent successfully (without icon)")
                     return True
                 except Exception as fallback_error:
@@ -60,8 +53,7 @@ async def send_safe_notification(title: str, message: str, icon_path: Path = Non
             # Final fallback: Try with basic notifier
             try:
                 basic_notifier = DesktopNotifier(app_name="SecureVault")
-                basic_notification = Notification(title=title, message=message)
-                await asyncio.wait_for(basic_notifier.send(basic_notification), timeout=5.0)
+                await asyncio.wait_for(basic_notifier.send(title=title, message=message), timeout=5.0)
                 logger.info("Notification sent via basic notifier")
                 return True
             except Exception as basic_error:
@@ -82,7 +74,7 @@ async def _periodic_sender(is_trial_active: bool):
     await asyncio.sleep(30)
     
     # Get the icon path
-    icon_path = Path(__file__).parent / "icons" / "main.ico"
+    icon_path = Path(__file__).parent / "icons" / "icon.png"
     
     # Check if we're on Windows and have potential permission issues
     if sys.platform == "win32":
@@ -118,7 +110,7 @@ async def send_trial_notification(remaining_time: str):
     """
     Send a trial expiration notification with enhanced error handling.
     """
-    icon_path = Path(__file__).parent / "icons" / "main.ico"
+    icon_path = Path(__file__).parent / "icons" / "icon.png"
     
     success = await send_safe_notification(
         "Trial Period Ending Soon",
@@ -291,7 +283,135 @@ def show_system_notification_fallback(title: str, message: str):
     
     return False
 
-# Initialize logging for the notification system
+
+def format_remaining_time(remaining_seconds: float) -> str:
+    """Format remaining seconds into a readable string."""
+    if remaining_seconds <= 0:
+        return "0 seconds"
+    
+    remaining_seconds = int(remaining_seconds)
+    days = remaining_seconds // 86400
+    hours = (remaining_seconds % 86400) // 3600
+    minutes = (remaining_seconds % 3600) // 60
+    seconds = remaining_seconds % 60
+    
+    parts = []
+    if days > 0:
+        parts.append(f"{days} day{'s' if days > 1 else ''}")
+    if hours > 0:
+        parts.append(f"{hours} hour{'s' if hours > 1 else ''}")
+    if minutes > 0:
+        parts.append(f"{minutes} minute{'s' if minutes > 1 else ''}")
+    if seconds > 0 and not parts:  # Only show seconds if nothing else
+        parts.append(f"{seconds} second{'s' if seconds > 1 else ''}")
+    
+    if len(parts) > 1:
+        return ", ".join(parts[:-1]) + f" and {parts[-1]}"
+    return parts[0] if parts else "0 seconds"
+
+
+async def trial_notification_loop(trial_manager, notification_interval_seconds: float = 120):
+    """
+    Periodically sends a notification about trial time remaining.
+    
+    Args:
+        trial_manager: The TrialManager instance to check trial status
+        notification_interval_seconds: How often to send notifications (default 120 = 2 minutes)
+    """
+    logger.info(f"Starting trial notification loop with {notification_interval_seconds}s interval")
+    
+    # Initial delay to let the app fully start
+    await asyncio.sleep(5)
+    
+    icon_path = Path(__file__).parent / "icons" / "icon.png"
+    notification_count = 0
+    max_notifications = 1000  # Prevent infinite notifications
+    
+    try:
+        while notification_count < max_notifications:
+            try:
+                # Check if trial is still active
+                if not trial_manager.is_trial_active and trial_manager.status != "TRIAL":
+                    logger.info("Trial is no longer active, stopping notification loop")
+                    break
+                
+                # Get remaining time
+                remaining_seconds = trial_manager.get_remaining_seconds()
+                
+                if remaining_seconds <= 0:
+                    logger.info("Trial time expired, stopping notification loop")
+                    break
+                
+                # Format the remaining time
+                remaining_time_str = format_remaining_time(remaining_seconds)
+                
+                # Create notification message
+                title = "SecureVault Pro - Trial Expiring"
+                message = f"Your trial will expire in {remaining_time_str}. Please activate to continue using the program."
+                
+                logger.info(f"Sending trial notification: {remaining_time_str} remaining")
+                
+                # Try to send notification
+                try:
+                    success = await send_safe_notification(
+                        title=title,
+                        message=message,
+                        icon_path=icon_path
+                    )
+                    
+                    if not success:
+                        # Fallback to system notification
+                        logger.warning("Async notification failed, trying system fallback")
+                        show_system_notification_fallback(title, message)
+                    
+                    notification_count += 1
+                    
+                except Exception as notify_error:
+                    logger.error(f"Error sending trial notification: {notify_error}")
+                    # Try fallback anyway
+                    try:
+                        show_system_notification_fallback(title, message)
+                    except Exception as fallback_error:
+                        logger.error(f"Fallback notification also failed: {fallback_error}")
+                
+                # Wait for the specified interval before sending next notification
+                await asyncio.sleep(notification_interval_seconds)
+                
+            except asyncio.CancelledError:
+                logger.info("Trial notification loop was cancelled")
+                break
+            except Exception as loop_error:
+                logger.error(f"Error in trial notification loop: {loop_error}")
+                await asyncio.sleep(10)  # Wait before retrying on error
+        
+        logger.info(f"Trial notification loop completed ({notification_count} notifications sent)")
+        
+    except Exception as outer_error:
+        logger.error(f"Unexpected error in trial notification loop: {outer_error}")
+
+
+def start_trial_notifications(trial_manager, asyncio_manager, notification_interval_seconds: float = 120):
+    """
+    Starts the trial notification loop using the asyncio manager.
+    
+    Args:
+        trial_manager: The TrialManager instance
+        asyncio_manager: The AsyncioEventLoopManager instance
+        notification_interval_seconds: How often to send notifications (default 120 = 2 minutes)
+    
+    Returns:
+        The asyncio Future/Task object, or None if it couldn't be started
+    """
+    try:
+        logger.info("Submitting trial notification coroutine to asyncio manager")
+        future = asyncio_manager.submit_coroutine(
+            trial_notification_loop(trial_manager, notification_interval_seconds)
+        )
+        logger.info("Trial notification coroutine submitted successfully")
+        return future
+    except Exception as e:
+        logger.error(f"Failed to start trial notifications: {e}")
+        return None
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     
@@ -304,7 +424,7 @@ if __name__ == "__main__":
         print(f"Basic notification: {'Success' if success1 else 'Failed'}")
         
         # Test notification with icon
-        icon_path = Path("icons/main.ico")
+        icon_path = Path("icons/icon.png")
         success2 = await send_safe_notification("Test", "Icon notification test", icon_path)
         print(f"Icon notification: {'Success' if success2 else 'Failed'}")
         

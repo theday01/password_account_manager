@@ -251,6 +251,11 @@ class TrialManager:
             if platform.system() == 'Windows':
                 os.system(f"attrib +h {self.LICENSE_FILE}")
             self.status = "FULL"
+            
+            # Set a flag to show activation success message on next login
+            self._settings['just_activated'] = True
+            self._save_activation_state()
+            
             return True
         except Exception as e:
             logging.error(f"Activation failed: {e}")

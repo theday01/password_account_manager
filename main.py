@@ -29,7 +29,7 @@ from audit_logger import setup_logging
 from tutorial import TutorialManager
 from localization import LanguageManager
 import threading
-from notification_manager import _periodic_sender, notifier, send_safe_notification, send_trial_notification
+from notification_manager import _periodic_sender, notifier, send_safe_notification, send_trial_notification, start_trial_notifications
 from desktop_notifier import Icon
 from trial_manager import TrialManager
 from reminder import ReminderManager
@@ -1687,10 +1687,26 @@ class ModernPasswordManagerGUI:
             self.auth_guardian.update_setting('consecutive_logins', consecutive_logins)
             self.settings['last_login_timestamp'] = now
             self.settings['consecutive_logins'] = consecutive_logins
-            # Submit the periodic notification sender to the asyncio manager
-            asyncio_manager.submit_coroutine(
-                _periodic_sender(is_trial_active=self.trial_manager.is_trial_active)
-            )
+            # Start trial notifications if in trial mode
+            if self.trial_manager.is_trial_active and self.trial_manager.status == "TRIAL":
+                logger.info("Starting trial notification loop")
+                start_trial_notifications(self.trial_manager, asyncio_manager, notification_interval_seconds=120)
+            
+            # Check if program was just activated and show activation success notification
+            if self.trial_manager._settings.get('just_activated', False):
+                logger.info("Program was just activated, showing success notification")
+                try:
+                    from notification_manager import show_system_notification_fallback
+                    show_system_notification_fallback(
+                        "Activation Successful",
+                        "Thank you for purchasing SecureVault Pro! The program is now activated for life. Enjoy secure password management!"
+                    )
+                    # Clear the flag after showing the notification
+                    self.trial_manager._settings['just_activated'] = False
+                    self.trial_manager._save_activation_state()
+                except Exception as e:
+                    logger.error(f"Failed to show activation notification: {e}")
+            
             self.show_loading_main_ui()
             self.root.after(100, self.show_main_interface)
 
@@ -1754,9 +1770,9 @@ class ModernPasswordManagerGUI:
         while True:
             dialog = ThemedToplevel(self.root)
             dialog.title(self.lang_manager.get_string("verify_master_password_title"))
-            dialog.geometry("400x230")
             dialog.grab_set()
             dialog.resizable(False, False)
+            self.center_window(dialog, 400, 230)
             result = {"password": None, "confirmed": False}
             main_frame = ctk.CTkFrame(dialog)
             main_frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -1830,7 +1846,7 @@ class ModernPasswordManagerGUI:
                 "of advanced encryption mechanisms.\n\n"
                 "Please create a long, strong, and unguessable master password to protect your vault."
             )
-            messagebox.showwarning("Security Notice", security_msg)
+            messagebox.showinfo("Security Notice", security_msg)
         except Exception:
             # If the GUI warning fails for any reason, proceed silently.
             logger.exception("Failed to display security notice dialog")
@@ -2176,6 +2192,13 @@ class ModernPasswordManagerGUI:
         else:
             entry.configure(show="*")
             button.configure(text="👁️")
+
+    def center_window(self, window, width: int, height: int):
+        """Center a window on the screen."""
+        window.update_idletasks()
+        x = (window.winfo_screenwidth() // 2) - (width // 2)
+        y = (window.winfo_screenheight() // 2) - (height // 2)
+        window.geometry(f"{width}x{height}+{x}+{y}")
 
     def _generate_welcome_message(self, count: int = 1) -> str:
         """
@@ -2565,9 +2588,9 @@ class ModernPasswordManagerGUI:
         
         backup_window = ThemedToplevel(self.root)
         backup_window.title("Create Backup")
-        backup_window.geometry("700x850")
         backup_window.grab_set()
         backup_window.resizable(False, False)
+        self.center_window(backup_window, 700, 850)
         
         # Main container
         main_frame = ctk.CTkFrame(backup_window)
@@ -2768,9 +2791,9 @@ class ModernPasswordManagerGUI:
         
         restore_window = ThemedToplevel(self.root)
         restore_window.title("Restore Backup")
-        restore_window.geometry("700x750")
         restore_window.grab_set()
         restore_window.resizable(False, False)
+        self.center_window(restore_window, 700, 750)
         
         # Main container
         main_frame = ctk.CTkFrame(restore_window)
@@ -2804,7 +2827,7 @@ class ModernPasswordManagerGUI:
         
         ctk.CTkLabel(warning_frame,
                     text="Restoring a backup will replace your current data. "
-                        "Your existing data will be backed up before restoration.",
+                        "Your current data will not be backed up before restoration; please check before proceeding.",
                     font=ctk.CTkFont(size=11),
                     text_color="#666666",
                     wraplength=600,
@@ -3536,9 +3559,9 @@ class ModernPasswordManagerGUI:
 
         settings_window = ThemedToplevel(self.root)
         settings_window.title(self.lang_manager.get_string("settings"))
-        settings_window.geometry("600x580")
         settings_window.grab_set()
         settings_window.resizable(False, False)
+        self.center_window(settings_window, 600, 580)
         
         # Store reference to settings window for closing on successful changes
         self.settings_window = settings_window
@@ -3597,9 +3620,9 @@ class ModernPasswordManagerGUI:
     def show_about_dialog(self):
         about_dialog = ThemedToplevel(self.root)
         about_dialog.title(self.lang_manager.get_string("about_dialog_title"))
-        about_dialog.geometry("1000x600")
         about_dialog.resizable(False, False)
         about_dialog.grab_set()
+        self.center_window(about_dialog, 1000, 600)
 
         main_frame = ctk.CTkFrame(about_dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -3643,9 +3666,9 @@ class ModernPasswordManagerGUI:
     def change_master_password_dialog(self):
         dialog = ThemedToplevel(self.root)
         dialog.title(self.lang_manager.get_string("change_master_password_dialog_title"))
-        dialog.geometry("450x530")
         dialog.resizable(False, False)
         dialog.grab_set()
+        self.center_window(dialog, 450, 530)
         
         main_frame = ctk.CTkFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -3653,23 +3676,59 @@ class ModernPasswordManagerGUI:
         ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("change_master_password_icon_title"),
                     font=ctk.CTkFont(size=20, weight="bold")).pack(pady=20)
         
+        # Current Password with toggle button
         ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("current_password_label"), 
                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
-        current_entry = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("current_password_placeholder"),
-                                    show="*", width=350, height=40)
-        current_entry.pack(padx=20, pady=(0, 10))
+        current_password_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        current_password_frame.pack(padx=20, pady=(0, 10))
+        current_entry = ctk.CTkEntry(current_password_frame, placeholder_text=self.lang_manager.get_string("current_password_placeholder"),
+                                    show="*", width=300, height=40)
+        current_entry.pack(side="left", padx=(0, 5))
         
+        current_toggle_btn = ctk.CTkButton(
+            current_password_frame,
+            text="👁️",
+            width=40,
+            height=40,
+            command=lambda: self.toggle_password_visibility(current_entry, current_toggle_btn)
+        )
+        current_toggle_btn.pack(side="left")
+        
+        # New Password with toggle button
         ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("new_password_label"),
                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
-        new_entry = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("new_password_placeholder"),
-                                show="*", width=350, height=40)
-        new_entry.pack(padx=20, pady=(0, 10))
+        new_password_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        new_password_frame.pack(padx=20, pady=(0, 10))
+        new_entry = ctk.CTkEntry(new_password_frame, placeholder_text=self.lang_manager.get_string("new_password_placeholder"),
+                                show="*", width=300, height=40)
+        new_entry.pack(side="left", padx=(0, 5))
         
+        new_toggle_btn = ctk.CTkButton(
+            new_password_frame,
+            text="👁️",
+            width=40,
+            height=40,
+            command=lambda: self.toggle_password_visibility(new_entry, new_toggle_btn)
+        )
+        new_toggle_btn.pack(side="left")
+        
+        # Confirm Password with toggle button
         ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("confirm_new_password_label"),
                     font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=20, pady=(10, 5))
-        confirm_entry = ctk.CTkEntry(main_frame, placeholder_text=self.lang_manager.get_string("confirm_new_password_placeholder"),
-                                    show="*", width=350, height=40)
-        confirm_entry.pack(padx=20, pady=(0, 15))
+        confirm_password_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        confirm_password_frame.pack(padx=20, pady=(0, 15))
+        confirm_entry = ctk.CTkEntry(confirm_password_frame, placeholder_text=self.lang_manager.get_string("confirm_new_password_placeholder"),
+                                    show="*", width=300, height=40)
+        confirm_entry.pack(side="left", padx=(0, 5))
+        
+        confirm_toggle_btn = ctk.CTkButton(
+            confirm_password_frame,
+            text="👁️",
+            width=40,
+            height=40,
+            command=lambda: self.toggle_password_visibility(confirm_entry, confirm_toggle_btn)
+        )
+        confirm_toggle_btn.pack(side="left")
         progress_label = ctk.CTkLabel(main_frame, text="", font=ctk.CTkFont(size=12))
         progress_label.pack(pady=5)
         
@@ -3828,9 +3887,9 @@ class ModernPasswordManagerGUI:
             # Create setup dialog
             setup_dialog = ThemedToplevel(self.root)
             setup_dialog.title(self.lang_manager.get_string("2fa_setup_title"))
-            setup_dialog.geometry("600x900")
             setup_dialog.grab_set()
             setup_dialog.resizable(False, False)
+            self.center_window(setup_dialog, 600, 900)
             
             # Main container with gradient background effect
             main_container = ctk.CTkFrame(setup_dialog, fg_color="transparent")
@@ -4944,8 +5003,8 @@ class ModernPasswordManagerGUI:
         
         dialog = ThemedToplevel(self.root)
         dialog.title(title)
-        dialog.geometry("900x950")
         dialog.grab_set()
+        self.center_window(dialog, 900, 950)
         
         main_frame = ctk.CTkScrollableFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
