@@ -1564,10 +1564,14 @@ class ModernPasswordManagerGUI:
             self.auth_guardian.update_setting('consecutive_logins', consecutive_logins)
             self.settings['last_login_timestamp'] = now
             self.settings['consecutive_logins'] = consecutive_logins
-            # Start trial notifications if in trial mode
+            # Start trial notifications if in trial mode (every 10 minutes)
             if self.trial_manager.is_trial_active and self.trial_manager.status == "TRIAL":
-                logger.info("Starting trial notification loop")
-                start_trial_notifications(self.trial_manager, asyncio_manager, notification_interval_seconds=120)
+                logger.info("Starting trial notification loop with 10-minute interval")
+                start_trial_notifications(self.trial_manager, asyncio_manager, notification_interval_seconds=600)
+            # Also start notifications if trial has expired (every 10 minutes reminder)
+            elif self.trial_manager.status == "EXPIRED":
+                logger.info("Trial expired - starting reminder notification loop with 10-minute interval")
+                start_trial_notifications(self.trial_manager, asyncio_manager, notification_interval_seconds=600)
             
             # Check if program was just activated and show activation success notification
             if self.trial_manager._settings.get('just_activated', False):
@@ -2273,23 +2277,13 @@ class ModernPasswordManagerGUI:
         self.root.bind("<Button-1>", self.reset_inactivity_timer)
 
         def on_closing():
-            # Stop trial check timer if running
-            self._stop_trial_check_timer()
-            if self.trial_manager and self.trial_manager.anchor:
-                self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
-            if hasattr(self, 'tamper_manager'):
-                self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
-            # Sync files to secure storage before closing
-            if self.secure_file_manager and self.authenticated and self.database:
-                try:
-                    logger.info("Syncing files to secure storage before closing...")
-                    # Ensure all database changes are flushed to disk
-                    self.database._checkpoint_databases()
-                    self.secure_file_manager.sync_all_files()
-                    logger.info("Files synced successfully")
-                except Exception as e:
-                    logger.error(f"Failed to sync files before closing: {e}")
-            self.root.destroy()
+            # Disable default close - force users to use logout button for security
+            logger.warning("User attempted to close window directly. Logout button must be used.")
+            messagebox.showwarning(
+                "Close Window Blocked",
+                "For security reasons, please use the 'Logout' button in the toolbar to safely close the application."
+            )
+            return 'break'  # Prevent default close
         
         self.root.protocol("WM_DELETE_WINDOW", on_closing)
 
@@ -2410,6 +2404,21 @@ class ModernPasswordManagerGUI:
             compound="left",  # icon on the left, text on the right
             command=self.show_about_dialog,
             font=ctk.CTkFont(size=18)
+        ).pack(side="right", padx=10, pady=8)
+        
+        # Add Logout button (RED for safety/logout action)
+        logout_icon = ctk.CTkImage(Image.open("icons/logout.png"), size=(24, 24))
+        ctk.CTkButton(
+            toolbar,
+            text="Logout",
+            width=120,
+            height=55,
+            image=logout_icon,
+            compound="left",
+            command=self.secure_logout,
+            font=ctk.CTkFont(size=18),
+            fg_color="#D32F2F",
+            hover_color="#B71C1C"
         ).pack(side="right", padx=10, pady=8)
 
         content_frame = ctk.CTkFrame(self.main_frame)
@@ -6211,6 +6220,163 @@ class ModernPasswordManagerGUI:
             hover_color="#555555"
         )
         exit_btn.pack(pady=20)
+
+    def secure_logout(self):
+        """Securely logout: sync data, clear memory, close application safely"""
+        logger.info("===== SECURE LOGOUT INITIATED =====")
+        
+        try:
+            # Step 1: Confirm logout with user
+            if not messagebox.askyesno(
+                "Confirm Logout",
+                "Are you sure you want to logout?"
+            ):
+                logger.info("Logout cancelled by user")
+                return
+            
+            logger.info("User confirmed logout")
+            
+            # Step 2: Stop trial check timer if running
+            try:
+                self._stop_trial_check_timer()
+                logger.info("Trial check timer stopped")
+            except Exception as e:
+                logger.error(f"Error stopping trial check timer: {e}")
+            
+            # Step 3: Stop password reminder thread
+            try:
+                if self.password_reminder:
+                    self.password_reminder.stop()
+                    logger.info("Password reminder thread stopped")
+            except Exception as e:
+                logger.error(f"Error stopping password reminder: {e}")
+            
+            # Step 4: Update trial manager status
+            try:
+                if self.trial_manager and self.trial_manager.anchor:
+                    self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
+                    logger.info("Trial manager shutdown status updated")
+            except Exception as e:
+                logger.error(f"Error updating trial manager: {e}")
+            
+            # Step 5: Update tamper manager status
+            try:
+                if hasattr(self, 'tamper_manager'):
+                    self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
+                    logger.info("Tamper manager shutdown status updated")
+            except Exception as e:
+                logger.error(f"Error updating tamper manager: {e}")
+            
+            # Step 6: Sync all files to secure storage
+            try:
+                if self.secure_file_manager and self.authenticated and self.database:
+                    logger.info("Starting file synchronization to secure storage...")
+                    # Ensure all database changes are flushed to disk
+                    self.database._checkpoint_databases()
+                    logger.info("Databases checkpointed")
+                    
+                    self.secure_file_manager.sync_all_files()
+                    logger.info("All files synced to secure storage")
+            except Exception as e:
+                logger.error(f"Error syncing files: {e}")
+            
+            # Step 7: Clear sensitive data from memory
+            try:
+                logger.info("Clearing sensitive data from memory...")
+                
+                # Clear master password and authentication
+                self.authenticated = False
+                if hasattr(self, 'master_password_entry'):
+                    self.master_password_entry.delete(0, "end")
+                
+                # Clear crypto manager
+                if self.crypto:
+                    self.crypto.key = None
+                    logger.info("Crypto manager cleared")
+                
+                # Clear database
+                if self.database:
+                    if hasattr(self.database, 'close'):
+                        self.database.close()
+                    self.database = None
+                    logger.info("Database cleared")
+                
+                # Clear accounts list
+                self.accounts = []
+                logger.info("Accounts list cleared")
+                
+                # Clear secure file manager keys
+                if self.secure_file_manager:
+                    self.secure_file_manager.encryption_key = None
+                    if hasattr(self.secure_file_manager, 'master_password'):
+                        self.secure_file_manager.master_password = None
+                    logger.info("Secure file manager keys cleared")
+                
+                # Clear settings
+                self.settings = {}
+                logger.info("Settings cleared")
+                
+                # Clear cached passwords/data
+                import gc
+                gc.collect()  # Force garbage collection to free memory
+                logger.info("Garbage collection performed")
+                
+            except Exception as e:
+                logger.error(f"Error clearing sensitive data: {e}")
+            
+            # Step 8: Clean temporary files
+            try:
+                logger.info("Cleaning temporary files...")
+                if self.secure_file_manager:
+                    temp_dir = self.secure_file_manager.temp_dir if hasattr(self.secure_file_manager, 'temp_dir') else None
+                    if temp_dir and os.path.exists(temp_dir):
+                        import shutil
+                        # Securely delete temp directory
+                        for root, dirs, files in os.walk(temp_dir, topdown=False):
+                            for file in files:
+                                file_path = os.path.join(root, file)
+                                try:
+                                    # Overwrite file with random data before deletion (secure deletion)
+                                    with open(file_path, 'rb+') as f:
+                                        size = os.path.getsize(file_path)
+                                        f.write(os.urandom(size))
+                                    os.remove(file_path)
+                                    logger.info(f"Securely deleted: {file_path}")
+                                except Exception as e:
+                                    logger.error(f"Error securely deleting {file_path}: {e}")
+                                    try:
+                                        os.remove(file_path)
+                                    except:
+                                        pass
+                            for dir in dirs:
+                                try:
+                                    os.rmdir(os.path.join(root, dir))
+                                except:
+                                    pass
+                        logger.info("Temporary files cleaned")
+            except Exception as e:
+                logger.error(f"Error cleaning temporary files: {e}")
+            
+            # Step 9: Show logout success message and close application
+            logger.info("Logout completed successfully")
+            logger.info("===== SECURE LOGOUT COMPLETED =====")
+            
+            messagebox.showinfo(
+                "Logout Successful",
+                "All sensitive data has been cleared from memory and temporary files.\n\n"
+                "The application will now close safely.."
+            )
+            
+            self.root.destroy()
+            
+        except Exception as e:
+            logger.error(f"Unexpected error during secure logout: {e}", exc_info=True)
+            messagebox.showerror(
+                "Logout Error",
+                f"An error occurred during logout:\n{str(e)}\n\n"
+                "The application will now close anyway for security."
+            )
+            self.root.destroy()
 
     def diagnose_secure_storage_issues(self) -> str:
         if not self.secure_file_manager:
