@@ -6364,7 +6364,7 @@ class ModernPasswordManagerGUI:
             messagebox.showinfo(
                 "Logout Successful",
                 "All sensitive data has been cleared from memory and temporary files.\n\n"
-                "The application will now close safely.."
+                "The application will now close safely...."
             )
             
             self.root.destroy()
