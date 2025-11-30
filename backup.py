@@ -123,7 +123,7 @@ class BackupManager:
     def _get_accounts_count(self) -> int:
         """Get total number of accounts"""
         try:
-            conn = sqlite3.connect(self.database.metadata_db)
+            conn = self.database._get_metadata_connection()
             cursor = conn.execute("SELECT COUNT(*) FROM accounts WHERE id != 'master_account'")
             count = cursor.fetchone()[0]
             conn.close()

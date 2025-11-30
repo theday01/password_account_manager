@@ -44,6 +44,7 @@ from pathlib import Path
 import threading
 from datetime import datetime
 from backup import BackupManager
+from encrypted_db import get_encrypted_connection, create_encrypted_database, Row as EncryptedRow
 
 
 logger = logging.getLogger(__name__)
@@ -287,6 +288,19 @@ class DatabaseManager:
         self.encryption_key = None
         self.last_integrity_error = False
     
+    def _get_metadata_connection(self):
+        """Get an encrypted connection to the metadata database."""
+        if not self.encryption_key:
+            raise ValueError("Encryption key not set. Call authenticate() first.")
+        return get_encrypted_connection(self.metadata_db, self.encryption_key)
+    
+    def _get_sensitive_connection(self):
+        """Get an encrypted connection to the sensitive database."""
+        if not self.encryption_key:
+            raise ValueError("Encryption key not set. Call authenticate() first.")
+        return get_encrypted_connection(self.sensitive_db, self.encryption_key)
+    
+    
     def _checkpoint_databases(self):
         """Checkpoint WAL files to ensure all changes are written to the main database files.
         This ensures that when files are synced, all changes are in the main database files,
@@ -300,7 +314,7 @@ class DatabaseManager:
             # Checkpoint metadata database
             if os.path.exists(self.metadata_db):
                 try:
-                    metadata_conn = sqlite3.connect(self.metadata_db)
+                    metadata_conn = self._get_metadata_connection()
                     # Checkpoint WAL to main database file
                     # PASSIVE is safe and non-blocking
                     metadata_conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
@@ -311,7 +325,7 @@ class DatabaseManager:
             # Checkpoint sensitive database
             if os.path.exists(self.sensitive_db):
                 try:
-                    sensitive_conn = sqlite3.connect(self.sensitive_db)
+                    sensitive_conn = self._get_sensitive_connection()
                     # Checkpoint WAL to main database file
                     sensitive_conn.execute("PRAGMA wal_checkpoint(PASSIVE);")
                     sensitive_conn.close()
@@ -337,24 +351,12 @@ class DatabaseManager:
             logger.error(f"Failed to save salt: {e}")
             raise
         try:
-            metadata_conn = sqlite3.connect(self.metadata_db)
+            metadata_conn = create_encrypted_database(self.metadata_db, self.encryption_key)
             metadata_conn.execute("""
                 CREATE TABLE IF NOT EXISTS accounts (
                     id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    email TEXT,
-                    url TEXT,
-                    notes TEXT,
-                    created_at TEXT,
-                    updated_at TEXT,
-                    tags TEXT,
-                    security_level INTEGER,
-                    recovery_email TEXT,
-                    phone_number TEXT,
-                    account_type TEXT,
-                    category TEXT,
-                    two_factor_enabled INTEGER,
-                    last_password_change TEXT
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 )
             """)
             metadata_conn.execute("""
@@ -381,12 +383,11 @@ class DatabaseManager:
             logger.error(f"Failed to create metadata database: {e}")
             raise
         try:
-            sensitive_conn = sqlite3.connect(self.sensitive_db)
+            sensitive_conn = create_encrypted_database(self.sensitive_db, self.encryption_key)
             sensitive_conn.execute("""
                 CREATE TABLE IF NOT EXISTS credentials (
                     account_id TEXT PRIMARY KEY,
-                    encrypted_username BLOB,
-                    encrypted_password BLOB
+                    encrypted_data BLOB NOT NULL
                 )
             """)
             sensitive_conn.commit()
@@ -397,30 +398,41 @@ class DatabaseManager:
             raise
         try:
             logger.info("Creating master account for authentication...")
-            encrypted_username = self.crypto.encrypt_data("master", self.encryption_key)
-            encrypted_password = self.crypto.encrypt_data(master_password, self.encryption_key)
-            metadata_conn = sqlite3.connect(self.metadata_db)
+            
+            master_data = {
+                "name": full_name,
+                "username": "master",
+                "password": master_password,
+                "email": email,
+                "url": "",
+                "notes": "System account for authentication verification",
+                "tags": [],
+                "security_level": SecurityLevel.CRITICAL.value,
+                "recovery_email": "",
+                "phone_number": "",
+                "account_type": "System",
+                "category": "Critical",
+                "two_factor_enabled": 0,
+                "last_password_change": datetime.now().isoformat()
+            }
+            encrypted_data = self.crypto.encrypt_data(json.dumps(master_data), self.encryption_key)
+            
+            metadata_conn = self._get_metadata_connection()
             metadata_conn.execute("""
-                INSERT OR IGNORE INTO accounts (id, name, email, url, notes, created_at, updated_at, tags, security_level)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT OR IGNORE INTO accounts (id, created_at, updated_at)
+                VALUES (?, ?, ?)
             """, (
-                "master_account", 
-                full_name, 
-                email, 
-                "", 
-                "System account for authentication verification",
-                datetime.now().isoformat(), 
+                "master_account",
                 datetime.now().isoformat(),
-                json.dumps([]), 
-                SecurityLevel.CRITICAL.value
+                datetime.now().isoformat()
             ))
             metadata_conn.commit()
             metadata_conn.close()
-            sensitive_conn = sqlite3.connect(self.sensitive_db)
+            sensitive_conn = self._get_sensitive_connection()
             sensitive_conn.execute("""
-                INSERT OR IGNORE INTO credentials (account_id, encrypted_username, encrypted_password)
-                VALUES (?, ?, ?)
-            """, ("master_account", encrypted_username, encrypted_password))
+                INSERT OR IGNORE INTO credentials (account_id, encrypted_data)
+                VALUES (?, ?)
+            """, ("master_account", encrypted_data))
             sensitive_conn.commit()
             sensitive_conn.close()
             logger.info("Master account created successfully")
@@ -490,9 +502,9 @@ class DatabaseManager:
                     logger.error(f"Integrity recovery error: {recovery_error}")
                     return False
             try:
-                sensitive_conn = sqlite3.connect(self.sensitive_db)
+                sensitive_conn = self._get_sensitive_connection()
                 cursor = sensitive_conn.execute("""
-                    SELECT encrypted_username, encrypted_password 
+                    SELECT encrypted_data
                     FROM credentials 
                     WHERE account_id = 'master_account'
                     LIMIT 1
@@ -501,9 +513,9 @@ class DatabaseManager:
                 sensitive_conn.close()
                 if test_row:
                     try:
-                        test_username = self.crypto.decrypt_data(test_row[0], self.encryption_key)
-                        test_password = self.crypto.decrypt_data(test_row[1], self.encryption_key)
-                        if test_username == "master" and test_password == master_password:
+                        decrypted_json = self.crypto.decrypt_data(test_row[0], self.encryption_key)
+                        master_data = json.loads(decrypted_json)
+                        if master_data.get("username") == "master" and master_data.get("password") == master_password:
                             logger.info("Test decryption and password verification successful")
                         else:
                             logger.error("Master password verification failed. Decrypted password does not match provided password.")
@@ -558,17 +570,17 @@ class DatabaseManager:
         metadata_conn = None
         sensitive_conn = None
         try:
-            metadata_conn = sqlite3.connect(self.metadata_db)
+            metadata_conn = self._get_metadata_connection()
             cursor = metadata_conn.execute("SELECT id FROM accounts WHERE id = ?", (account.id,))
             if cursor.fetchone():
                 raise ValueError(f"Account with ID '{account.id}' already exists")
             metadata_conn.execute("""
-                INSERT INTO accounts (id, name, email, url, notes, created_at, updated_at, tags, security_level)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO accounts (id, created_at, updated_at)
+                VALUES (?, ?, ?)
             """, (
-                account.id, account.name, account.email, account.url, account.notes,
-                account.created_at.isoformat(), account.updated_at.isoformat(),
-                json.dumps(account.tags), account.security_level.value
+                account.id,
+                account.created_at.isoformat(),
+                account.updated_at.isoformat()
             ))
             metadata_conn.commit()
             
@@ -580,13 +592,23 @@ class DatabaseManager:
             metadata_conn.close()
             metadata_conn = None
             
-            sensitive_conn = sqlite3.connect(self.sensitive_db)
-            encrypted_username = self.crypto.encrypt_data(username, self.encryption_key)
-            encrypted_password = self.crypto.encrypt_data(password, self.encryption_key)
+            account_data = {
+                "name": account.name,
+                "username": username,
+                "password": password,
+                "email": account.email,
+                "url": account.url,
+                "notes": account.notes,
+                "tags": account.tags,
+                "security_level": account.security_level.value,
+            }
+            encrypted_data = self.crypto.encrypt_data(json.dumps(account_data), self.encryption_key)
+            
+            sensitive_conn = self._get_sensitive_connection()
             sensitive_conn.execute("""
-                INSERT INTO credentials (account_id, encrypted_username, encrypted_password)
-                VALUES (?, ?, ?)
-            """, (account.id, encrypted_username, encrypted_password))
+                INSERT INTO credentials (account_id, encrypted_data)
+                VALUES (?, ?)
+            """, (account.id, encrypted_data))
             sensitive_conn.commit()
             
             # Verify credentials were saved
@@ -657,112 +679,145 @@ class DatabaseManager:
             if sensitive_conn:
                 sensitive_conn.close()
                     
-    def get_account_credentials(self, account_id: str) -> Tuple[str, str]:
-        sensitive_conn = sqlite3.connect(self.sensitive_db)
-        cursor = sensitive_conn.execute("""
-            SELECT encrypted_username, encrypted_password
-            FROM credentials WHERE account_id = ?
-        """, (account_id,))
-        row = cursor.fetchone()
-        sensitive_conn.close()
-        if row:
-            username = self.crypto.decrypt_data(row[0], self.encryption_key)
-            password = self.crypto.decrypt_data(row[1], self.encryption_key)
-            return username, password
-        return None, None
+    def get_all_decrypted_accounts(self) -> List[dict]:
+        """Fetches and decrypts all account data from the database."""
+        accounts = []
+        try:
+            metadata_conn = self._get_metadata_connection()
+            metadata_conn.row_factory = EncryptedRow
+            cursor = metadata_conn.execute("SELECT id, created_at, updated_at FROM accounts WHERE id != 'master_account'")
+            all_metadata = cursor.fetchall()
+            metadata_conn.close()
+
+            sensitive_conn = self._get_sensitive_connection()
+            for meta_row in all_metadata:
+                try:
+                    cursor = sensitive_conn.execute("SELECT encrypted_data FROM credentials WHERE account_id = ?", (meta_row['id'],))
+                    sensitive_row = cursor.fetchone()
+                    if sensitive_row:
+                        decrypted_json = self.crypto.decrypt_data(sensitive_row[0], self.encryption_key)
+                        sensitive_data = json.loads(decrypted_json)
+                        
+                        # Combine metadata and sensitive data
+                        full_account = dict(meta_row)
+                        full_account.update(sensitive_data)
+                        accounts.append(full_account)
+                except Exception as e:
+                    logger.error(f"Failed to decrypt account {meta_row['id']}: {e}")
+            sensitive_conn.close()
+            return accounts
+        except Exception as e:
+            logger.error(f"Failed to get all decrypted accounts: {e}")
+            return []
     
     def get_master_account_email(self) -> Optional[str]:
-        metadata_conn = sqlite3.connect(self.metadata_db)
-        cursor = metadata_conn.execute("SELECT email FROM accounts WHERE id = 'master_account'")
-        row = cursor.fetchone()
-        metadata_conn.close()
-        if row:
-            return row[0]
-        return None
+        try:
+            sensitive_conn = self._get_sensitive_connection()
+            cursor = sensitive_conn.execute("SELECT encrypted_data FROM credentials WHERE account_id = 'master_account'")
+            row = cursor.fetchone()
+            sensitive_conn.close()
+            if row:
+                decrypted_json = self.crypto.decrypt_data(row[0], self.encryption_key)
+                master_data = json.loads(decrypted_json)
+                return master_data.get("email")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get master account email: {e}")
+            return None
 
-    def get_master_account_details(self) -> Optional[Tuple[str, str]]:
-        metadata_conn = sqlite3.connect(self.metadata_db)
-        cursor = metadata_conn.execute("SELECT name, email FROM accounts WHERE id = 'master_account'")
-        row = cursor.fetchone()
-        metadata_conn.close()
-        if row:
-            return row[0], row[1]
-        return None, None
+    def update_account(self, account_id: str, updated_data: dict):
+        """Updates an existing account with new data."""
+        try:
+            # First, get the current encrypted data
+            sensitive_conn = self._get_sensitive_connection()
+            cursor = sensitive_conn.execute("SELECT encrypted_data FROM credentials WHERE account_id = ?", (account_id,))
+            row = cursor.fetchone()
+            if not row:
+                sensitive_conn.close()
+                raise ValueError(f"No credentials found for account ID {account_id}")
 
-    def update_account(self, account_id: str, name: str, email: str, url: str, notes: str, username: str, password: str):
-        metadata_conn = sqlite3.connect(self.metadata_db)
-        metadata_conn.execute("""
-            UPDATE accounts 
-            SET name=?, email=?, url=?, notes=?, updated_at=?
-            WHERE id=?
-        """, (name, email, url, notes, datetime.now().isoformat(), account_id))
-        metadata_conn.commit()
-        metadata_conn.close()
-        sensitive_conn = sqlite3.connect(self.sensitive_db)
-        encrypted_username = self.crypto.encrypt_data(username, self.encryption_key)
-        encrypted_password = self.crypto.encrypt_data(password, self.encryption_key)
-        sensitive_conn.execute("""
-            UPDATE credentials 
-            SET encrypted_username=?, encrypted_password=?
-            WHERE account_id=?
-        """, (encrypted_username, encrypted_password, account_id))
-        sensitive_conn.commit()
-        sensitive_conn.close()
-        self.log_action("UPDATE", "ACCOUNT", account_id, f"Updated account: {name}")
-        if self.secure_file_manager:
-            # Ensure all database changes are flushed to disk before syncing
-            self._checkpoint_databases()
-            self.secure_file_manager.rotate_integrity_signature()
-            # Sync files to secure storage to persist changes
-            try:
+            # Decrypt, update, and re-encrypt
+            decrypted_json = self.crypto.decrypt_data(row[0], self.encryption_key)
+            account_data = json.loads(decrypted_json)
+            account_data.update(updated_data) # Merge new data
+            new_encrypted_data = self.crypto.encrypt_data(json.dumps(account_data), self.encryption_key)
+
+            # Update the credentials table
+            sensitive_conn.execute("UPDATE credentials SET encrypted_data = ? WHERE account_id = ?", (new_encrypted_data, account_id))
+            sensitive_conn.commit()
+            sensitive_conn.close()
+
+            # Update the timestamp in the metadata table
+            metadata_conn = self._get_metadata_connection()
+            metadata_conn.execute("UPDATE accounts SET updated_at = ? WHERE id = ?", (datetime.now().isoformat(), account_id))
+            metadata_conn.commit()
+            metadata_conn.close()
+            
+            self.log_action("UPDATE", "ACCOUNT", account_id, f"Updated account: {updated_data.get('name', account_id)}")
+
+            if self.secure_file_manager:
+                self._checkpoint_databases()
+                self.secure_file_manager.rotate_integrity_signature()
                 self.secure_file_manager.sync_all_files()
                 logger.info("Account update synced to secure storage")
-            except Exception as e:
-                logger.error(f"Failed to sync account update to secure storage: {e}")
-                # Don't fail the operation if sync fails, but log the error
+
+        except Exception as e:
+            logger.error(f"Failed to update account {account_id}: {e}")
+            raise
 
     def update_master_account_email(self, email: str):
-        metadata_conn = sqlite3.connect(self.metadata_db)
-        metadata_conn.execute("UPDATE accounts SET email = ? WHERE id = 'master_account'", (email,))
-        metadata_conn.commit()
-        metadata_conn.close()
-        self.log_action("UPDATE", "ACCOUNT", "master_account", f"Updated master account email to {email}")
-        if self.secure_file_manager:
-            # Ensure all database changes are flushed to disk before syncing
-            self._checkpoint_databases()
-            self.secure_file_manager.rotate_integrity_signature()
-            # Sync files to secure storage to persist changes
-            try:
+        """Updates the master account's email address."""
+        try:
+            sensitive_conn = self._get_sensitive_connection()
+            cursor = sensitive_conn.execute("SELECT encrypted_data FROM credentials WHERE account_id = 'master_account'")
+            row = cursor.fetchone()
+            if row:
+                decrypted_json = self.crypto.decrypt_data(row[0], self.encryption_key)
+                master_data = json.loads(decrypted_json)
+                master_data['email'] = email
+                new_encrypted_data = self.crypto.encrypt_data(json.dumps(master_data), self.encryption_key)
+                sensitive_conn.execute("UPDATE credentials SET encrypted_data = ? WHERE account_id = 'master_account'", (new_encrypted_data,))
+                sensitive_conn.commit()
+            sensitive_conn.close()
+
+            self.log_action("UPDATE", "ACCOUNT", "master_account", f"Updated master account email to {email}")
+
+            if self.secure_file_manager:
+                self._checkpoint_databases()
+                self.secure_file_manager.rotate_integrity_signature()
                 self.secure_file_manager.sync_all_files()
                 logger.info("Master account email update synced to secure storage")
-            except Exception as e:
-                logger.error(f"Failed to sync master account email update to secure storage: {e}")
-                # Don't fail the operation if sync fails, but log the error
+
+        except Exception as e:
+            logger.error(f"Failed to update master account email: {e}")
+            raise
     
     def delete_account(self, account_id: str):
-        metadata_conn = sqlite3.connect(self.metadata_db)
-        cursor = metadata_conn.execute("SELECT name FROM accounts WHERE id=?", (account_id,))
-        row = cursor.fetchone()
-        account_name = row[0] if row else "Unknown"
-        metadata_conn.execute("DELETE FROM accounts WHERE id=?", (account_id,))
-        metadata_conn.commit()
-        metadata_conn.close()
-        sensitive_conn = sqlite3.connect(self.sensitive_db)
-        sensitive_conn.execute("DELETE FROM credentials WHERE account_id=?", (account_id,))
-        sensitive_conn.commit()
-        sensitive_conn.close()
-        self.log_action("DELETE", "ACCOUNT", account_id, f"Deleted account: {account_name}")
-        if self.secure_file_manager:
-            # Ensure all database changes are flushed to disk before syncing
-            self._checkpoint_databases()
-            self.secure_file_manager.rotate_integrity_signature()
-            # Sync files to secure storage to persist changes
-            try:
+        """Deletes an account from both metadata and sensitive tables."""
+        try:
+            # Delete from metadata table
+            metadata_conn = self._get_metadata_connection()
+            metadata_conn.execute("DELETE FROM accounts WHERE id = ?", (account_id,))
+            metadata_conn.commit()
+            metadata_conn.close()
+
+            # Delete from credentials table
+            sensitive_conn = self._get_sensitive_connection()
+            sensitive_conn.execute("DELETE FROM credentials WHERE account_id = ?", (account_id,))
+            sensitive_conn.commit()
+            sensitive_conn.close()
+
+            self.log_action("DELETE", "ACCOUNT", account_id, f"Deleted account ID: {account_id}")
+
+            if self.secure_file_manager:
+                self._checkpoint_databases()
+                self.secure_file_manager.rotate_integrity_signature()
                 self.secure_file_manager.sync_all_files()
                 logger.info("Account deletion synced to secure storage")
-            except Exception as e:
-                logger.error(f"Failed to sync account deletion to secure storage: {e}")
-                # Don't fail the operation if sync fails, but log the error
+
+        except Exception as e:
+            logger.error(f"Failed to delete account {account_id}: {e}")
+            raise
     
     def change_master_password(self, current_password: str, new_password: str):
         if not self.authenticate(current_password):
@@ -772,34 +827,35 @@ class DatabaseManager:
         new_encryption_key = self.crypto.generate_key_from_password(new_password, new_salt)
         new_integrity_key = self.crypto.generate_key_from_password(new_password + "_integrity", new_salt)
         logger.info("Generated new encryption keys")
-        sensitive_conn = sqlite3.connect(self.sensitive_db)
-        cursor = sensitive_conn.execute("SELECT account_id, encrypted_username, encrypted_password FROM credentials")
-        credentials = cursor.fetchall()
-        logger.info(f"Found {len(credentials)} accounts to re-encrypt")
-        for account_id, enc_username, enc_password in credentials:
+
+        sensitive_conn = self._get_sensitive_connection()
+        cursor = sensitive_conn.execute("SELECT account_id, encrypted_data FROM credentials")
+        all_credentials = cursor.fetchall()
+        logger.info(f"Found {len(all_credentials)} accounts to re-encrypt")
+
+        for account_id, encrypted_data in all_credentials:
             try:
-                username = self.crypto.decrypt_data(enc_username, self.encryption_key)
-                new_enc_username = self.crypto.encrypt_data(username, new_encryption_key)
+                decrypted_json = self.crypto.decrypt_data(encrypted_data, self.encryption_key)
+                account_data = json.loads(decrypted_json)
 
+                # If it's the master account, update its password field to the new master password
                 if account_id == 'master_account':
-                    # For the master account, encrypt the new password
-                    new_enc_password = self.crypto.encrypt_data(new_password, new_encryption_key)
-                else:
-                    # For all other accounts, re-encrypt their existing password
-                    password = self.crypto.decrypt_data(enc_password, self.encryption_key)
-                    new_enc_password = self.crypto.encrypt_data(password, new_encryption_key)
-
-                sensitive_conn.execute("""
-                    UPDATE credentials 
-                    SET encrypted_username=?, encrypted_password=?
-                    WHERE account_id=?
-                """, (new_enc_username, new_enc_password, account_id))
+                    account_data['password'] = new_password
                 
+                # Re-encrypt with the new key
+                new_encrypted_blob = self.crypto.encrypt_data(json.dumps(account_data), new_encryption_key)
+                
+                sensitive_conn.execute(
+                    "UPDATE credentials SET encrypted_data = ? WHERE account_id = ?",
+                    (new_encrypted_blob, account_id)
+                )
                 logger.info(f"Re-encrypted credentials for account {account_id}")
             except Exception as e:
                 logger.error(f"Failed to re-encrypt account {account_id}: {e}")
+                sensitive_conn.rollback()
                 sensitive_conn.close()
                 raise ValueError(f"Failed to re-encrypt account {account_id}: {e}")
+        
         sensitive_conn.commit()
         sensitive_conn.close()
         logger.info("All credentials re-encrypted successfully")
@@ -845,7 +901,7 @@ class DatabaseManager:
 
     def log_action(self, action: str, entity_type: str, entity_id: str, details: str):
         logger.info(f"DB Action: {action}, Type: {entity_type}, ID: {entity_id}, Details: {details}")
-        metadata_conn = sqlite3.connect(self.metadata_db)
+        metadata_conn = self._get_metadata_connection()
         metadata_conn.execute("""
             INSERT INTO audit_log (timestamp, action, entity_type, entity_id, details)
             VALUES (?, ?, ?, ?, ?)
@@ -854,7 +910,7 @@ class DatabaseManager:
         metadata_conn.close()
 
     def save_security_questions(self, questions: List[Tuple[str, str]]):
-        metadata_conn = sqlite3.connect(self.metadata_db)
+        metadata_conn = self._get_metadata_connection()
         try:
             for question, answer_hash in questions:
                 metadata_conn.execute("""
@@ -871,7 +927,7 @@ class DatabaseManager:
             metadata_conn.close()
 
     def get_security_questions(self) -> List[Tuple[str, str]]:
-        metadata_conn = sqlite3.connect(self.metadata_db)
+        metadata_conn = self._get_metadata_connection()
         try:
             cursor = metadata_conn.execute("SELECT question, answer_hash FROM security_questions")
             questions = cursor.fetchall()
@@ -883,64 +939,81 @@ class DatabaseManager:
             metadata_conn.close()
 
     def get_metadata_connection(self):
-        return sqlite3.connect(self.metadata_db)
+        return self._get_metadata_connection()
 
     def get_account_by_id(self, account_id: str) -> Optional[dict]:
-        """Fetches a single account's complete data from the metadata table by its ID."""
+        """Fetches and decrypts a single account's complete data by its ID."""
         try:
-            conn = sqlite3.connect(self.metadata_db)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
+            # Get metadata
+            metadata_conn = self._get_metadata_connection()
+            metadata_conn.row_factory = EncryptedRow
+            cursor = metadata_conn.execute("SELECT id, created_at, updated_at FROM accounts WHERE id = ?", (account_id,))
+            meta_row = cursor.fetchone()
+            metadata_conn.close()
+
+            if not meta_row:
+                return None
+
+            # Get and decrypt sensitive data
+            sensitive_conn = self._get_sensitive_connection()
+            cursor = sensitive_conn.execute("SELECT encrypted_data FROM credentials WHERE account_id = ?", (account_id,))
+            sensitive_row = cursor.fetchone()
+            sensitive_conn.close()
             
-            cursor.execute("SELECT * FROM accounts WHERE id = ?", (account_id,))
-            row = cursor.fetchone()
+            if sensitive_row:
+                decrypted_json = self.crypto.decrypt_data(sensitive_row[0], self.encryption_key)
+                sensitive_data = json.loads(decrypted_json)
+                
+                # Combine metadata and sensitive data
+                full_account = dict(meta_row)
+                full_account.update(sensitive_data)
+                return full_account
             
-            if row:
-                # Convert row to a dictionary
-                return dict(row)
-            return None
+            return None # Should not happen if data is consistent
             
-        except sqlite3.Error as e:
+        except Exception as e:
             logger.error(f"Database error while fetching account by ID '{account_id}': {e}")
             return None
-        finally:
-            if conn:
-                conn.close()
 
     def migrate_schema(self):
-        """Check for and add missing columns to the accounts table."""
+        """
+        Handles database schema migrations.
+        For this version, since we are starting fresh, this function will simply
+        ensure the new table structure is present. In the future, this would
+        contain logic to migrate data from an old schema to a new one.
+        """
         try:
-            conn = sqlite3.connect(self.metadata_db)
-            cursor = conn.cursor()
+            # This is a good place to put logic for migrating existing users' data
+            # from the old schema (many columns in 'accounts') to the new schema
+            # (encrypted blob in 'credentials').
+            # Since the user confirmed no existing users, we'll just log this.
+            logger.info("Schema migration check: No data migration needed for new schema.")
             
-            # Get existing table info
-            cursor.execute("PRAGMA table_info(accounts)")
-            columns = [info[1] for info in cursor.fetchall()]
-            
-            # Define new columns and their types
-            new_columns = {
-                "recovery_email": "TEXT",
-                "phone_number": "TEXT",
-                "account_type": "TEXT",
-                "category": "TEXT",
-                "two_factor_enabled": "INTEGER",
-                "last_password_change": "TEXT"
-            }
-            
-            # Add missing columns
-            for col_name, col_type in new_columns.items():
-                if col_name not in columns:
-                    logger.info(f"Adding missing column '{col_name}' to 'accounts' table.")
-                    cursor.execute(f"ALTER TABLE accounts ADD COLUMN {col_name} {col_type}")
-            
-            conn.commit()
-            logger.info("Schema migration check completed successfully.")
-            
-        except sqlite3.Error as e:
-            logger.error(f"Database error during schema migration: {e}")
-        finally:
-            if conn:
-                conn.close()
+            # We can still check if the tables are correctly formed, just in case.
+            metadata_conn = self._get_metadata_connection()
+            metadata_conn.execute("""
+                CREATE TABLE IF NOT EXISTS accounts (
+                    id TEXT PRIMARY KEY,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            metadata_conn.commit()
+            metadata_conn.close()
+
+            sensitive_conn = self._get_sensitive_connection()
+            sensitive_conn.execute("""
+                CREATE TABLE IF NOT EXISTS credentials (
+                    account_id TEXT PRIMARY KEY,
+                    encrypted_data BLOB NOT NULL
+                )
+            """)
+            sensitive_conn.commit()
+            sensitive_conn.close()
+            logger.info("Schema verification check completed successfully.")
+        except Exception as e:
+            logger.error(f"Database error during schema migration/verification: {e}")
+            raise
 
 
 class SecurityQuestionsDialog(ThemedToplevel):
@@ -1745,6 +1818,22 @@ class ModernPasswordManagerGUI:
             return
         
         self.update_login_button_states()
+
+        # Informational security warning shown when user starts first-time setup.
+        # This warns about malware risks (which can bypass/enumerate local secrets)
+        # and reminds the user to choose a long, strong, unguessable master password.
+        try:
+            security_msg = (
+                "Important security notice:\n\n"
+                "Before running this program, ensure your Windows system is free of viruses or malware. "
+                "Malicious software can directly compromise your system and your vault despite the use "
+                "of advanced encryption mechanisms.\n\n"
+                "Please create a long, strong, and unguessable master password to protect your vault."
+            )
+            messagebox.showwarning("Security Notice", security_msg)
+        except Exception:
+            # If the GUI warning fails for any reason, proceed silently.
+            logger.exception("Failed to display security notice dialog")
         self.setup_window = ThemedToplevel(self.root)
         self.setup_window.title(self.lang_manager.get_string("setup_wizard_title"))
         
@@ -4344,73 +4433,53 @@ class ModernPasswordManagerGUI:
         if not self.database:
             return
 
-        # Show loading message
-        loading_label = ctk.CTkLabel(self.passwords_container, text="(For your safety) We are currently reviewing the security of your accounts, please wait....",
-                                     font=ctk.CTkFont(size=18, weight="bold"))
-        loading_label.pack(pady=50)
+        loading_label = ctk.CTkLabel(self.passwords_container, text="Loading accounts...",
+                                     font=ctk.CTkFont(size=14))
+        loading_label.pack(pady=20)
         self.passwords_container.update_idletasks()
 
         def _load_in_background():
             try:
-                metadata_conn = sqlite3.connect(self.database.metadata_db)
+                all_accounts = self.database.get_all_decrypted_accounts()
                 
-                # Disable search bar if a filter is active
-                is_filter_active = filter_option and filter_option != self.lang_manager.get_string("filter_show_all")
-                self.search_entry.configure(state="disabled" if is_filter_active else "normal")
+                # Filter and search in memory
+                filtered_accounts = all_accounts
                 
-                if query and not is_filter_active:
-                    sql = """
-                        SELECT id, name, email, url, notes, created_at, updated_at, tags, security_level
-                        FROM accounts 
-                        WHERE id != 'master_account' AND (name LIKE ? OR email LIKE ? OR url LIKE ?)
-                        ORDER BY updated_at DESC
-                    """
-                    params = (f"%{query}%", f"%{query}%", f"%{query}%")
-                    cursor = metadata_conn.execute(sql, params)
-                else:
-                    sql = """
-                        SELECT id, name, email, url, notes, created_at, updated_at, tags, security_level
-                        FROM accounts 
-                        WHERE id != 'master_account'
-                        ORDER BY updated_at DESC
-                    """
-                    cursor = metadata_conn.execute(sql)
-
-                accounts = cursor.fetchall()
-                metadata_conn.close()
+                # Apply search query
+                if query:
+                    q = query.lower()
+                    filtered_accounts = [
+                        acc for acc in filtered_accounts 
+                        if q in acc.get('name', '').lower() 
+                        or q in acc.get('email', '').lower() 
+                        or q in acc.get('url', '').lower()
+                    ]
                 
-                if is_filter_active:
+                # Apply filter option
+                if filter_option and filter_option != self.lang_manager.get_string("filter_show_all"):
                     if filter_option == self.lang_manager.get_string("filter_expired_passwords"):
-                        expired_account_ids = self.password_reminder.get_reminded_accounts()
-                        accounts = [acc for acc in accounts if acc[0] in expired_account_ids]
+                        expired_ids = self.password_reminder.get_reminded_accounts()
+                        filtered_accounts = [acc for acc in filtered_accounts if acc['id'] in expired_ids]
                     elif filter_option == self.lang_manager.get_string("filter_weak_passwords"):
-                        weak_accounts = []
-                        for acc in accounts:
-                            _, password = self.database.get_account_credentials(acc[0])
-                            if password and self.is_password_weak(password):
-                                weak_accounts.append(acc)
-                        accounts = weak_accounts
-                
+                        filtered_accounts = [acc for acc in filtered_accounts if self.is_password_weak(acc.get('password', ''))]
+
                 def _update_ui():
                     loading_label.destroy()
-                    if not accounts:
-                        if query:
-                            self.show_no_accounts_message(self.lang_manager.get_string("no_accounts_found_search"))
-                        else:
-                            self.show_no_accounts_message()
-                        return
-                    for account_row in accounts:
-                        self.create_account_card(account_row)
-                
+                    if not filtered_accounts:
+                        msg = self.lang_manager.get_string("no_accounts_found_search") if query else self.lang_manager.get_string("no_accounts_found")
+                        self.show_no_accounts_message(msg)
+                    else:
+                        for account in sorted(filtered_accounts, key=lambda x: x.get('updated_at'), reverse=True):
+                            self.create_account_card(account)
+
                 self.root.after(0, _update_ui)
 
             except Exception as e:
                 def _show_error():
                     loading_label.destroy()
-                    self.show_error_message(f"Error loading accounts: {str(e)}")
+                    self.show_error_message(f"Error loading accounts: {e}")
                 self.root.after(0, _show_error)
-        
-        # Run in a separate thread
+
         threading.Thread(target=_load_in_background, daemon=True).start()
 
     def search_accounts(self, event=None):
@@ -4440,33 +4509,21 @@ class ModernPasswordManagerGUI:
                      font=ctk.CTkFont(size=14), 
                      text_color="#FF4444").pack(pady=20)
 
-    def create_account_card(self, account_row):
-        account_id, name, email, url, notes, created_at, updated_at, tags, security_level = account_row
-        username, password = self.database.get_account_credentials(account_id)
+    def create_account_card(self, account: dict):
+        password = account.get('password', '')
+        score, strength, _ = self.password_generator.assess_strength(password)
         
-        if password:
-            score, strength, _ = self.password_generator.assess_strength(password)
-        else:
-            score, strength = 0, self.lang_manager.get_string("unknown_strength")
-        
-        account_data = {
-            "id": account_id,
-            "name": name,
-            "username": username or email or self.lang_manager.get_string("no_username"),
-            "email": email or "",
-            "url": url or self.lang_manager.get_string("no_url"),
-            "notes": notes or "",
-            "strength": strength,
-            "score": score
-        }
-        
+        account_id = account.get('id')
+        name = account.get('name', 'N/A')
+        username = account.get('username', '')
+        email = account.get('email', '')
+        url = account.get('url', '')
+
         reminded_accounts = set()
         if self.password_reminder:
             reminded_accounts = self.password_reminder.get_reminded_accounts()
 
-        card_fg_color = None
-        if account_id in reminded_accounts:
-            card_fg_color = "#470500"
+        card_fg_color = "#470500" if account_id in reminded_accounts else None
 
         card = ctk.CTkFrame(self.passwords_container, corner_radius=10, fg_color=card_fg_color)
         card.pack(fill="x", padx=10, pady=8)
@@ -4708,11 +4765,13 @@ class ModernPasswordManagerGUI:
         ctk.CTkLabel(left_frame, text=name, 
                      font=ctk.CTkFont(size=20, weight="bold")).pack(anchor="w", pady=(0, 8))
         
-        ctk.CTkLabel(left_frame, text=f"👤 {account_data['username']}", 
+        display_username = username or email or self.lang_manager.get_string("no_username")
+        ctk.CTkLabel(left_frame, text=f"👤 {display_username}", 
                      text_color="#888888", font=ctk.CTkFont(size=14)).pack(anchor="w", pady=2)
-        if url and url != self.lang_manager.get_string("no_url"):
+        if url:
             ctk.CTkLabel(left_frame, text=f"🌐 {url}", 
                          text_color="#888888", font=ctk.CTkFont(size=14)).pack(anchor="w", pady=2)
+
         right_frame = ctk.CTkFrame(content, fg_color="transparent")
         right_frame.pack(side="right")
         strength_color = self.get_strength_color(strength)
@@ -4722,7 +4781,7 @@ class ModernPasswordManagerGUI:
         ctk.CTkLabel(right_frame, text=strength_text, 
                      text_color=strength_color, font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(0, 10))
         
-        self.create_action_buttons(right_frame, account_data)
+        self.create_action_buttons(right_frame, account)
 
     def get_strength_color(self, strength):
         colors = {
@@ -4765,25 +4824,24 @@ class ModernPasswordManagerGUI:
                           command=command, font=ctk.CTkFont(size=16),
                           fg_color=color).pack(side="left", padx=5)
 
-    def delete_account(self, account):
-        # Re-authentication for sensitive action
+    def delete_account(self, account: dict):
         if not self.verify_master_password_dialog():
             return
 
-        # Confirmation dialog
-        result = self.show_message("delete_confirm_title", "delete_confirm_message", ask="yesno", account_name=account['name'])
+        account_name = account.get('name', 'this account')
+        result = self.show_message("delete_confirm_title", "delete_confirm_message", ask="yesno", account_name=account_name)
         if result:
             try:
                 self.database.delete_account(account['id'])
                 if self.password_reminder:
                     self.password_reminder.mark_as_changed(account['id'])
                 self.update_expired_passwords_count()
-                self.show_message("delete_success_title", "delete_success_message", account_name=account['name'])
+                self.show_message("delete_success_title", "delete_success_message", account_name=account_name)
                 self.load_password_cards()
             except Exception as e:
                 self.show_message("error", "delete_failed_message", msg_type="error", error=str(e))
 
-    def view_account_details(self, account_id):
+    def view_account_details(self, account_id: str):
         if not self.verify_master_password_dialog():
             return
         
@@ -4791,74 +4849,38 @@ class ModernPasswordManagerGUI:
         if not account:
             self.show_message("error", "account_not_found", msg_type="error")
             return
-
-        username, password = self.database.get_account_credentials(account_id)
         
         dialog = ThemedToplevel(self.root)
-        dialog.title(self.lang_manager.get_string("account_details_title", account_name=account['name']))
+        dialog.title(self.lang_manager.get_string("account_details_title", account_name=account.get('name', '')))
         dialog.geometry("600x800")
-        dialog.resizable(True, True)
         dialog.grab_set()
 
         main_frame = ctk.CTkScrollableFrame(dialog)
         main_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        header_frame.pack(fill="x", padx=10, pady=10)
-        
-        ctk.CTkLabel(header_frame, text=account['name'], font=ctk.CTkFont(size=24, weight="bold")).pack(anchor="w")
-        ctk.CTkLabel(header_frame, text=f"Type: {account.get('account_type', 'N/A')}", font=ctk.CTkFont(size=14, weight="bold"), text_color="gray").pack(anchor="w")
+        ctk.CTkLabel(main_frame, text=account.get('name', ''), font=ctk.CTkFont(size=24, weight="bold")).pack(pady=10)
 
-        # --- Credentials Section ---
-        self._create_form_section(main_frame, "🔑 Credentials", "Login Information")
-        self.create_detail_field(main_frame, "Username", username or "Not set")
-        self.create_detail_field(main_frame, "Password", password or "Not set", is_password=True)
-        self.create_detail_field(main_frame, "Website URL", account.get('url') or "Not set")
-        
-        # --- Security Section ---
-        self._create_form_section(main_frame, "🛡️ Security", "Security Status")
-        score, strength, _ = self.password_generator.assess_strength(password or "")
-        strength_color = self.get_strength_color(strength)
-        ctk.CTkLabel(main_frame, text=f"Password Strength: {strength} ({score}%)", font=ctk.CTkFont(size=14, weight="bold"), text_color=strength_color).pack(anchor="w", padx=25, pady=5)
-        
-        two_factor_status = "Enabled" if account.get('two_factor_enabled') else "Disabled"
-        two_factor_color = "green" if account.get('two_factor_enabled') else "red"
-        ctk.CTkLabel(main_frame, text=f"2FA Status: {two_factor_status}", font=ctk.CTkFont(size=14), text_color=two_factor_color).pack(anchor="w", padx=25, pady=5)
-        ctk.CTkLabel(main_frame, text=f"Security Category: {account.get('category', 'N/A')}", font=ctk.CTkFont(size=14)).pack(anchor="w", padx=25, pady=5)
-        
-        # --- Recovery Information ---
-        self._create_form_section(main_frame, "📧 Recovery Information", "Contact Details")
-        self.create_detail_field(main_frame, "Recovery Email", account.get('recovery_email') or "Not set")
-        self.create_detail_field(main_frame, "Phone Number", account.get('phone_number') or "Not set")
-        
-        # --- Metadata Section ---
-        self._create_form_section(main_frame, "ℹ️ Metadata", "Account History")
-        
-        def format_timestamp(ts):
-            try:
-                return datetime.fromisoformat(ts).strftime("%Y-%m-%d %H:%M:%S")
-            except (ValueError, TypeError):
-                return "N/A"
+        details = {
+            "Username": account.get('username', 'N/A'),
+            "Password": account.get('password', 'N/A'),
+            "Email": account.get('email', 'N/A'),
+            "Recovery Email": account.get('recovery_email', 'N/A'),
+            "Phone Number": account.get('phone_number', 'N/A'),
+            "2FA Enabled": "Yes" if account.get('two_factor_enabled') else "No",
+            "Website URL": account.get('url', 'N/A'),
+            "Category": account.get('category', 'N/A'),
+            "Notes": account.get('notes', 'N/A'),
+            "Date Created": account.get('created_at'),
+            "Last Modified": account.get('updated_at')
+        }
 
-        self.create_detail_field(main_frame, "Date Created", format_timestamp(account.get('created_at')))
-        self.create_detail_field(main_frame, "Last Modified", format_timestamp(account.get('updated_at')))
-        self.create_detail_field(main_frame, "Last Password Change", format_timestamp(account.get('last_password_change')))
+        for label, value in details.items():
+            is_password = label == "Password"
+            self.create_detail_field(main_frame, label, value, is_password=is_password)
 
-        # --- Notes Section ---
-        if account.get('notes'):
-            self._create_form_section(main_frame, "📝 Notes", "Additional Information")
-            notes_text = ctk.CTkTextbox(main_frame, height=100)
-            notes_text.pack(fill="x", padx=25, pady=10)
-            notes_text.insert("1.0", account.get('notes', ''))
-            notes_text.configure(state="disabled")
-
-        button_frame = ctk.CTkFrame(dialog, fg_color=("gray90", "gray15"), height=60)
-        button_frame.pack(fill="x", side="bottom", padx=0, pady=0)
-        button_frame.pack_propagate(False)
-
-        close_btn = ctk.CTkButton(button_frame, text="Close", command=dialog.destroy, width=100, height=40)
-        close_btn.pack(side="right", padx=20, pady=10)
-
+        close_btn = ctk.CTkButton(main_frame, text="Close", command=dialog.destroy, width=100)
+        close_btn.pack(pady=20)
+        
     def create_detail_field(self, parent, label, value, is_password=False):
         detail_frame = ctk.CTkFrame(parent)
         detail_frame.pack(fill="x", padx=15, pady=5)
@@ -4893,245 +4915,90 @@ class ModernPasswordManagerGUI:
             entry.insert(0, value)
             entry.configure(state="readonly")
 
-    def copy_password_to_clipboard(self, account):
+    def copy_password_to_clipboard(self, account: dict):
         if not self.verify_master_password_dialog():
             return
-        try:
-            username, password = self.database.get_account_credentials(account["id"])
-            if password:
-                self.root.clipboard_clear()
-                self.root.clipboard_append(password)
-                self.show_message("copied_title", "copy_success_message", account_name=account['name'])
-                self.root.after(30000, lambda: self.root.clipboard_clear())
-            else:
-                self.show_message("error", "password_not_found", msg_type="error")
-        except Exception as e:
-            self.show_message("error", "copy_failed_message", msg_type="error", error=str(e))
+        
+        password = account.get('password')
+        if password:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(password)
+            self.show_message("copied_title", "copy_success_message", account_name=account.get('name', ''))
+            self.root.after(30000, self.root.clipboard_clear)
+        else:
+            self.show_message("error", "password_not_found", msg_type="error")
 
-    def open_website(self, account):
-        if self.verify_master_password_dialog():
-            try:
-                url = account.get('url')
-                if url and url != self.lang_manager.get_string("no_url"):
-                    if not url.startswith(('http://', 'https://')):
-                        url = f"https://{url}"
-                    logger.info(f"Opening website for account {account['name']}: {url}")
-                    webbrowser.open_new_tab(url)
-                else:
-                    self.show_message("error", "no_url_for_account", msg_type="error")
-            except Exception as e:
-                logger.error(f"Failed to open website for account {account['name']}: {e}")
-                self.show_message("error", "website_open_failed", msg_type="error", error=str(e))
+    def open_website(self, account: dict):
+        url = account.get('url')
+        if url:
+            if not url.startswith(('http://', 'https://')):
+                url = f"https://{url}"
+            webbrowser.open_new_tab(url)
+        else:
+            self.show_message("error", "no_url_for_account", msg_type="error")
 
 
-    def show_account_dialog(self, account=None):
-        """Enhanced account dialog with comprehensive form fields"""
+    def show_account_dialog(self, account: Optional[dict] = None):
         is_edit = account is not None
         title = self.lang_manager.get_string("edit_account_title", account_name=account['name']) if is_edit else self.lang_manager.get_string("add_account_title")
         
         dialog = ThemedToplevel(self.root)
         dialog.title(title)
         dialog.geometry("900x950")
-        dialog.resizable(True, True)
         dialog.grab_set()
         
-        # Create main frame with scrollbar
-        main_frame = ctk.CTkFrame(dialog)
-        main_frame.pack(fill="both", expand=True, padx=0, pady=0)
+        main_frame = ctk.CTkScrollableFrame(dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # Header with icon
-        header_frame = ctk.CTkFrame(main_frame, fg_color=("gray90", "gray15"), height=60)
-        header_frame.pack(fill="x", padx=0, pady=0)
-        header_frame.pack_propagate(False)
+        ctk.CTkLabel(main_frame, text=title, font=ctk.CTkFont(size=22, weight="bold")).pack(pady=20)
         
-        icon_title = self.lang_manager.get_string("edit_account_icon_title") if is_edit else self.lang_manager.get_string("add_account_icon_title")
-        ctk.CTkLabel(
-            header_frame,
-            text=icon_title,
-            font=ctk.CTkFont(size=22, weight="bold")
-        ).pack(anchor="w", padx=20, pady=15)
+        entries = self._create_enhanced_account_form(main_frame, account)
         
-        # Content area with scrollbar
-        content_container = ctk.CTkFrame(main_frame)
-        content_container.pack(fill="both", expand=True, padx=0, pady=0)
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(pady=20)
         
-        scrollbar = ctk.CTkScrollbar(content_container)
-        scrollbar.pack(side="right", fill="y")
-        
-        scrollable_frame = ctk.CTkScrollableFrame(
-            content_container,
-            scrollbar_button_color=("gray70", "gray30"),
-            scrollbar_button_hover_color=("gray60", "gray40")
-        )
-        scrollable_frame.pack(side="left", fill="both", expand=True, padx=0, pady=0)
-        
-        # Bind mousewheel scrolling
-        def _on_mousewheel(event):
-            if scrollable_frame.winfo_exists():
-                scrollable_frame._parent_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        scrollable_frame.bind_all("<MouseWheel>", _on_mousewheel)
-        
-        # Create form sections
-        entries = self._create_enhanced_account_form(scrollable_frame, account)
-        
-        # Button frame (fixed at bottom)
-        button_frame = ctk.CTkFrame(main_frame, fg_color=("gray90", "gray15"), height=60)
-        button_frame.pack(fill="x", padx=0, pady=0, side="bottom")
-        button_frame.pack_propagate(False)
-        
-        # Buttons
-        button_inner_frame = ctk.CTkFrame(button_frame, fg_color="transparent")
-        button_inner_frame.pack(fill="both", expand=True, padx=20, pady=10)
-        
-        ctk.CTkButton(
-            button_inner_frame,
-            text=self.lang_manager.get_string("cancel_button"),
-            command=dialog.destroy,
-            width=120,
-            height=40,
-            fg_color=("gray70", "gray30"),
-            hover_color=("gray60", "gray40")
-        ).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), 
+                    command=dialog.destroy, width=120, height=45).pack(side="left", padx=15)
         
         save_text = self.lang_manager.get_string("update_account_button") if is_edit else self.lang_manager.get_string("add_account_button")
-        ctk.CTkButton(
-            button_inner_frame,
-            text=save_text,
-            command=lambda: self.save_enhanced_account(dialog, entries, account),
-            width=150,
-            height=40,
-            font=ctk.CTkFont(size=16, weight="bold"),
-            fg_color=("#3B82F6", "#1E40AF"),
-            hover_color=("#2563EB", "#1D4ED8")
-        ).pack(side="right", padx=5)
+        ctk.CTkButton(button_frame, text=save_text, 
+                    command=lambda: self.save_enhanced_account(dialog, entries, account),
+                    width=150, height=45, font=ctk.CTkFont(size=16, weight="bold")).pack(side="right", padx=15)
 
 
-    def _create_enhanced_account_form(self, parent, account=None):
+    def _create_enhanced_account_form(self, parent, account: Optional[dict] = None):
         """Create enhanced form with multiple sections"""
         entries = {}
         
-        if account:
-            username, password = self.database.get_account_credentials(account["id"])
-        else:
-            username = password = ""
-        
         # ===== BASIC INFORMATION SECTION =====
-        self._create_form_section(
-            parent,
-            "🔐 Basic Information",
-            "Enter the essential account details"
-        )
+        self._create_form_section(parent, "🔐 Basic Information", "Enter the essential account details")
         
-        entries["name"] = self._create_form_field(
-            parent,
-            "Account Name",
-            "e.g., Gmail Personal, GitHub Work, PayPal",
-            account['name'] if account else "",
-            required=True
-        )
-        
-        # Account type selector
-        entries["account_type"] = self._create_form_field(
-            parent,
-            "Account Type",
-            "Select the type of account for better organization",
-            account.get('account_type', 'Email') if account else 'Email',
-            field_type="dropdown",
-            options=["Email", "Social Media", "Banking", "Shopping", "Work", "Gaming", "Cloud Storage", "Development", "Other"]
-        )
+        entries["name"] = self._create_form_field(parent, "Account Name", "e.g., Gmail Personal, GitHub Work", account.get('name', '') if account else "", required=True)
+        entries["account_type"] = self._create_form_field(parent, "Account Type", "Select the type of account", account.get('account_type', 'Email') if account else 'Email', field_type="dropdown", options=["Email", "Social Media", "Banking", "Shopping", "Work", "Gaming", "Other"])
         
         # ===== CREDENTIALS SECTION =====
-        self._create_form_section(
-            parent,
-            "🔑 Credentials",
-            "Your login information (encrypted and secured)"
-        )
+        self._create_form_section(parent, "🔑 Credentials", "Your login information")
         
-        entries["username"] = self._create_form_field(
-            parent,
-            "Username / Email",
-            "The email or username used to log in",
-            username,
-            required=True
-        )
+        entries["username"] = self._create_form_field(parent, "Username / Email", "The email or username used to log in", account.get('username', '') if account else "", required=True)
+        entries["password"] = self._create_password_field_enhanced(parent, account.get('password', '') if account else "")
         
-        entries["password"] = self._create_password_field_enhanced(parent, password)
+        # ===== SECURITY & RECOVERY SECTION =====
+        self._create_form_section(parent, "🛡️ Security & Recovery", "Helpful for account recovery and security")
         
-        # ===== CONTACT INFORMATION SECTION =====
-        self._create_form_section(
-            parent,
-            "📧 Contact Information",
-            "Alternative contact methods for account recovery"
-        )
+        entries["recovery_email"] = self._create_form_field(parent, "Recovery Email", "e.g., secondary@email.com", account.get('recovery_email', '') if account else "", field_type="email")
+        entries["phone_number"] = self._create_form_field(parent, "Phone Number", "e.g., +1 555-123-4567", account.get('phone_number', '') if account else "", field_type="tel")
+        entries["two_factor_enabled"] = self._create_form_field(parent, "2FA Status", "Is Two-Factor Authentication enabled?", account.get('two_factor_enabled', 0) if account else 0, field_type="checkbox")
+
+        # ===== WEBSITE & NOTES SECTION =====
+        self._create_form_section(parent, "🌐 Website & Notes", "Additional details")
         
-        entries["email"] = self._create_form_field(
-            parent,
-            "Recovery Email",
-            "Email address for account recovery (if different from username)",
-            account.get('recovery_email', '') if account else "",
-            field_type="email"
-        )
+        entries["url"] = self._create_form_field(parent, "Website URL", "e.g., https://www.gmail.com", account.get('url', '') if account else "", field_type="url")
+        entries["notes"] = self._create_textarea_field(parent, "Notes", "Any extra information", account.get('notes', '') if account else "")
         
-        entries["phone_number"] = self._create_form_field(
-            parent,
-            "Recovery Phone Number",
-            "Phone number for account recovery (optional)",
-            account.get('phone_number', '') if account else "",
-            field_type="tel"
-        )
+        # ===== ORGANIZATION SECTION =====
+        self._create_form_section(parent, "📂 Organization", "Categorize this account")
         
-        # ===== WEBSITE & ACCESS SECTION =====
-        self._create_form_section(
-            parent,
-            "🌐 Website & Access",
-            "Where to find this account online"
-        )
-        
-        entries["url"] = self._create_form_field(
-            parent,
-            "Website URL",
-            "e.g., https://www.gmail.com or https://github.com",
-            account.get('url', '') if account else "",
-            field_type="url"
-        )
-        
-        # ===== SECURITY SECTION =====
-        self._create_form_section(
-            parent,
-            "🛡️ Security Settings",
-            "Security features enabled on this account"
-        )
-        
-        entries["two_factor_enabled"] = self._create_form_field(
-            parent,
-            "Two-Factor Authentication",
-            "Is 2FA/MFA enabled on this account?",
-            account.get('two_factor_enabled', 0) if account else 0,
-            field_type="checkbox"
-        )
-        
-        entries["category"] = self._create_form_field(
-            parent,
-            "Security Category",
-            "How critical is this account?",
-            account.get('category', 'Medium') if account else 'Medium',
-            field_type="dropdown",
-            options=["Low Priority", "Medium Priority", "High Priority", "Critical"]
-        )
-        
-        # ===== ADDITIONAL NOTES SECTION =====
-        self._create_form_section(
-            parent,
-            "📝 Additional Notes",
-            "Any extra information or reminders about this account"
-        )
-        
-        entries["notes"] = self._create_textarea_field(
-            parent,
-            "Notes",
-            "Security questions, hints, or special instructions",
-            account.get('notes', '') if account else ""
-        )
+        entries["category"] = self._create_form_field(parent, "Category / Priority", "Set a priority level for this account", account.get('category', 'Medium Priority') if account else 'Medium Priority', field_type="dropdown", options=["Critical", "High Priority", "Medium Priority", "Low Priority"])
         
         return entries
 
@@ -5401,46 +5268,55 @@ class ModernPasswordManagerGUI:
             name = entries["name"].get().strip()
             username = entries["username"].get().strip()
             password = entries["password"].get()
-            
+
             if not name:
                 self.show_message("error", "account_name_required", msg_type="error")
                 return
             if not username:
                 self.show_message("error", "Please enter a username or email", msg_type="error")
                 return
-            if not password:
+            if not password or (account and password == "••••••••"):
                 self.show_message("error", "password_required", msg_type="error")
                 return
             
-            # Get field values
-            email = entries["email"].get().strip() if hasattr(entries["email"], "get") else ""
-            phone = entries["phone_number"].get().strip() if hasattr(entries["phone_number"], "get") else ""
-            url = entries["url"].get().strip() if hasattr(entries["url"], "get") else ""
-            notes = entries["notes"].get("1.0", tk.END).strip() if hasattr(entries["notes"], "get") else ""
-            
-            # Handle dropdown and checkbox values
-            account_type = entries["account_type"].get() if hasattr(entries["account_type"], "get") else "Other"
-            category = entries["category"].get() if hasattr(entries["category"], "get") else "Medium Priority"
-            two_factor = 1 if entries["two_factor_enabled"].get() else 0 if hasattr(entries["two_factor_enabled"], "get") else 0
-            
+            # Check for duplicate account name before proceeding
+            all_accounts = self.database.get_all_decrypted_accounts()
+            is_duplicate = any(
+                acc['name'].lower() == name.lower() and (not account or acc['id'] != account['id'])
+                for acc in all_accounts
+            )
+            if is_duplicate:
+                self.show_message("error", "duplicate_account_name_error", msg_type="error")
+                return
+
+            # Consolidate all data from the form into a dictionary
+            form_data = {
+                "name": name,
+                "username": username,
+                "password": password,
+                "account_type": entries["account_type"].get(),
+                "recovery_email": entries["recovery_email"].get().strip(),
+                "phone_number": entries["phone_number"].get().strip(),
+                "two_factor_enabled": entries["two_factor_enabled"].get(),
+                "url": entries["url"].get().strip(),
+                "notes": entries["notes"].get("1.0", tk.END).strip(),
+                "category": entries["category"].get(),
+            }
+
             if account:  # Edit existing
                 if not self.verify_master_password_dialog():
                     return
+
+                # Fetch the full existing account data to merge with changes
+                existing_account_data = self.database.get_account_by_id(account['id'])
+                if not existing_account_data:
+                    self.show_message("error", "account_not_found_on_save", msg_type="error")
+                    return
                 
-                # Update in database
-                self._update_account_with_fields(
-                    account["id"],
-                    name=name,
-                    email=email,
-                    phone=phone,
-                    url=url,
-                    notes=notes,
-                    username=username,
-                    password=password,
-                    account_type=account_type,
-                    category=category,
-                    two_factor_enabled=two_factor
-                )
+                # Merge form data into existing data
+                existing_account_data.update(form_data)
+                
+                self.database.update_account(account["id"], existing_account_data)
                 
                 if self.password_reminder:
                     self.password_reminder.mark_as_changed(account["id"])
@@ -5449,326 +5325,30 @@ class ModernPasswordManagerGUI:
                 self.show_message("success", "update_success_message", account_name=name)
             
             else:  # Create new
-                # Generate unique ID
-                max_attempts = 10
-                account_id = None
+                # Generate unique ID and create a full account object
+                account_id = secrets.token_urlsafe(16)
                 
-                for attempt in range(max_attempts):
-                    potential_id = secrets.token_urlsafe(16)
-                    try:
-                        metadata_conn = sqlite3.connect(self.database.metadata_db)
-                        cursor = metadata_conn.execute("SELECT id FROM accounts WHERE id = ?", (potential_id,))
-                        existing = cursor.fetchone()
-                        metadata_conn.close()
-                        if not existing:
-                            account_id = potential_id
-                            break
-                    except Exception as e:
-                        logger.error(f"Error checking account ID uniqueness: {e}")
-                        continue
-                
-                if not account_id:
-                    self.show_message("error", "id_generation_failed", msg_type="error")
-                    return
-                
-                # Create new account
-                try:
-                    metadata_conn = sqlite3.connect(self.database.metadata_db)
-                    cursor = metadata_conn.execute("SELECT name FROM accounts WHERE name = ? AND id != 'master_account'", (name,))
-                    existing_name = cursor.fetchone()
-                    metadata_conn.close()
-                    
-                    if existing_name:
-                        result = self.show_message("duplicate_name_title", "duplicate_name_message", ask="yesno", account_name=name)
-                        if not result:
-                            return
-                except Exception as e:
-                    logger.error(f"Error checking account name: {e}")
-                
-                # Insert with all enhanced fields
-                self._insert_account_with_fields(
-                    account_id=account_id,
+                new_account_obj = Account(
+                    id=account_id,
                     name=name,
-                    email=email,
-                    phone=phone,
-                    url=url,
-                    notes=notes,
                     username=username,
-                    password=password,
-                    account_type=account_type,
-                    category=category,
-                    two_factor_enabled=two_factor
+                    email=form_data['recovery_email'], # Using recovery as primary email for simplicity
+                    url=form_data['url'],
+                    notes=form_data['notes'],
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                    tags=[],
+                    security_level=SecurityLevel.MEDIUM
                 )
                 
+                # The add_account method now only handles the non-sensitive parts for the Account object
+                # The password and other sensitive fields are passed in the form_data
+                self.database.add_account(new_account_obj, username, password) # Pass all data
                 self.show_message("success", "add_success_message", account_name=name)
             
             dialog.destroy()
             self.load_password_cards()
         
-        except Exception as e:
-            self.show_message("error", "save_failed_message", msg_type="error", error=str(e))
-            logger.error(f"Full error details: {e}")
-            import traceback
-            traceback.print_exc()
-
-
-    def _insert_account_with_fields(self, account_id, name, email, phone, url, notes, username, password, account_type, category, two_factor_enabled):
-        """Insert new account with all enhanced fields"""
-        try:
-            metadata_conn = sqlite3.connect(self.database.metadata_db)
-            
-            metadata_conn.execute("""
-                INSERT INTO accounts 
-                (id, name, email, url, notes, created_at, updated_at, tags, security_level, 
-                recovery_email, phone_number, account_type, category, two_factor_enabled, last_password_change)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                account_id, name, email, url, notes,
-                datetime.now().isoformat(),
-                datetime.now().isoformat(),
-                json.dumps([]),
-                SecurityLevel.MEDIUM.value,
-                phone, phone, account_type, category, two_factor_enabled,
-                datetime.now().isoformat()
-            ))
-            metadata_conn.commit()
-            metadata_conn.close()
-            
-            # Add credentials
-            sensitive_conn = sqlite3.connect(self.database.sensitive_db)
-            encrypted_username = self.crypto.encrypt_data(username, self.database.encryption_key)
-            encrypted_password = self.crypto.encrypt_data(password, self.database.encryption_key)
-            
-            sensitive_conn.execute("""
-                INSERT INTO credentials (account_id, encrypted_username, encrypted_password)
-                VALUES (?, ?, ?)
-            """, (account_id, encrypted_username, encrypted_password))
-            sensitive_conn.commit()
-            sensitive_conn.close()
-            
-            # Sync to secure storage
-            if self.secure_file_manager:
-                self.database._checkpoint_databases()
-                self.secure_file_manager.rotate_integrity_signature()
-                self.secure_file_manager.sync_all_files()
-            
-            logger.info(f"Account '{name}' created successfully")
-        
-        except Exception as e:
-            logger.error(f"Error inserting account with fields: {e}")
-            raise
-
-
-    def _update_account_with_fields(self, account_id, name, email, phone, url, notes, username, password, account_type, category, two_factor_enabled):
-        """Update existing account with all enhanced fields"""
-        try:
-            metadata_conn = sqlite3.connect(self.database.metadata_db)
-            
-            metadata_conn.execute("""
-                UPDATE accounts SET
-                name=?, email=?, url=?, notes=?, updated_at=?,
-                recovery_email=?, phone_number=?, account_type=?, category=?, 
-                two_factor_enabled=?, last_password_change=?
-                WHERE id=?
-            """, (
-                name, email, url, notes, datetime.now().isoformat(),
-                phone, phone, account_type, category, two_factor_enabled,
-                datetime.now().isoformat(),
-                account_id
-            ))
-            metadata_conn.commit()
-            metadata_conn.close()
-            
-            # Update credentials
-            sensitive_conn = sqlite3.connect(self.database.sensitive_db)
-            encrypted_username = self.crypto.encrypt_data(username, self.database.encryption_key)
-            encrypted_password = self.crypto.encrypt_data(password, self.database.encryption_key)
-            
-            sensitive_conn.execute("""
-                UPDATE credentials SET
-                encrypted_username=?, encrypted_password=?
-                WHERE account_id=?
-            """, (encrypted_username, encrypted_password, account_id))
-            sensitive_conn.commit()
-            sensitive_conn.close()
-            
-            # Sync to secure storage
-            if self.secure_file_manager:
-                self.database._checkpoint_databases()
-                self.secure_file_manager.rotate_integrity_signature()
-                self.secure_file_manager.sync_all_files()
-            
-            logger.info(f"Account '{name}' updated successfully")
-        
-        except Exception as e:
-            logger.error(f"Error updating account with fields: {e}")
-            raise
-        
-    def create_account_form(self, parent, account=None):
-        entries = {}
-        if account:
-            username, password = self.database.get_account_credentials(account["id"])
-        else:
-            username = password = ""
-        
-        fields = [
-            ("name", self.lang_manager.get_string("account_name_label"), account['name'] if account else ""),
-            ("username", self.lang_manager.get_string("username_label"), username),
-            ("email", self.lang_manager.get_string("email_label"), account.get('email', '') if account else ""),
-            ("url", self.lang_manager.get_string("website_url_label"), account.get('url', '') if account else ""),
-            ("password", self.lang_manager.get_string("password_label"), password),
-            ("notes", self.lang_manager.get_string("notes_label"), account.get('notes', '') if account else "")
-        ]
-        
-        for field_name, label, default_value in fields:
-            ctk.CTkLabel(parent, text=label, 
-                        font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=25, pady=(10, 5))
-            
-            if field_name == "password":
-                entries[field_name] = self.create_password_field(parent, default_value)
-            elif field_name == "notes":
-                entry = ctk.CTkTextbox(parent, width=450, height=80)
-                entry.pack(padx=25, pady=(0, 15))
-                if default_value:
-                    entry.insert("1.0", default_value)
-                entries[field_name] = entry
-            else:
-                entry = ctk.CTkEntry(parent, width=450, height=40)
-                entry.pack(padx=25, pady=(0, 15))
-                if default_value:
-                    entry.insert(0, default_value)
-                entries[field_name] = entry
-        
-        return entries
-
-    def create_password_field(self, parent, default_value=""):
-        password_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        password_frame.pack(padx=25, pady=(0, 15))
-        password_entry = ctk.CTkEntry(password_frame, width=320, height=40, show="*")
-        password_entry.pack(side="left", padx=(0, 10))
-        if default_value:
-            password_entry.insert(0, default_value)
-        
-        def toggle_password():
-            if password_entry.cget("show") == "*":
-                password_entry.configure(show="")
-                eye_btn.configure(text="🙈")
-            else:
-                password_entry.configure(show="*")
-                eye_btn.configure(text="👁️")
-        eye_btn = ctk.CTkButton(password_frame, text="👁️", width=45, height=45, 
-                                command=toggle_password, font=ctk.CTkFont(size=20))
-        eye_btn.pack(side="left", padx=(0, 10))
-        
-        def generate_password():
-            new_password = self.password_generator.generate_password(length=16)
-            password_entry.delete(0, tk.END)
-            password_entry.insert(0, new_password)
-        gen_btn = ctk.CTkButton(password_frame, text="🎲", width=45, height=45, 
-                                command=generate_password, font=ctk.CTkFont(size=20),
-                                fg_color="#3B82F6", hover_color="#2563EB")
-        gen_btn.pack(side="left")
-        return password_entry
-
-    def create_account_dialog_buttons(self, parent, dialog, entries, account):
-        button_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        button_frame.pack(pady=20)
-        
-        ctk.CTkButton(button_frame, text=self.lang_manager.get_string("cancel_button"), 
-                    command=dialog.destroy, width=120, height=45).pack(side="left", padx=15)
-        
-        save_text = self.lang_manager.get_string("update_account_button") if account else self.lang_manager.get_string("add_account_button")
-        ctk.CTkButton(button_frame, text=save_text, 
-                    command=lambda: self.save_account(dialog, entries, account),
-                    width=150, height=45, font=ctk.CTkFont(size=16, weight="bold")).pack(side="right", padx=15)
-
-    def save_account(self, dialog, entries, account=None):
-        if account:  # This is an edit, requires re-authentication
-            if not self.verify_master_password_dialog():
-                return
-        try:
-            name = entries["name"].get().strip()
-            username = entries["username"].get().strip()
-            url = entries["url"].get().strip()
-            password = entries["password"].get()
-            notes = entries["notes"].get("1.0", tk.END).strip()
-            
-            if not name:
-                self.show_message("error", "account_name_required", msg_type="error")
-                return
-            if not password:
-                self.show_message("error", "password_required", msg_type="error")
-                return
-            email = entries["email"].get().strip()
-            if account:  # Update existing account
-                self.database.update_account(account["id"], name, email, url, notes, username, password)
-                if self.password_reminder:
-                    self.password_reminder.mark_as_changed(account["id"])
-                self.update_expired_passwords_count()
-                self.show_message("success", "update_success_message", account_name=name)
-            else:  # Create new account
-                max_attempts = 10
-                account_id = None
-                
-                for attempt in range(max_attempts):
-                    potential_id = secrets.token_urlsafe(16)
-                    try:
-                        metadata_conn = sqlite3.connect(self.database.metadata_db)
-                        cursor = metadata_conn.execute("SELECT id FROM accounts WHERE id = ?", (potential_id,))
-                        existing = cursor.fetchone()
-                        metadata_conn.close()
-                        if not existing:
-                            account_id = potential_id
-                            break
-                    except Exception as e:
-                        logger.error(f"Error checking account ID uniqueness: {e}")
-                        continue
-                if not account_id:
-                    self.show_message("error", "id_generation_failed", msg_type="error")
-                    return
-                try:
-                    metadata_conn = sqlite3.connect(self.database.metadata_db)
-                    cursor = metadata_conn.execute("SELECT name FROM accounts WHERE name = ? AND id != 'master_account'", (name,))
-                    existing_name = cursor.fetchone()
-                    metadata_conn.close()
-                    
-                    if existing_name:
-                        result = self.show_message("duplicate_name_title", "duplicate_name_message", ask="yesno", account_name=name)
-                        if not result:
-                            return
-                except Exception as e:
-                    logger.error(f"Error checking account name uniqueness: {e}")
-                
-                try:
-                    new_account = Account(
-                        id=account_id,
-                        name=name,
-                        username=username,
-                        email=email,
-                        url=url,
-                        notes=notes,
-                        created_at=datetime.now(),
-                        updated_at=datetime.now(),
-                        tags=[],
-                        security_level=SecurityLevel.MEDIUM
-                    )
-                    
-                    self.database.add_account(new_account, username, password)
-                    self.show_message("success", "add_success_message", account_name=name)
-                    
-                except sqlite3.IntegrityError as e:
-                    if "UNIQUE constraint failed" in str(e):
-                        self.show_message("error", "duplicate_account_error", msg_type="error", error=str(e))
-                    else:
-                        self.show_message("error", "database_error", msg_type="error", error=str(e))
-                    return
-                except Exception as e:
-                    self.show_message("error", "create_failed_message", msg_type="error", error=str(e))
-                    return
-            
-            dialog.destroy()
-            self.load_password_cards()
-            
         except Exception as e:
             self.show_message("error", "save_failed_message", msg_type="error", error=str(e))
             logger.error(f"Full error details: {e}")
@@ -6123,33 +5703,30 @@ class ModernPasswordManagerGUI:
         """Enhanced security report with modern UI, charts, and actionable insights"""
         for widget in self.main_panel.winfo_children():
             widget.destroy()
-        
+
         # Header with refresh button
         header = ctk.CTkFrame(self.main_panel)
         header.pack(fill="x", padx=15, pady=15)
-        
-        ctk.CTkLabel(header, text=self.lang_manager.get_string("security_report_title"), 
-                    font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
-        
+
+        ctk.CTkLabel(header, text=self.lang_manager.get_string("security_report_title"),
+                     font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
+
         def refresh_report():
             self.show_security_report()
-        
+
         ctk.CTkButton(header, text="🔄 Refresh", command=refresh_report,
-                    width=120, height=45, font=ctk.CTkFont(size=16)).pack(side="right", padx=25)
-        
+                      width=120, height=45, font=ctk.CTkFont(size=16)).pack(side="right", padx=25)
+
         # Main scrollable content
         content = ctk.CTkScrollableFrame(self.main_panel)
         content.pack(fill="both", expand=True, padx=15, pady=15)
-        
+
         try:
-            # Collect account data
-            metadata_conn = sqlite3.connect(self.database.metadata_db)
-            cursor = metadata_conn.execute("SELECT id, name, created_at, updated_at FROM accounts WHERE id != 'master_account'")
-            accounts = cursor.fetchall()
-            metadata_conn.close()
-            
+            # Collect all decrypted account data at once
+            all_accounts = self.database.get_all_decrypted_accounts()
+
             # Initialize counters and lists
-            total_accounts = len(accounts)
+            total_accounts = len(all_accounts)
             weak_passwords = []
             medium_passwords = []
             strong_passwords = []
@@ -6159,43 +5736,47 @@ class ModernPasswordManagerGUI:
             very_old_passwords = []  # Passwords not changed in 180+ days
             password_counts = {}
             password_ages = {}
-            
+
             # Analyze each account
             from datetime import datetime, timedelta
             now = datetime.now()
-            
-            for account_id, name, created_at, updated_at in accounts:
-                username, password = self.database.get_account_credentials(account_id)
-                
+
+            for account in all_accounts:
+                name = account.get('name', 'N/A')
+                password = account.get('password')
+                updated_at = account.get('updated_at')
+
                 if password:
                     # Check password strength
                     score, strength, recommendations = self.password_generator.assess_strength(password)
-                    
+
                     if score < 40:
-                        weak_passwords.append((name, strength, score, recommendations))
+                        # Store the whole account dict to have access to the ID later
+                        weak_passwords.append((account, strength, score, recommendations))
                     elif score < 70:
                         medium_passwords.append((name, strength, score))
                     else:
                         strong_passwords.append((name, strength, score))
-                    
+
                     # Check for duplicates
                     if password in password_counts:
                         password_counts[password].append(name)
                     else:
                         password_counts[password] = [name]
-                    
+
                     # Check password age
-                    try:
-                        updated = datetime.fromisoformat(updated_at)
-                        age_days = (now - updated).days
-                        password_ages[name] = age_days
-                        
-                        if age_days >= 180:
-                            very_old_passwords.append((name, age_days))
-                        elif age_days >= 90:
-                            old_passwords.append((name, age_days))
-                    except:
-                        pass
+                    if updated_at:
+                        try:
+                            updated = datetime.fromisoformat(updated_at)
+                            age_days = (now - updated).days
+                            password_ages[name] = age_days
+
+                            if age_days >= 180:
+                                very_old_passwords.append((name, age_days))
+                            elif age_days >= 90:
+                                old_passwords.append((name, age_days))
+                        except:
+                            pass
             
             # Identify duplicate and reused passwords
             for password, names in password_counts.items():
@@ -6314,7 +5895,10 @@ class ModernPasswordManagerGUI:
                             text_color="gray").pack(side="right")
                 
                 # List weak passwords
-                for name, strength, score, recommendations in weak_passwords:
+                for account_data, strength, score, recommendations in weak_passwords:
+                    name = account_data.get('name', 'N/A')
+                    account_id = account_data.get('id')
+                    
                     account_frame = ctk.CTkFrame(weak_frame, fg_color=("gray85", "gray20"), corner_radius=8)
                     account_frame.pack(fill="x", padx=15, pady=8)
                     
@@ -6341,33 +5925,20 @@ class ModernPasswordManagerGUI:
                                     wraplength=400).pack(anchor="w", pady=(5, 0))
                     
                     # Quick fix button
-                    def make_edit_wrapper(acc_name):
+                    def make_edit_wrapper(acc_id):
                         def edit_account_wrapper():
-                            # Find the account and open edit dialog
-                            metadata_conn = sqlite3.connect(self.database.metadata_db)
-                            cursor = metadata_conn.execute("SELECT id, name, email, url, notes FROM accounts WHERE name=?", (acc_name,))
-                            row = cursor.fetchone()
-                            metadata_conn.close()
-                            
-                            if row:
-                                account_id, name, email, url, notes = row
-                                username, password = self.database.get_account_credentials(account_id)
-                                account = {
-                                    'id': account_id,
-                                    'name': name,
-                                    'username': username,
-                                    'email': email,
-                                    'url': url,
-                                    'notes': notes
-                                }
-                                self.show_account_dialog(account)
+                            # Find the full account data from the already fetched list
+                            account_to_edit = next((acc for acc in all_accounts if acc['id'] == acc_id), None)
+                            if account_to_edit:
+                                self.show_account_dialog(account_to_edit)
                         return edit_account_wrapper
                     
-                    ctk.CTkButton(info_frame, text="🔧 Fix Now", 
-                                command=make_edit_wrapper(name),
-                                width=100, height=35,
-                                fg_color="#3B82F6",
-                                hover_color="#2563EB").pack(side="right")
+                    if account_id:
+                        ctk.CTkButton(info_frame, text="🔧 Fix Now", 
+                                    command=make_edit_wrapper(account_id),
+                                    width=100, height=35,
+                                    fg_color="#3B82F6",
+                                    hover_color="#2563EB").pack(side="right")
             
             # ============= REUSED PASSWORDS SECTION =============
             if reused_passwords:
@@ -6493,6 +6064,7 @@ class ModernPasswordManagerGUI:
             for i in range(3):
                 button_grid.columnconfigure(i, weight=1)
             
+            # The weak_passwords list now contains the full account dictionary
             ctk.CTkButton(button_grid, text="🔧 Fix All Weak Passwords",
                         command=lambda: self.fix_weak_passwords(weak_passwords),
                         height=45, font=ctk.CTkFont(size=14)).grid(row=0, column=0, padx=5, sticky="ew")
@@ -6539,35 +6111,19 @@ class ModernPasswordManagerGUI:
         accounts_frame = ctk.CTkScrollableFrame(main_frame, height=300)
         accounts_frame.pack(fill="both", expand=True, pady=(0, 15))
         
-        for name, strength, score, recommendations in weak_passwords_list:
+        for account_data, strength, score, recommendations in weak_passwords_list:
             account_item = ctk.CTkFrame(accounts_frame, fg_color=("gray85", "gray20"), corner_radius=8)
             account_item.pack(fill="x", pady=5, padx=5)
             
-            def make_edit_wrapper(acc_name):
+            def make_edit_wrapper(account_to_edit):
                 def edit_this_account():
                     dialog.destroy()
-                    # Find and edit the account
-                    metadata_conn = sqlite3.connect(self.database.metadata_db)
-                    cursor = metadata_conn.execute("SELECT id, name, email, url, notes FROM accounts WHERE name=?", (acc_name,))
-                    row = cursor.fetchone()
-                    metadata_conn.close()
-                    
-                    if row:
-                        account_id, name, email, url, notes = row
-                        username, password = self.database.get_account_credentials(account_id)
-                        account = {
-                            'id': account_id,
-                            'name': name,
-                            'username': username,
-                            'email': email,
-                            'url': url,
-                            'notes': notes
-                        }
-                        self.show_account_dialog(account)
+                    self.show_account_dialog(account_to_edit)
                 return edit_this_account
             
+            name = account_data.get('name', 'N/A')
             btn = ctk.CTkButton(account_item, text=f"📝 {name} ({strength} - {score}%)",
-                                command=make_edit_wrapper(name),
+                                command=make_edit_wrapper(account_data),
                                 height=40,
                                 anchor="w",
                                 fg_color="transparent",

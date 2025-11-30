@@ -29,7 +29,7 @@ class PasswordReminder:
             
             metadata_conn = self.db_manager.get_metadata_connection()
             cursor = metadata_conn.execute(
-                "SELECT id, name, updated_at FROM accounts WHERE updated_at <= ? AND id != 'master_account'",
+                "SELECT id, updated_at FROM accounts WHERE updated_at <= ? AND id != 'master_account'",
                 (five_minutes_ago.isoformat(),)
             )
             accounts_to_remind = cursor.fetchall()
@@ -37,14 +37,14 @@ class PasswordReminder:
 
             self.logger.info(f"Found {len(accounts_to_remind)} accounts older than 5 minutes")
 
-            for account_id, name, updated_at in accounts_to_remind:
+            for account_id, updated_at in accounts_to_remind:
                 if account_id not in self.reminded_accounts:
-                    self.logger.info(f"Adding reminder for account: {name} (ID: {account_id}, Last updated: {updated_at})")
+                    self.logger.info(f"Adding reminder for account ID: {account_id}, Last updated: {updated_at}")
                     self.reminded_accounts.add(account_id)
                     self.parent_window.root.after(0, self.parent_window.load_password_cards)
                     self.parent_window.root.after(0, self.parent_window.update_expired_passwords_count)
                 else:
-                    self.logger.debug(f"Account {name} (ID: {account_id}) already reminded")
+                    self.logger.debug(f"Account ID: {account_id} already reminded")
             
             self.logger.debug(f"Account check completed. Total reminded accounts: {len(self.reminded_accounts)}")
                     

@@ -1,5 +1,4 @@
 import os
-import sqlite3
 import json
 import shutil
 import tempfile
@@ -11,6 +10,7 @@ import time
 import logging
 from datetime import datetime
 from typing import Tuple, List, Callable, Dict, Optional
+from encrypted_db import get_encrypted_connection, create_encrypted_database
 
 # optional dependency for file system events
 try:
@@ -241,25 +241,24 @@ class SecureFileManager:
 
         This function will not overwrite existing DBs; it will only create them when missing.
         It then writes an initial integrity signature (HMAC or SHA256) and attempts permission hardening.
+        
+        **IMPORTANT: Databases are now encrypted with SQLCipher using the encryption_key.**
         """
         LOG.info("Initializing vault files...")
+        
+        if not self.encryption_key:
+            LOG.error("Cannot initialize vault files without encryption key")
+            raise ValueError("Encryption key must be set before initializing vault files")
+        
         try:
             if not os.path.exists(self.metadata_db):
-                LOG.info(f"Metadata database not found, creating at {self.metadata_db}")
-                conn = sqlite3.connect(self.metadata_db)
-                conn.execute("PRAGMA journal_mode=WAL;")
-                conn.execute("PRAGMA synchronous=NORMAL;")
+                LOG.info(f"Metadata database not found, creating encrypted database at {self.metadata_db}")
+                conn = create_encrypted_database(self.metadata_db, self.encryption_key)
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS accounts (
                         id TEXT PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        email TEXT,
-                        url TEXT,
-                        notes TEXT,
-                        created_at TEXT,
-                        updated_at TEXT,
-                        tags TEXT,
-                        security_level INTEGER
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
                     )
                 """)
                 conn.execute("""
@@ -274,21 +273,20 @@ class SecureFileManager:
                 """)
                 conn.commit()
                 conn.close()
+                LOG.info("Encrypted metadata database created successfully")
 
             if not os.path.exists(self.sensitive_db):
-                LOG.info(f"Sensitive database not found, creating at {self.sensitive_db}")
-                conn = sqlite3.connect(self.sensitive_db)
-                conn.execute("PRAGMA journal_mode=WAL;")
-                conn.execute("PRAGMA synchronous=NORMAL;")
+                LOG.info(f"Sensitive database not found, creating encrypted database at {self.sensitive_db}")
+                conn = create_encrypted_database(self.sensitive_db, self.encryption_key)
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS credentials (
                         account_id TEXT PRIMARY KEY,
-                        encrypted_username BLOB,
-                        encrypted_password BLOB
+                        encrypted_data BLOB NOT NULL
                     )
                 """)
                 conn.commit()
                 conn.close()
+                LOG.info("Encrypted sensitive database created successfully")
 
             # Ensure salt exists
             if not os.path.exists(self.salt_path):
@@ -305,7 +303,7 @@ class SecureFileManager:
             except Exception as e:
                 LOG.warning("Permission hardening not fully applied: %s", e)
             
-            LOG.info("Vault files initialized successfully.")
+            LOG.info("Vault files initialized successfully with full encryption.")
             return True
         except Exception as e:
             LOG.exception("initialize_vault_files failed")
