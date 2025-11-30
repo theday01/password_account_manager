@@ -66,7 +66,7 @@ class EnhancedLoadingScreen:
             load_icon_path = os.path.join("icons", "load.png")
             if os.path.exists(load_icon_path):
                 load_image = Image.open(load_icon_path)
-                load_icon = ctk.CTkImage(light_image=load_image, size=(260, 260))
+                load_icon = ctk.CTkImage(light_image=load_image, size=(260, 200))
                 icon_label = ctk.CTkLabel(left_content, image=load_icon, text="", fg_color="transparent")
                 icon_label.pack(expand=True, pady=20)
         except Exception as e:
