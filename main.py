@@ -8,10 +8,12 @@ import base64
 import sqlite3
 import time
 import webbrowser
+import sys
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 from dataclasses import dataclass 
 from enum import Enum
+from process_lock import check_single_instance
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -6436,6 +6438,22 @@ def build_executable():
         print(f"\nAn unexpected error occurred: {e}")
         
 def main():
+    # Check if program is already running
+    lock = check_single_instance()
+    if lock is None:
+        # Another instance is already running
+        try:
+            import tkinter.messagebox as msgbox
+            msgbox.showwarning(
+                "Program Already Running",
+                "⚠️ SecureVault Pro is already running!\n\n"
+                "Multiple instances cannot be opened simultaneously.\n\n"
+                "Please close the existing instance and try again."
+            )
+        except Exception as e:
+            print(f"Warning: {e}")
+        return
+    
     if len(sys.argv) > 1 and sys.argv[1] == 'build':
         print("Build process started...")
         build_executable()
