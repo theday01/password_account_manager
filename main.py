@@ -47,6 +47,7 @@ import threading
 from datetime import datetime
 from backup import BackupManager
 from encrypted_db import get_encrypted_connection, create_encrypted_database, Row as EncryptedRow
+from enhanced_loading_screen import EnhancedLoadingScreen
 
 
 logger = logging.getLogger(__name__)
@@ -1246,136 +1247,8 @@ class ModernPasswordManagerGUI:
         welcome_window.wait_window()
 
     def show_loading_screen(self):
-        bg_color = "#f5f5f5"      
-        accent_color = "#2b6cb0" 
-        text_color = "#1a202c"     
-        slogan_color = "#4a5568" 
-        
-        width, height = 700, 300
-        loading_window = ThemedToplevel(self.root, fg_color=bg_color)
-        loading_window.title(self.lang_manager.get_string("loading"))
-        loading_window.geometry(f"{width}x{height}")
-        loading_window.resizable(False, False)
-        loading_window.overrideredirect(True)
-        loading_window.grab_set()
-        
-        self.root.update_idletasks()
-        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.root.winfo_screenheight() // 2) - (height // 2)
-        loading_window.geometry(f"{width}x{height}+{x}+{y}")
-
-        main_frame = ctk.CTkFrame(loading_window, fg_color=bg_color, corner_radius=10)
-        main_frame.pack(fill="both", expand=True, padx=2, pady=2)
-
-        # Left frame for the logo
-        left_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        left_frame.pack(side="left", fill="both", expand=True, padx=20, pady=20)
-
-        try:
-            load_icon_path = os.path.join("icons", "load.png")
-            if os.path.exists(load_icon_path):
-                load_image = Image.open(load_icon_path)
-                load_icon = ctk.CTkImage(light_image=load_image, size=(250, 200))
-                icon_label = ctk.CTkLabel(left_frame, image=load_icon, text="", fg_color="transparent")
-                icon_label.pack(expand=True)
-        except Exception as e:
-            logger.warning(f"Could not display loading icon: {e}")
-
-        # Right frame for the data and progress bar
-        right_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        right_frame.pack(side="right", fill="both", expand=True, padx=20, pady=20)
-        
-        # Use a frame to center the content vertically in the right column
-        right_content_frame = ctk.CTkFrame(right_frame, fg_color="transparent")
-        right_content_frame.pack(expand=True)
-
-        ctk.CTkLabel(
-            right_content_frame,
-            text=self.lang_manager.get_string("app_title"),
-            font=ctk.CTkFont(size=32, weight="bold"),
-            text_color=text_color
-        ).pack(pady=(5, 5), anchor="w")
-
-        ctk.CTkLabel(
-            right_content_frame,
-            text=self.lang_manager.get_string("app_slogan"),
-            font=ctk.CTkFont(size=12, slant="italic"),
-            text_color=slogan_color
-        ).pack(pady=(0, 25), anchor="w")
-
-        status_label = ctk.CTkLabel(
-            right_content_frame,
-            text=self.lang_manager.get_string("initializing"),
-            font=ctk.CTkFont(size=12),
-            text_color=accent_color
-        )
-        status_label.pack(pady=(10, 5), anchor="w")
-
-        # Progress bar
-        progress_bar = ctk.CTkProgressBar(
-            right_content_frame,
-            width=320,
-            height=8,
-            progress_color=accent_color,
-            fg_color="#333333",
-            corner_radius=4
-        )
-        progress_bar.pack(pady=5, anchor="w")
-
-        # Copyright/version label
-        ctk.CTkLabel(
-            loading_window,
-            text="© 2024 SecureVault Pro. All rights reserved.",
-            font=ctk.CTkFont(size=9),
-            text_color=slogan_color
-        ).pack(side="bottom", pady=10)
-
-        # Animation and logic
-        def update_loading(progress, status_text):
-            progress_bar.set(progress)
-            status_label.configure(text=status_text)
-            loading_window.update_idletasks()
-
-        def animate_progress(current_progress, target_progress, status_text, duration_ms, steps=20):
-            step_progress = (target_progress - current_progress) / steps
-            step_delay = duration_ms // steps
-            
-            def step_func(step_num):
-                if step_num <= steps:
-                    new_progress = current_progress + step_progress * step_num
-                    update_loading(new_progress, status_text)
-                    loading_window.after(step_delay, lambda: step_func(step_num + 1))
-            
-            step_func(1)
-
-        def sequence_loader():
-            # Initial state
-            update_loading(0, self.lang_manager.get_string("initializing"))
-            loading_window.after(500)
-
-            # Step 1: Loading components
-            animate_progress(0, 0.25, self.lang_manager.get_string("loading_components"), 700)
-            loading_window.after(700, lambda: sequence_step_2())
-
-        def sequence_step_2():
-            # Step 2: Verifying security
-            animate_progress(0.25, 0.55, self.lang_manager.get_string("verifying_security"), 1000)
-            loading_window.after(1000, lambda: sequence_step_3())
-
-        def sequence_step_3():
-            # Step 3: Preparing workspace
-            animate_progress(0.55, 0.85, self.lang_manager.get_string("preparing_workspace"), 600)
-            loading_window.after(600, lambda: sequence_step_4())
-
-        def sequence_step_4():
-            # Step 4: Finalizing
-            animate_progress(0.85, 1.0, self.lang_manager.get_string("launching_application"), 600)
-            loading_window.after(600, lambda: finish_loading())
-
-        def finish_loading():
-            loading_window.destroy()
-            self.root.deiconify()
-
+        """Display professional enterprise-grade loading screen"""
+        def on_loading_complete():
             # Initialize SFM early for trial manager
             self._setup_secure_file_manager()
             
@@ -1399,8 +1272,10 @@ class ModernPasswordManagerGUI:
             #     return
 
             self._initialize_app()
-
-        loading_window.after(200, sequence_loader)
+        
+        # Create and show the enhanced loading screen
+        enhanced_loader = EnhancedLoadingScreen(self.root, self.lang_manager, self.version_data)
+        enhanced_loader.show(on_loading_complete)
 
     def _setup_secure_file_manager(self):
         try:
