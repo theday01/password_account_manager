@@ -176,6 +176,14 @@ class AuthGuardian:
         for key, value in self._settings.items():
             settings_to_save[key] = value
         
+        # CRITICAL: Remove 2FA keys that were explicitly deleted (e.g., during disable_tfa)
+        # These keys should NOT exist in settings_to_save if they're not in self._settings
+        tfa_keys_to_remove = {'tfa_secret', 'tfa_enabled_at', 'tfa_backup_codes'}
+        for key in tfa_keys_to_remove:
+            if key not in self._settings and key in settings_to_save:
+                logger.debug(f"Removing 2FA key '{key}' that was deleted but still in disk settings")
+                del settings_to_save[key]
+        
         # Update guardian-specific state (these always override any existing values)
         settings_to_save['guardian_failed_attempts'] = self.failed_attempts
         settings_to_save['guardian_consecutive_lockouts'] = self.consecutive_lockouts
@@ -286,10 +294,11 @@ class AuthGuardian:
             raise ValueError("pyotp library is not available. Please install it: pip install pyotp")
         return pyotp.random_base32()
     
+
     def _get_icon_data_uri(self, max_size: int = 32) -> str:
-        """Convert the security icon to a base64 data URI for use in the provisioning URI.
+        """Convert the 2FA icon to a base64 data URI for use in the provisioning URI.
         
-        This icon will appear inside 2FA apps like Google Authenticator if space permits.
+        This icon will appear in 2FA apps like Google Authenticator if space permits.
         The data URI format allows embedding the icon directly in the provisioning URI without
         requiring external URL hosting.
         
@@ -303,26 +312,27 @@ class AuthGuardian:
             logger.debug("PIL not available. Cannot generate icon data URI for 2FA provisioning.")
             return ""
         
-        # Try to find and load a lock or vault-themed icon
-        icon_candidates = [
-            "icons/load.png",  # Vault/lock icon
-            "icons/2fa_icon.png",
+        # Primary icon path - 2fa_icon.png is now the default
+        icon_path = "icons/2fa_icon.png"
+        
+        # Fallback icon paths if primary doesn't exist
+        icon_fallbacks = [
+            "icons/load.png",
             "icons/security.png",
             "icons/main.png",
         ]
         
-        icon_path = None
-        for candidate in icon_candidates:
-            try:
-                if Path(candidate).exists():
-                    icon_path = candidate
+        # Check if primary icon exists, otherwise try fallbacks
+        if not Path(icon_path).exists():
+            logger.debug(f"Primary 2FA icon not found at {icon_path}, trying fallbacks...")
+            for fallback in icon_fallbacks:
+                if Path(fallback).exists():
+                    icon_path = fallback
+                    logger.debug(f"Using fallback icon: {icon_path}")
                     break
-            except Exception:
-                continue
-        
-        if not icon_path:
-            logger.debug("No suitable icon found for 2FA provisioning URI")
-            return ""
+            else:
+                logger.debug("No suitable icon found for 2FA provisioning URI")
+                return ""
         
         try:
             # Open and process the icon image
@@ -359,48 +369,68 @@ class AuthGuardian:
             b64_data = base64.b64encode(png_data).decode('ascii')
             data_uri = f"data:image/png;base64,{b64_data}"
             
-            logger.debug(f"Generated optimized icon data URI ({len(data_uri)} chars)")
+            logger.debug(f"Generated optimized icon data URI from {icon_path} ({len(data_uri)} chars)")
             return data_uri
             
         except Exception as e:
             logger.debug(f"Failed to generate icon data URI for 2FA provisioning: {e}")
             return ""
-    
-    def get_tfa_provisioning_uri(self, account_name: str = None, issuer_name: str = "Vault", secret: str = None) -> str:
+         
+    def get_tfa_provisioning_uri(self, account_name: str = None, issuer_name: str = None, secret: str = None) -> str:
         """Get the provisioning URI for the TOTP secret (for QR code generation).
         
-        The issuer_name is displayed in 2FA apps. Using generic names works best across all apps.
-        Note: Google Authenticator doesn't support custom icons - it uses predefined icons for known services.
+        Uses "Vault" as the default issuer name which is more likely to be recognized
+        by 2FA apps and display a vault/security icon instead of a generic icon.
+        
+        Args:
+            account_name: Account identifier (email or username)
+            issuer_name: Service name shown in 2FA app (defaults to "Vault")
+            secret: TOTP secret (uses stored secret if not provided)
+        
+        Returns:
+            str: The provisioning URI for QR code generation
         """
         if not PYOTP_AVAILABLE:
             raise ValueError("pyotp library is not available")
-        # Allow using a provided secret for cases where 2FA is being set up but not yet enabled
+        
         totp_secret = secret if secret else self._settings.get('tfa_secret')
         if not totp_secret:
             raise ValueError("2FA is not enabled")
 
         totp = pyotp.TOTP(totp_secret)
 
-        # Use the provided account_name, but fall back to the default "SecureVault Pro" if it's None or empty.
+        # Use provided account_name or default
         effective_account_name = account_name if account_name else "SecureVault Pro"
-
-        # Generate the base provisioning URI
-        uri = totp.provisioning_uri(name=effective_account_name, issuer_name=issuer_name)
         
-        logger.debug(f"Generated provisioning URI for {effective_account_name} - length: {len(uri)} chars")
+        # Use a recognizable issuer name that's likely in 2FA app databases
+        # Common recognized names that trigger vault/security icons:
+        # Best options: "Vault", "Bitwarden", "1Password", "LastPass" (if you want their icons)
+        # Generic options: "Security", "Password Manager", "Authenticator"
+        # 
+        # For maximum recognition, use "Vault" - it's generic enough and commonly recognized
+        effective_issuer_name = issuer_name if issuer_name else "Vault"
+
+        # Generate the provisioning URI
+        uri = totp.provisioning_uri(name=effective_account_name, issuer_name=effective_issuer_name)
+        
+        logger.debug(f"Generated provisioning URI for {effective_account_name} with issuer '{effective_issuer_name}'")
         return uri
 
     def generate_tfa_qr_with_logo(self, account_name: str = None, issuer_name: str = "SecureVault",
-                                  logo_path: str = None, qr_size: int = 400, logo_scale: float = 0.34,
-                                  secret: str = None):
-        """Generate a QR code PIL Image for the current TOTP secret and overlay a security logo.
+                                logo_path: str = None, qr_size: int = 400, logo_scale: float = 0.34,
+                                secret: str = None):
+        """Generate a QR code PIL Image for the current TOTP secret and overlay the 2FA icon.
+
+        This is where we CAN control the icon - by overlaying it on the QR code itself.
+        Users will see your custom icon on the QR code, which helps with brand recognition.
 
         Args:
             account_name: Optional account name to include in the provisioning URI.
             issuer_name: Issuer name for the provisioning URI.
-            logo_path: Path to a logo image. If None, tries sensible defaults in the `icons/` folder.
+            logo_path: Path to a logo image. If None, uses 2fa_icon.png as default.
             qr_size: Size in pixels for the generated QR (square).
             logo_scale: Fractional size of logo relative to QR (0.0 - 0.5 typical).
+            secret: Optional secret (uses stored secret if not provided).
 
         Returns:
             PIL.Image: The composed image object ready for display or saving.
@@ -412,27 +442,15 @@ class AuthGuardian:
             raise ValueError("pyotp is required to generate TOTP provisioning URIs")
         if not QRCODE_AVAILABLE or not PIL_AVAILABLE:
             raise ValueError("qrcode and pillow are required to generate QR images with logos")
-        # Allow generation using a provided secret (useful during setup) or the saved secret
+        
         totp_secret = secret if secret else self._settings.get('tfa_secret')
         if not totp_secret:
             raise ValueError("2FA secret is not available. Provide `secret` parameter or enable 2FA first.")
 
-        # Determine effective account name
         effective_account_name = account_name if account_name else "SecureVault Pro"
 
-        # Generate provisioning URI
         totp = pyotp.TOTP(totp_secret)
         uri = totp.provisioning_uri(name=effective_account_name, issuer_name=issuer_name)
-
-        # Maximum URI length for QR version 40 (highest capacity)
-        # QR v40 can hold ~7089 alphanumeric chars, we use 2953 as safe limit to ensure scannability
-        MAX_URI_LENGTH = 2953
-        
-        # If URI is too long, don't add to QR - just use the plain URI
-        if len(uri) > MAX_URI_LENGTH:
-            logger.warning(f"Provisioning URI too long ({len(uri)} chars) for QR code. Using shorter format without extras.")
-            # Recreate with minimal issuer name to reduce size
-            uri = totp.provisioning_uri(name=effective_account_name, issuer_name="SV")
 
         # Create QR code
         qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=4)
@@ -440,21 +458,22 @@ class AuthGuardian:
         qr.make(fit=True)
         qr_img = qr.make_image(image_factory=QRPilImage).convert('RGBA')
         
-
-        # Determine logo path defaults
+        # Determine logo path - DEFAULT TO 2fa_icon.png
         if not logo_path:
-            # Prefer a lock/vault-themed icon if present
-            possible = [
+            # Try 2fa_icon.png first (our primary icon)
+            icon_candidates = [
+                'icons/2fa_icon.png',  # PRIMARY - Your custom 2FA icon
                 'icons/load.png',
-                'icons/2fa_icon.png',
                 'icons/security.png',
                 'icons/mainlogo.png'
             ]
+            
             found = None
-            for p in possible:
+            for candidate in icon_candidates:
                 try:
-                    with open(p, 'rb'):
-                        found = p
+                    if Path(candidate).exists():
+                        found = candidate
+                        logger.info(f"Using 2FA icon: {candidate}")
                         break
                 except Exception:
                     continue
@@ -462,16 +481,18 @@ class AuthGuardian:
 
         # If no logo found, just return the QR image
         if not logo_path:
+            logger.warning("No 2FA icon found, returning QR code without logo")
             return qr_img
 
-        # Load logo image and coerce to a square with preserved aspect by adding transparent padding
+        # Load and process logo image
         try:
             logo_img = Image.open(logo_path).convert('RGBA')
+            logger.info(f"Successfully loaded 2FA icon from: {logo_path}")
         except Exception as e:
             logger.warning(f"Failed to open logo at {logo_path}: {e}")
             return qr_img
 
-        # Make the logo square (centered) to improve recognizability in small icon thumbnails
+        # Make the logo square (centered) for better appearance
         lw, lh = logo_img.size
         if lw != lh:
             side = max(lw, lh)
@@ -482,19 +503,17 @@ class AuthGuardian:
 
         # Calculate logo size and paste centered
         logo_max_size = int(qr_size * float(logo_scale))
-        # Preserve aspect ratio
         logo_w, logo_h = logo_img.size
         scale = min(logo_max_size / logo_w, logo_max_size / logo_h, 1.0)
         new_logo_size = (max(1, int(logo_w * scale)), max(1, int(logo_h * scale)))
         logo_img = logo_img.resize(new_logo_size, resample=Image.LANCZOS)
 
-        # Create a solid white square background for the logo to maximize contrast in small thumbnails
+        # Create white background for the logo for better visibility
         padding = max(6, int(logo_max_size * 0.10))
         bg_size = (logo_img.size[0] + padding * 2, logo_img.size[1] + padding * 2)
-
-        # White opaque background (helps small icons remain identifiable)
         bg = Image.new('RGBA', bg_size, (255, 255, 255, 255))
-        # Create an alpha mask for the background if we want rounded corners; use full opaque by default
+        
+        # Create rounded corners for the background
         mask = None
         try:
             from PIL import ImageDraw
@@ -520,6 +539,7 @@ class AuthGuardian:
         logo_pos = ((qr_size - logo_img.size[0]) // 2, (qr_size - logo_img.size[1]) // 2)
         try:
             composed.paste(logo_img, logo_pos, logo_img)
+            logger.info("Successfully composed QR code with 2FA icon overlay")
         except Exception:
             composed.paste(logo_img, logo_pos)
 
