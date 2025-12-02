@@ -65,7 +65,7 @@ class TrialManager:
     _machine_id = None  # Cache for machine ID
 
     def __init__(self, parent_window, settings_manager, restart_callback=None):
-        self.TRIAL_PERIOD = timedelta(days=8)
+        self.TRIAL_PERIOD = timedelta(days=7)
         self.LICENSE_FILE = self._get_obfuscated_license_path()
 
         self.parent_window = parent_window

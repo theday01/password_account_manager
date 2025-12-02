@@ -2344,52 +2344,9 @@ class ModernPasswordManagerGUI:
         toolbar.pack_propagate(False)
         
         if self.trial_manager and self.trial_manager.is_trial_active:
-            remaining_minutes = int(self.trial_manager.minutes_remaining)
-            remaining_days = remaining_minutes // (24 * 60)
-
-            def _english_time(n, unit):
-                if unit == "day":
-                    return f"{n} day" if n == 1 else f"{n} days"
-                if unit == "hour":
-                    return f"{n} hour" if n == 1 else f"{n} hours"
-                # minutes
-                return f"{n} minute" if n == 1 else f"{n} minutes"
-
-            if remaining_minutes >= 24 * 60:
-                time_text = _english_time(remaining_days, "day")
-            elif remaining_minutes >= 60:
-                remaining_hours = remaining_minutes // 60
-                time_text = _english_time(remaining_hours, "hour")
-            else:
-                time_text = _english_time(remaining_minutes, "minute")
-
-            # UI: bold primary line + subdued secondary line
-            trial_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-            trial_frame.pack(side="left", padx=20, pady=8)
-
-            text_color = "#FF7A18"  # Default orange
-            if remaining_days <= 3:
-                text_color = "red"
-
-            primary_label = ctk.CTkLabel(
-                trial_frame,
-                text=f"⏳ Trial — {time_text} remaining",
-                font=ctk.CTkFont(size=14, weight="bold"),
-                text_color=text_color,
-                anchor="w",
-                justify="left"
-            )
-            primary_label.pack(anchor="w")
-
-            secondary_label = ctk.CTkLabel(
-                trial_frame,
-                text="When the trial ends, you'll need to activate the full version to continue.",
-                font=ctk.CTkFont(size=11),
-                text_color="#6B7280",  # soft gray for secondary info
-                anchor="w",
-                justify="left"
-            )
-            secondary_label.pack(anchor="w", pady=(4, 0))
+            self.trial_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+            self.trial_frame.pack(side="left", padx=20, pady=8)
+            self.update_trial_status_periodically()
         
         left_toolbar_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
         left_toolbar_frame.pack(side="left", fill="y", padx=25, pady=10)
@@ -2500,6 +2457,65 @@ class ModernPasswordManagerGUI:
         # Using a longer delay (500ms) to ensure UI is fully visible before heavy work
         self.root.after(500, deferred_startup_tasks)
 
+    def update_trial_status_periodically(self):
+        """Updates the trial status UI periodically."""
+        if not self.trial_manager or not self.trial_manager.is_trial_active:
+            return
+
+        # Clear previous widgets
+        for widget in self.trial_frame.winfo_children():
+            widget.destroy()
+
+        remaining_seconds = self.trial_manager.get_remaining_seconds()
+        
+        if remaining_seconds <= 0:
+            self.trial_frame.pack_forget()
+            return
+
+        remaining_minutes = int(remaining_seconds / 60)
+        remaining_hours = remaining_minutes // 60
+        remaining_days = remaining_hours // 24
+
+        def _english_time(n, unit):
+            if unit == "day":
+                return f"{n} day" if n == 1 else f"{n} days"
+            if unit == "hour":
+                return f"{n} hour" if n == 1 else f"{n} hours"
+            # minutes
+            return f"{n} minute" if n == 1 else f"{n} minutes"
+
+        if remaining_days > 0:
+            time_text = _english_time(remaining_days, "day")
+        elif remaining_hours > 0:
+            time_text = _english_time(remaining_hours, "hour")
+        else:
+            time_text = _english_time(remaining_minutes, "minute")
+            
+        text_color = "red" if remaining_days < 1 else "#FF7A18"
+
+        primary_label = ctk.CTkLabel(
+            self.trial_frame,
+            text=f"⏳ Trial — {time_text} remaining",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=text_color,
+            anchor="w",
+            justify="left"
+        )
+        primary_label.pack(anchor="w")
+
+        secondary_label = ctk.CTkLabel(
+            self.trial_frame,
+            text="When the trial ends, you'll need to activate the full version to continue.",
+            font=ctk.CTkFont(size=11),
+            text_color="#6B7280",
+            anchor="w",
+            justify="left"
+        )
+        secondary_label.pack(anchor="w", pady=(4, 0))
+        
+        # Schedule the next update (e.g., every hour)
+        TRIAL_UI_UPDATE_INTERVAL_MS = 3600000  # 1 hour
+        self.root.after(TRIAL_UI_UPDATE_INTERVAL_MS, self.update_trial_status_periodically)
 
     # 5. Add the backup window method
     def show_backup_window(self):

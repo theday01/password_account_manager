@@ -1,6 +1,8 @@
 import hashlib
 import platform
 import subprocess
+import os
+import uuid
 
 def get_mac_address():
     """
@@ -109,7 +111,24 @@ def generate_machine_id():
 
     # Fallback for cases where no hardware identifiers can be retrieved
     if machine_info == "no_mac|no_ram|no_uuid":
-        system_info = f"{platform.system()}-{platform.node()}-{platform.architecture()}"
-        return hashlib.sha256(system_info.encode()).hexdigest()
+        # Persist a generated stable id to the user's profile so it survives restarts
+        home_dir = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+        store_path = os.path.join(home_dir, ".sv_machine_id")
+
+        try:
+            if os.path.exists(store_path):
+                with open(store_path, 'r') as f:
+                    stored = f.read().strip()
+                    if stored:
+                        return hashlib.sha256(stored.encode()).hexdigest()
+            # Generate and persist a fallback id
+            fallback = uuid.uuid4().hex
+            with open(store_path, 'w') as f:
+                f.write(fallback)
+            return hashlib.sha256(fallback.encode()).hexdigest()
+        except Exception:
+            # As a last resort, fall back to hashing volatile system info
+            system_info = f"{platform.system()}-{platform.node()}-{platform.architecture()}"
+            return hashlib.sha256(system_info.encode()).hexdigest()
 
     return hashlib.sha256(machine_info.encode()).hexdigest()
