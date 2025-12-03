@@ -1252,26 +1252,41 @@ class ModernPasswordManagerGUI:
             # Initialize SFM early for trial manager
             self._setup_secure_file_manager()
             
-            self.trial_manager = TrialManager(self.root, self.secure_file_manager, restart_callback=self.restart_program)
-            self.reminder_manager = ReminderManager(self.trial_manager, self)
-            logger.info(f"Trial status at startup: {self.trial_manager.status}")
-            if self.trial_manager.status in ["EXPIRED", "TAMPERED"]:
-                logger.warning("Trial has expired or is tampered. Showing dialog.")
-                if not self.trial_manager.show_trial_expired_dialog():
-                    logger.warning("User exited the application from the trial dialog.")
-                    self.root.quit()
-                    return
+            # Initialize TrialManager in background thread to prevent UI freeze
+            def init_trial_manager():
+                try:
+                    self.trial_manager = TrialManager(self.root, self.secure_file_manager, restart_callback=self.restart_program)
+                    self.reminder_manager = ReminderManager(self.trial_manager, self)
+                    logger.info(f"Trial status at startup: {self.trial_manager.status}")
+                    
+                    # Schedule the next steps on the main thread
+                    self.root.after(0, check_trial_status)
+                except Exception as e:
+                    logger.error(f"Error initializing trial manager: {e}")
+                    self.root.after(0, lambda: self._initialize_app())
             
-            # Perform application integrity check
-            self.tamper_manager = TamperManager()
-            # Temporarily disable tamper check for testing
-            # if self.tamper_manager.perform_full_check() == "TAMPERED":
-            #     logger.critical("Tampering detected! Shutting down.")
-            #     messagebox.showerror("Security Alert", "Application files have been tampered with. The program will now exit.")
-            #     self.root.quit()
-            #     return
-
-            self._initialize_app()
+            def check_trial_status():
+                try:
+                    if self.trial_manager.status in ["EXPIRED", "TAMPERED"]:
+                        logger.warning("Trial has expired or is tampered. Showing dialog.")
+                        if not self.trial_manager.show_trial_expired_dialog():
+                            logger.warning("User exited the application from the trial dialog.")
+                            self.root.quit()
+                            return
+                    
+                    # Perform application integrity check
+                    self.tamper_manager = TamperManager()
+                    
+                    # Continue to initialize app
+                    self._initialize_app()
+                except Exception as e:
+                    logger.error(f"Error during trial status check: {e}")
+                    self._initialize_app()
+            
+            # Run trial manager init in background thread to prevent freezing
+            import threading
+            trial_thread = threading.Thread(target=init_trial_manager, daemon=True)
+            trial_thread.start()
         
         # Create and show the enhanced loading screen
         enhanced_loader = EnhancedLoadingScreen(self.root, self.lang_manager, self.version_data)
@@ -2317,13 +2332,26 @@ class ModernPasswordManagerGUI:
         self.root.bind("<Button-1>", self.reset_inactivity_timer)
 
         def on_closing():
-            # Disable default close - force users to use logout button for security
-            logger.warning("User attempted to close window directly. Logout button must be used.")
-            messagebox.showwarning(
-                "Close Window Blocked",
-                "For security reasons, please use the 'Logout' button in the toolbar to safely close the application."
-            )
-            return 'break'  # Prevent default close
+            """Handle window close button - ensure proper shutdown"""
+            logger.info("Window close button pressed")
+            
+            # Update shutdown status in background thread to prevent blocking
+            def update_status_bg():
+                try:
+                    if self.trial_manager and self.trial_manager.anchor:
+                        self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
+                    if hasattr(self, 'tamper_manager'):
+                        self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
+                except Exception as e:
+                    logger.error(f"Error updating shutdown status on close: {e}")
+                finally:
+                    # Schedule logout after status update
+                    self.root.after(100, self.secure_logout)
+            
+            # Run status update in background thread
+            import threading
+            status_thread = threading.Thread(target=update_status_bg, daemon=True)
+            status_thread.start()
         
         self.root.protocol("WM_DELETE_WINDOW", on_closing)
 
@@ -3407,21 +3435,45 @@ class ModernPasswordManagerGUI:
         try:
             self.root.mainloop()
         finally:
-            # Stop the asyncio event loop manager
-            asyncio_manager.stop()
-            if self.trial_manager and self.trial_manager.anchor:
-                self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
-            if hasattr(self, 'tamper_manager'):
-                self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
-            if self.secure_file_manager:
-                logger.info("Performing final sync and cleanup...")
+            # CRITICAL: Update shutdown status FIRST before any other cleanup
+            # Do this in a separate thread to avoid blocking the main thread
+            logger.info("Application shutting down - updating guardian status")
+            
+            def shutdown_cleanup():
                 try:
-                    if self.authenticated:
-                        self.secure_file_manager.sync_all_files()
-                    self.secure_file_manager.cleanup_temp_files()
-                    logger.info("Secure cleanup completed")
+                    if self.trial_manager and self.trial_manager.anchor:
+                        logger.info("Updating anchor shutdown status to SHUTDOWN_CLEAN")
+                        self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
+                    if hasattr(self, 'tamper_manager'):
+                        logger.info("Updating tamper manager shutdown status")
+                        self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
                 except Exception as e:
-                    logger.error(f"Cleanup error: {e}")
+                    logger.error(f"Error updating shutdown status: {e}")
+                finally:
+                    # Stop the asyncio event loop manager
+                    logger.info("Stopping asyncio event loop manager")
+                    asyncio_manager.stop()
+                    
+                    # Sync and cleanup secure files
+                    if self.secure_file_manager:
+                        logger.info("Performing final sync and cleanup...")
+                        try:
+                            if self.authenticated:
+                                self.secure_file_manager.sync_all_files()
+                            self.secure_file_manager.cleanup_temp_files()
+                            logger.info("Secure cleanup completed")
+                        except Exception as e:
+                            logger.error(f"Cleanup error: {e}")
+            
+            # Run cleanup in a background thread with timeout
+            import threading
+            cleanup_thread = threading.Thread(target=shutdown_cleanup, daemon=True)
+            cleanup_thread.daemon = True
+            cleanup_thread.start()
+            cleanup_thread.join(timeout=5.0)  # Wait max 5 seconds for cleanup
+            
+            if cleanup_thread.is_alive():
+                logger.warning("Cleanup thread did not finish within timeout, continuing shutdown anyway")
 
     def create_desktop_integration():
         try:
@@ -4380,8 +4432,6 @@ class ModernPasswordManagerGUI:
             verify_dialog.wait_window()
             
             return verified[0]
-    
-    
     
     def restart_program(self):
         import sys
@@ -6522,21 +6572,33 @@ class ModernPasswordManagerGUI:
             except Exception as e:
                 logger.error(f"Error stopping password reminder: {e}")
             
-            # Step 4: Update trial manager status
+            # Step 4: Update trial manager status (non-blocking)
             try:
-                if self.trial_manager and self.trial_manager.anchor:
-                    self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
-                    logger.info("Trial manager shutdown status updated")
+                def update_status_bg():
+                    try:
+                        if self.trial_manager and self.trial_manager.anchor:
+                            logger.info("Updating anchor shutdown status to SHUTDOWN_CLEAN")
+                            if self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN'):
+                                logger.info("Anchor shutdown status updated successfully")
+                            else:
+                                logger.error("Failed to update anchor shutdown status")
+                        
+                        if hasattr(self, 'tamper_manager'):
+                            logger.info("Updating tamper manager shutdown status")
+                            self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
+                    except Exception as e:
+                        logger.error(f"Error updating shutdown status: {e}")
+                
+                # Run in background thread to prevent blocking
+                import threading
+                status_thread = threading.Thread(target=update_status_bg, daemon=True)
+                status_thread.start()
+                status_thread.join(timeout=2.0)  # Wait max 2 seconds
             except Exception as e:
-                logger.error(f"Error updating trial manager: {e}")
+                logger.error(f"Error updating shutdown status: {e}")
             
-            # Step 5: Update tamper manager status
-            try:
-                if hasattr(self, 'tamper_manager'):
-                    self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
-                    logger.info("Tamper manager shutdown status updated")
-            except Exception as e:
-                logger.error(f"Error updating tamper manager: {e}")
+            # Step 5: Update tamper manager status (already handled in step 4)
+            # Removed duplicate code
             
             # Step 6: Sync all files to secure storage
             try:

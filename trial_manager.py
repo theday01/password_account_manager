@@ -91,6 +91,17 @@ class TrialManager:
         self.minutes_remaining = 0
         self.status = self.check_trial_status()
         self._validate_activation_state()
+        
+        # On first run, the observer may detect ANCHOR_MISMATCH - this is normal
+        # Don't treat it as tampering on initial setup
+        if self.status == "TAMPERED" and not os.path.exists(self.LICENSE_FILE):
+            # Check if this is a first-run scenario
+            observer_path = self.observer.observer_path
+            if not os.path.exists(observer_path):
+                # Observer file doesn't exist = first run, not tampering
+                logging.info("First-run detected (no observer file) - resetting to TRIAL status")
+                self.status = "TRIAL"
+                self.is_trial_active = True
 
     def _get_machine_id(self):
         if TrialManager._machine_id is None:
@@ -182,63 +193,150 @@ class TrialManager:
     def check_trial_status(self):
         """
         Checks the trial status by consulting the guardians.
-        This is the single point of truth for the trial state.
+        Enhanced with detailed logging for debugging and timeout protection.
         """
-        logging.info("--- Starting Trial Status Check ---")
+        logging.info("="*60)
+        logging.info("TRIAL STATUS CHECK - DETAILED ANALYSIS")
+        logging.info("="*60)
+        
+        # Check if anchor file exists and log its contents
+        anchor_path = self.anchor.anchor_path
+        if os.path.exists(anchor_path):
+            logging.info(f"✓ Anchor file found: {anchor_path}")
+            try:
+                with open(anchor_path, 'r') as f:
+                    raw_data = f.read()
+                    logging.info(f"  Raw anchor size: {len(raw_data)} bytes")
+            except Exception as e:
+                logging.error(f"  Failed to read anchor file: {e}")
+        else:
+            logging.warning(f"✗ Anchor file NOT found: {anchor_path}")
+        
         # 1. A valid license file always wins.
         if os.path.exists(self.LICENSE_FILE):
-            logging.info(f"License file found at {self.LICENSE_FILE}. Status: FULL")
+            logging.info(f"✓ License file found at {self.LICENSE_FILE}. Status: FULL")
+            self.is_trial_active = False
             return "FULL"
 
-        # 2. Check the anchor guardian for the installation timestamp and shutdown status.
-        anchor_status, anchor_data = self.anchor.check()
-        logging.info(f"Guardian Anchor check returned: status={anchor_status}, data={anchor_data}")
-
-        if anchor_status == "OK_UNEXPECTED_SHUTDOWN":
-            # Gracefully handle the unexpected shutdown. Log it, but don't tamper the app.
-            # The observer check will be skipped because its state might be unreliable.
-            logging.warning("Guardian Anchor reported an unexpected shutdown.")
-            pass  # Continue to expiration check
-        elif "TAMPERED" in anchor_status:
-            logging.error(f"Guardian Anchor reported tampering. Status: {anchor_status}")
-            return "TAMPERED"
-        
-        install_ts_str = anchor_data.get('install_ts')
-        if not install_ts_str:
-            logging.error("No installation timestamp found in anchor data. Status: TAMPERED")
-            return "TAMPERED"
-
-        # 3. Check for expiration.
+        # 2. Check the anchor guardian for the installation timestamp with timeout protection
         try:
-            install_ts = datetime.fromisoformat(install_ts_str)
-            current_time_utc = datetime.utcnow()
-            elapsed = current_time_utc - install_ts
+            # Add a timeout wrapper using signal (Unix) or threading (Windows/universal)
+            anchor_status = None
+            anchor_data = None
             
-            logging.info(f"Installation timestamp: {install_ts}")
-            logging.info(f"Current UTC time: {current_time_utc}")
-            logging.info(f"Time elapsed since installation: {elapsed}")
-            logging.info(f"Trial period: {self.TRIAL_PERIOD}")
+            def get_anchor_status():
+                nonlocal anchor_status, anchor_data
+                try:
+                    anchor_status, anchor_data = self.anchor.check()
+                except Exception as e:
+                    logging.error(f"Error calling anchor.check(): {e}")
+                    anchor_status = "TAMPERED_CORRUPT"
+                    anchor_data = {}
+            
+            # Run anchor check with timeout
+            import threading
+            anchor_thread = threading.Thread(target=get_anchor_status, daemon=True)
+            anchor_thread.start()
+            anchor_thread.join(timeout=5.0)  # Max 5 seconds to check anchor
+            
+            if anchor_thread.is_alive():
+                logging.error("Anchor check timed out after 5 seconds - assuming TAMPERED")
+                self.is_trial_active = False
+                return "TAMPERED"
+            
+            if anchor_status is None:
+                logging.error("Anchor check returned None - assuming TAMPERED")
+                self.is_trial_active = False
+                return "TAMPERED"
+            
+            logging.info(f"Guardian Anchor check returned: status={anchor_status}, data={anchor_data}")
 
-            if elapsed >= self.TRIAL_PERIOD:
-                logging.warning("Trial period has expired. Status: EXPIRED")
-                return "EXPIRED"
-        except (ValueError, TypeError) as e:
-            logging.error(f"Error parsing timestamp '{install_ts_str}': {e}. Status: TAMPERED")
-            return "TAMPERED"
-        
-        # 4. If the trial is active and shutdown was clean, check the observer.
-        if anchor_status != "OK_UNEXPECTED_SHUTDOWN":
-            observer_status = self.observer.check()
-            logging.info(f"Guardian Observer check returned: {observer_status}")
-            if "TAMPERED" in observer_status:
-                logging.error(f"Guardian Observer reported tampering. Status: {observer_status}")
+            # Handle tampering first
+            if "TAMPERED" in anchor_status:
+                logging.error(f"Guardian Anchor reported tampering. Status: {anchor_status}")
+                self.is_trial_active = False
+                return "TAMPERED"
+            
+            install_ts_str = anchor_data.get('install_ts')
+            if not install_ts_str:
+                logging.error("No installation timestamp found in anchor data. Status: TAMPERED")
+                self.is_trial_active = False
                 return "TAMPERED"
 
-        # 5. If we reach here, the trial is active and valid.
-        self.is_trial_active = True
-        self.minutes_remaining = (self.TRIAL_PERIOD - elapsed).total_seconds() / 60
-        logging.info(f"Trial is active. Minutes remaining: {self.minutes_remaining:.2f}. Status: TRIAL")
-        return "TRIAL"
+            # 3. Check for expiration using UTC time consistently
+            try:
+                install_ts = datetime.fromisoformat(install_ts_str)
+                current_time_utc = datetime.utcnow()
+                elapsed = current_time_utc - install_ts
+                
+                logging.info(f"Installation timestamp: {install_ts}")
+                logging.info(f"Current UTC time: {current_time_utc}")
+                logging.info(f"Time elapsed since installation: {elapsed}")
+                logging.info(f"Trial period: {self.TRIAL_PERIOD}")
+
+                if elapsed >= self.TRIAL_PERIOD:
+                    logging.warning("Trial period has expired. Status: EXPIRED")
+                    self.is_trial_active = False
+                    self.minutes_remaining = 0
+                    return "EXPIRED"
+            except (ValueError, TypeError) as e:
+                logging.error(f"Error parsing timestamp '{install_ts_str}': {e}. Status: TAMPERED")
+                self.is_trial_active = False
+                return "TAMPERED"
+            
+            # 4. Check the observer ONLY if shutdown was clean
+            # If shutdown was unexpected, we skip observer to allow recovery from crashes
+            if anchor_status == "OK_UNEXPECTED_SHUTDOWN":
+                logging.warning("Unexpected shutdown detected - skipping observer check to allow recovery")
+                # Update anchor to mark as running for this session
+                self.anchor.update_shutdown_status('RUNNING')
+            elif anchor_status in ["OK_EXISTS", "OK_CREATED", "OK_HEALED"]:
+                # Normal startup - check observer for clock tampering with timeout
+                def get_observer_status():
+                    nonlocal observer_status
+                    try:
+                        observer_status = self.observer.check()
+                    except Exception as e:
+                        logging.error(f"Error calling observer.check(): {e}")
+                        observer_status = "TAMPERED_CORRUPT"
+                
+                observer_status = None
+                observer_thread = threading.Thread(target=get_observer_status, daemon=True)
+                observer_thread.start()
+                observer_thread.join(timeout=5.0)  # Max 5 seconds to check observer
+                
+                if observer_thread.is_alive():
+                    logging.error("Observer check timed out after 5 seconds - assuming TAMPERED")
+                    self.is_trial_active = False
+                    return "TAMPERED"
+                
+                if observer_status is None:
+                    logging.error("Observer check returned None - assuming TAMPERED")
+                    self.is_trial_active = False
+                    return "TAMPERED"
+                
+                logging.info(f"Guardian Observer check returned: {observer_status}")
+                
+                if observer_status == "OK_UNEXPECTED_SHUTDOWN":
+                    # Observer detected unexpected shutdown, but anchor was clean
+                    # This is acceptable - just log it
+                    logging.warning("Observer detected unexpected shutdown, but continuing")
+                elif "TAMPERED" in observer_status:
+                    logging.error(f"Guardian Observer reported tampering. Status: {observer_status}")
+                    self.is_trial_active = False
+                    return "TAMPERED"
+
+            # 5. Trial is active and valid
+            self.is_trial_active = True
+            self.minutes_remaining = (self.TRIAL_PERIOD - elapsed).total_seconds() / 60
+            logging.info(f"Trial is active. Minutes remaining: {self.minutes_remaining:.2f}. Status: TRIAL")
+            logging.info("="*60)
+            return "TRIAL"
+            
+        except Exception as e:
+            logging.error(f"Unexpected error in check_trial_status: {e}", exc_info=True)
+            self.is_trial_active = False
+            return "TAMPERED"
 
     def activate_full_version(self):
         """Creates the license file to permanently activate the application."""

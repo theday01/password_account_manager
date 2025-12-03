@@ -99,27 +99,36 @@ async def trial_notification_loop(trial_manager, notification_interval_seconds: 
                     logger.info("Full version activated - stopping trial notifications")
                     break
                 
-                # Send the notification if determined necessary
+                # Send the notification if determined necessary with timeout
                 if should_notify:
                     try:
                         logger.info(f"Sending notification: {title}")
-                        success = await send_safe_notification(
-                            title=title,
-                            message=message,
-                            icon_path=icon_path
-                        )
+                        # Add a 10-second timeout to prevent hanging
+                        try:
+                            future = send_safe_notification(
+                                title=title,
+                                message=message,
+                                icon_path=icon_path
+                            )
+                            success = await asyncio.wait_for(future, timeout=10.0)
+                        except asyncio.TimeoutError:
+                            logger.warning("Notification send timed out after 10 seconds, trying fallback")
+                            success = False
                         
                         if not success:
-                            # Fallback to system notification
+                            # Fallback to system notification (non-blocking)
                             logger.warning("Async notification failed, trying system fallback")
-                            show_system_notification_fallback(title, message)
+                            try:
+                                show_system_notification_fallback(title, message)
+                            except Exception as fallback_error:
+                                logger.error(f"Fallback notification failed: {fallback_error}")
                         
                         notification_count += 1
                         last_notification_time = asyncio.get_event_loop().time()
                         
                     except Exception as notify_error:
                         logger.error(f"Error sending notification: {notify_error}")
-                        # Try fallback anyway
+                        # Try fallback anyway (non-blocking)
                         try:
                             show_system_notification_fallback(title, message)
                         except Exception as fallback_error:

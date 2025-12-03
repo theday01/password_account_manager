@@ -98,17 +98,15 @@ class GuardianObserver:
         Performs all observer checks.
 
         :return: A status string: "OK", "TAMPERED_ANCHOR_INVALID",
-                 "TAMPERED_ANCHOR_MISMATCH", "TAMPERED_CLOCK", "OK_UNEXPECTED_SHUTDOWN".
+                "TAMPERED_ANCHOR_MISMATCH", "TAMPERED_CLOCK", "OK_UNEXPECTED_SHUTDOWN".
         """
         anchor_status, anchor_data = self.anchor.check()
 
-        if anchor_status == "OK_UNEXPECTED_SHUTDOWN":
-            # If the anchor reports an unexpected shutdown, the observer should not
-            # perform its clock check, as the 'last_run_ts' could be unreliable.
-            # We pass this status up to the TrialManager.
-            return "OK_UNEXPECTED_SHUTDOWN"
-            
-        if "TAMPERED" in anchor_status:
+        # CRITICAL FIX: Don't skip observer check on unexpected shutdown
+        # Instead, verify but don't fail on clock check
+        was_unexpected_shutdown = (anchor_status == "OK_UNEXPECTED_SHUTDOWN")
+        
+        if "TAMPERED" in anchor_status and not was_unexpected_shutdown:
             return "TAMPERED_ANCHOR_INVALID"
         
         install_ts = anchor_data['install_ts']
@@ -120,6 +118,7 @@ class GuardianObserver:
             return "TAMPERED_CORRUPT"
 
         if observer_data is None:
+            # First run - create observer file
             new_data = {
                 'install_ts_hash': install_ts_hash,
                 'last_run_ts': datetime.utcnow().isoformat()
@@ -133,10 +132,27 @@ class GuardianObserver:
         now = datetime.utcnow()
         last_run_ts = datetime.fromisoformat(observer_data.get('last_run_ts', now.isoformat()))
         
-        if (last_run_ts - now).total_seconds() > 120:
-            return "TAMPERED_CLOCK"
+        # CRITICAL FIX: Clock tampering check
+        # Check if time has moved backwards (tampering) or too far forward
+        time_difference_seconds = (now - last_run_ts).total_seconds()
+        
+        if was_unexpected_shutdown:
+            # After unexpected shutdown, be lenient on backwards time
+            # Only flag if time moved backwards significantly (>1 hour)
+            if time_difference_seconds < -3600:  # 1 hour backwards = tampering
+                return "TAMPERED_CLOCK"
+        else:
+            # Normal operation - flag if time moved backwards at all
+            if time_difference_seconds < 0:
+                return "TAMPERED_CLOCK"
 
+        # Update last run timestamp
         observer_data['last_run_ts'] = now.isoformat()
         self._write_observer_data(observer_data)
 
+        # Return special status if this was an unexpected shutdown
+        if was_unexpected_shutdown:
+            return "OK_UNEXPECTED_SHUTDOWN"
+        
         return "OK"
+
