@@ -2317,174 +2317,168 @@ class ModernPasswordManagerGUI:
             self.show_login_screen()
         except Exception as e:
             self.show_message("error", "setup_failed_message", msg_type="error", error=str(e))
-            
+
+
     def show_main_interface(self):
-        for widget in self.main_frame.winfo_children():
-            widget.destroy()
+            for widget in self.main_frame.winfo_children():
+                widget.destroy()
 
-        self.root.state('zoomed')
-        self.root.resizable(True, True)
-        self.root.minsize(800, 600)
+            self.root.state('zoomed')
+            self.root.resizable(True, True)
+            self.root.minsize(800, 600)
 
-        self.reset_inactivity_timer()
-        self.root.bind("<KeyPress>", self.reset_inactivity_timer)
-        self.root.bind("<Motion>", self.reset_inactivity_timer)
-        self.root.bind("<Button-1>", self.reset_inactivity_timer)
+            self.reset_inactivity_timer()
+            self.root.bind("<KeyPress>", self.reset_inactivity_timer)
+            self.root.bind("<Motion>", self.reset_inactivity_timer)
+            self.root.bind("<Button-1>", self.reset_inactivity_timer)
 
-        def on_closing():
-            """Handle window close button - ensure proper shutdown"""
-            logger.info("Window close button pressed")
+            def on_closing():
+                """
+                Handle window close button (X).
+                Instead of closing, prompt the user to use the Logout button.
+                """
+                logger.info("Window close button pressed - Action intercepted")
+                
+                # Use the custom message box to match the app's theme
+                CustomMessageBox(
+                    title="Secure Logout Required", 
+                    message="For security reasons, please use the red 'Logout' button located in the toolbar to securely close the application.", 
+                    msg_type="warning"
+                ).show()
             
-            # Update shutdown status in background thread to prevent blocking
-            def update_status_bg():
+            # Bind the close event (X button) to the new function
+            self.root.protocol("WM_DELETE_WINDOW", on_closing)
+
+            # The tutorial is now started manually from the "About" window.
+            # logger.info(f"Tutorial check: tutorial_completed = {self.settings.get('tutorial_completed', False)}")
+            # if not self.settings.get('tutorial_completed', False):
+            #     logger.info("Showing tutorial window...")
+            #     tutorial = TutorialManager(self.root, self.lang_manager)
+            #     tutorial.show_tutorial_window()
+            #     self.settings['tutorial_completed'] = True
+            #     logger.info("Tutorial completed, saving settings...")
+            #     self.save_settings_to_file()
+            # else:
+            #     logger.info("Tutorial already completed, skipping.")
+
+            toolbar = ctk.CTkFrame(self.main_frame, height=70)
+            toolbar.pack(fill="x", padx=10, pady=10)
+            toolbar.pack_propagate(False)
+            
+            if self.trial_manager and self.trial_manager.is_trial_active:
+                self.trial_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+                self.trial_frame.pack(side="left", padx=20, pady=8)
+                self.update_trial_status_periodically()
+            
+            left_toolbar_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+            left_toolbar_frame.pack(side="left", fill="y", padx=25, pady=10)
+
+            ctk.CTkLabel(
+                left_toolbar_frame,
+                text=self.lang_manager.get_string("main_toolbar_title"),
+                font=ctk.CTkFont(size=24, weight="bold")
+            ).pack(anchor="w")
+            
+            welcome_message = self._generate_welcome_message()
+            ctk.CTkLabel(
+                left_toolbar_frame,
+                text=welcome_message,
+                font=ctk.CTkFont(size=12),
+                justify="left",
+                anchor="w"
+            ).pack(anchor="w", pady=(5, 0))
+        
+            # Add Backup button (before About button)
+            backup_icon = ctk.CTkImage(Image.open("icons/uploadbk.png"), size=(24, 24))  # You'll need this icon
+            ctk.CTkButton(
+                toolbar,
+                text=self.lang_manager.get_string("backup"),
+                width=120,
+                height=55,
+                image=backup_icon,
+                compound="left",
+                command=self.show_backup_window,
+                font=ctk.CTkFont(size=18)
+            ).pack(side="right", padx=10, pady=8)
+            
+            # Add Restore button
+            restore_icon = ctk.CTkImage(Image.open("icons/backup.png"), size=(24, 24))  # You'll need this icon
+            ctk.CTkButton(
+                toolbar,
+                text=self.lang_manager.get_string("restore"),
+                width=120,
+                height=55,
+                image=restore_icon,
+                compound="left",
+                command=self.show_restore_window,
+                font=ctk.CTkFont(size=18)
+            ).pack(side="right", padx=10, pady=8)
+            
+            ctk.CTkButton(
+                toolbar,
+                text=self.lang_manager.get_string("about"),
+                width=120,
+                height=55,
+                image=info,
+                compound="left",  # icon on the left, text on the right
+                command=self.show_about_dialog,
+                font=ctk.CTkFont(size=18)
+            ).pack(side="right", padx=10, pady=8)
+            
+            # Add Logout button (RED for safety/logout action)
+            logout_icon = ctk.CTkImage(Image.open("icons/logout.png"), size=(24, 24))
+            ctk.CTkButton(
+                toolbar,
+                text="Logout",
+                width=120,
+                height=55,
+                image=logout_icon,
+                compound="left",
+                command=self.secure_logout,
+                font=ctk.CTkFont(size=18),
+                fg_color="#D32F2F",
+                hover_color="#B71C1C"
+            ).pack(side="right", padx=10, pady=8)
+
+            content_frame = ctk.CTkFrame(self.main_frame)
+            content_frame.pack(fill="both", expand=True, padx=10, pady=10)
+            
+            self.create_sidebar(content_frame)
+            self.main_panel = ctk.CTkFrame(content_frame)
+            self.main_panel.pack(side="right", fill="both", expand=True, padx=10, pady=10)
+            
+            if self.trial_manager and self.trial_manager.is_trial_active:
+                self._start_trial_check_timer()
+
+            self.show_passwords()
+        
+            # DEFERRED: Start expensive operations after UI is visible
+            # Use root.after to schedule these tasks for later execution
+            def deferred_startup_tasks():
+                """Heavy operations deferred to after UI is shown"""
+                logger.info("Starting deferred startup tasks...")
+                
                 try:
-                    if self.trial_manager and self.trial_manager.anchor:
-                        self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
-                    if hasattr(self, 'tamper_manager'):
-                        self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
+                    # Initialize password reminder (now with deferred start)
+                    self.password_reminder = PasswordReminder(self.database, self)
+                    self.password_reminder.start()  # Now starts the background thread
+                    logger.info("Password reminder initialized and started")
                 except Exception as e:
-                    logger.error(f"Error updating shutdown status on close: {e}")
-                finally:
-                    # Schedule logout after status update
-                    self.root.after(100, self.secure_logout)
+                    logger.error(f"Error initializing password reminder: {e}")
+                
+                try:
+                    # Update expired passwords count
+                    self.update_expired_passwords_count()
+                    logger.info("Expired passwords count updated")
+                except Exception as e:
+                    logger.error(f"Error updating expired passwords: {e}")
+                
+                logger.info("Deferred startup tasks completed")
             
-            # Run status update in background thread
-            import threading
-            status_thread = threading.Thread(target=update_status_bg, daemon=True)
-            status_thread.start()
-        
-        self.root.protocol("WM_DELETE_WINDOW", on_closing)
-
-        # The tutorial is now started manually from the "About" window.
-        # logger.info(f"Tutorial check: tutorial_completed = {self.settings.get('tutorial_completed', False)}")
-        # if not self.settings.get('tutorial_completed', False):
-        #     logger.info("Showing tutorial window...")
-        #     tutorial = TutorialManager(self.root, self.lang_manager)
-        #     tutorial.show_tutorial_window()
-        #     self.settings['tutorial_completed'] = True
-        #     logger.info("Tutorial completed, saving settings...")
-        #     self.save_settings_to_file()
-        # else:
-        #     logger.info("Tutorial already completed, skipping.")
-
-        toolbar = ctk.CTkFrame(self.main_frame, height=70)
-        toolbar.pack(fill="x", padx=10, pady=10)
-        toolbar.pack_propagate(False)
-        
-        if self.trial_manager and self.trial_manager.is_trial_active:
-            self.trial_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-            self.trial_frame.pack(side="left", padx=20, pady=8)
-            self.update_trial_status_periodically()
-        
-        left_toolbar_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-        left_toolbar_frame.pack(side="left", fill="y", padx=25, pady=10)
-
-        ctk.CTkLabel(
-            left_toolbar_frame,
-            text=self.lang_manager.get_string("main_toolbar_title"),
-            font=ctk.CTkFont(size=24, weight="bold")
-        ).pack(anchor="w")
-        
-        welcome_message = self._generate_welcome_message()
-        ctk.CTkLabel(
-            left_toolbar_frame,
-            text=welcome_message,
-            font=ctk.CTkFont(size=12),
-            justify="left",
-            anchor="w"
-        ).pack(anchor="w", pady=(5, 0))
-       
-        # Add Backup button (before About button)
-        backup_icon = ctk.CTkImage(Image.open("icons/uploadbk.png"), size=(24, 24))  # You'll need this icon
-        ctk.CTkButton(
-            toolbar,
-            text=self.lang_manager.get_string("backup"),
-            width=120,
-            height=55,
-            image=backup_icon,
-            compound="left",
-            command=self.show_backup_window,
-            font=ctk.CTkFont(size=18)
-        ).pack(side="right", padx=10, pady=8)
-        
-        # Add Restore button
-        restore_icon = ctk.CTkImage(Image.open("icons/backup.png"), size=(24, 24))  # You'll need this icon
-        ctk.CTkButton(
-            toolbar,
-            text=self.lang_manager.get_string("restore"),
-            width=120,
-            height=55,
-            image=restore_icon,
-            compound="left",
-            command=self.show_restore_window,
-            font=ctk.CTkFont(size=18)
-        ).pack(side="right", padx=10, pady=8)
-        
-        ctk.CTkButton(
-            toolbar,
-            text=self.lang_manager.get_string("about"),
-            width=120,
-            height=55,
-            image=info,
-            compound="left",  # icon on the left, text on the right
-            command=self.show_about_dialog,
-            font=ctk.CTkFont(size=18)
-        ).pack(side="right", padx=10, pady=8)
-        
-        # Add Logout button (RED for safety/logout action)
-        logout_icon = ctk.CTkImage(Image.open("icons/logout.png"), size=(24, 24))
-        ctk.CTkButton(
-            toolbar,
-            text="Logout",
-            width=120,
-            height=55,
-            image=logout_icon,
-            compound="left",
-            command=self.secure_logout,
-            font=ctk.CTkFont(size=18),
-            fg_color="#D32F2F",
-            hover_color="#B71C1C"
-        ).pack(side="right", padx=10, pady=8)
-
-        content_frame = ctk.CTkFrame(self.main_frame)
-        content_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        self.create_sidebar(content_frame)
-        self.main_panel = ctk.CTkFrame(content_frame)
-        self.main_panel.pack(side="right", fill="both", expand=True, padx=10, pady=10)
-        
-        if self.trial_manager and self.trial_manager.is_trial_active:
-            self._start_trial_check_timer()
-
-        self.show_passwords()
+            # Schedule deferred tasks after a short delay to allow UI to render
+            # Using a longer delay (500ms) to ensure UI is fully visible before heavy work
+            self.root.after(500, deferred_startup_tasks)    
     
-        # DEFERRED: Start expensive operations after UI is visible
-        # Use root.after to schedule these tasks for later execution
-        def deferred_startup_tasks():
-            """Heavy operations deferred to after UI is shown"""
-            logger.info("Starting deferred startup tasks...")
-            
-            try:
-                # Initialize password reminder (now with deferred start)
-                self.password_reminder = PasswordReminder(self.database, self)
-                self.password_reminder.start()  # Now starts the background thread
-                logger.info("Password reminder initialized and started")
-            except Exception as e:
-                logger.error(f"Error initializing password reminder: {e}")
-            
-            try:
-                # Update expired passwords count
-                self.update_expired_passwords_count()
-                logger.info("Expired passwords count updated")
-            except Exception as e:
-                logger.error(f"Error updating expired passwords: {e}")
-            
-            logger.info("Deferred startup tasks completed")
-        
-        # Schedule deferred tasks after a short delay to allow UI to render
-        # Using a longer delay (500ms) to ensure UI is fully visible before heavy work
-        self.root.after(500, deferred_startup_tasks)
-
     def update_trial_status_periodically(self):
         """Updates the trial status UI periodically."""
         if not self.trial_manager or not self.trial_manager.is_trial_active:
