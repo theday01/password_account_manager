@@ -1,5 +1,6 @@
 import logging
 import sys
+import io
 
 def setup_logging():
     """
@@ -15,12 +16,15 @@ def setup_logging():
     )
 
     # Create a file handler
-    file_handler = logging.FileHandler('audit.log')
+    file_handler = logging.FileHandler('audit.log', encoding='utf-8')
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
 
-    # Create a stream handler to output to the console
-    stream_handler = logging.StreamHandler(sys.stdout)
+    # Create a stream handler to output to the console with UTF-8 encoding
+    # This fixes UnicodeEncodeError on Windows console
+    stream_handler = logging.StreamHandler(
+        io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    )
     stream_handler.setLevel(logging.INFO)
     stream_handler.setFormatter(formatter)
 

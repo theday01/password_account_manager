@@ -7,6 +7,7 @@ Uses a lock file to track if the program is already running.
 import os
 import sys
 import atexit
+import tempfile
 from pathlib import Path
 
 
@@ -22,8 +23,7 @@ class ProcessLock:
         """
         if lock_file is None:
             # Store lock file in user's temp directory
-            temp_dir = Path(os.getenv('APPDATA')) / 'Local' / 'Temp'
-            lock_file = temp_dir / 'password_manager.lock'
+            lock_file = Path(tempfile.gettempdir()) / 'password_manager.lock'
         
         self.lock_file = Path(lock_file)
         self.lock_file.parent.mkdir(parents=True, exist_ok=True)

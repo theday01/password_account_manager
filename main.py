@@ -31,10 +31,8 @@ from audit_logger import setup_logging
 from tutorial import TutorialManager
 from localization import LanguageManager
 import threading
-from notification_manager import _periodic_sender, notifier, send_safe_notification, send_trial_notification, start_trial_notifications
+from notification_manager import _periodic_sender, notifier, send_safe_notification
 from desktop_notifier import Icon
-from trial_manager import TrialManager
-from reminder import ReminderManager
 from password_reminder import PasswordReminder
 from asyncio_manager import asyncio_manager
 from tamper_manager import TamperManager
@@ -1114,8 +1112,6 @@ class ModernPasswordManagerGUI:
         self.password_generator = PasswordGenerator(self.lang_manager)
         self.database = None
         self.secure_file_manager = None
-        self.trial_manager = None
-        self.reminder_manager = None
         self.password_reminder = None
         self.authenticated = False  # Initialize here to prevent cleanup error
         ctk.set_appearance_mode("dark")  
@@ -1249,45 +1245,10 @@ class ModernPasswordManagerGUI:
     def show_loading_screen(self):
         """Display professional enterprise-grade loading screen"""
         def on_loading_complete():
-            # Initialize SFM early for trial manager
             self._setup_secure_file_manager()
-            
-            # Initialize TrialManager in background thread to prevent UI freeze
-            def init_trial_manager():
-                try:
-                    self.trial_manager = TrialManager(self.root, self.secure_file_manager, restart_callback=self.restart_program)
-                    self.reminder_manager = ReminderManager(self.trial_manager, self)
-                    logger.info(f"Trial status at startup: {self.trial_manager.status}")
-                    
-                    # Schedule the next steps on the main thread
-                    self.root.after(0, check_trial_status)
-                except Exception as e:
-                    logger.error(f"Error initializing trial manager: {e}")
-                    self.root.after(0, lambda: self._initialize_app())
-            
-            def check_trial_status():
-                try:
-                    if self.trial_manager.status in ["EXPIRED", "TAMPERED"]:
-                        logger.warning("Trial has expired or is tampered. Showing dialog.")
-                        if not self.trial_manager.show_trial_expired_dialog():
-                            logger.warning("User exited the application from the trial dialog.")
-                            self.root.quit()
-                            return
-                    
-                    # Perform application integrity check
-                    self.tamper_manager = TamperManager()
-                    
-                    # Continue to initialize app
-                    self._initialize_app()
-                except Exception as e:
-                    logger.error(f"Error during trial status check: {e}")
-                    self._initialize_app()
-            
-            # Run trial manager init in background thread to prevent freezing
-            import threading
-            trial_thread = threading.Thread(target=init_trial_manager, daemon=True)
-            trial_thread.start()
-        
+            self.tamper_manager = TamperManager()
+            self._initialize_app()
+
         # Create and show the enhanced loading screen
         enhanced_loader = EnhancedLoadingScreen(self.root, self.lang_manager, self.version_data)
         enhanced_loader.show(on_loading_complete)
@@ -1579,29 +1540,6 @@ class ModernPasswordManagerGUI:
             self.auth_guardian.update_setting('consecutive_logins', consecutive_logins)
             self.settings['last_login_timestamp'] = now
             self.settings['consecutive_logins'] = consecutive_logins
-            # Start trial notifications if in trial mode (every 10 minutes)
-            if self.trial_manager.is_trial_active and self.trial_manager.status == "TRIAL":
-                logger.info("Starting trial notification loop with 10-minute interval")
-                start_trial_notifications(self.trial_manager, asyncio_manager, notification_interval_seconds=600)
-            # Also start notifications if trial has expired (every 10 minutes reminder)
-            elif self.trial_manager.status == "EXPIRED":
-                logger.info("Trial expired - starting reminder notification loop with 10-minute interval")
-                start_trial_notifications(self.trial_manager, asyncio_manager, notification_interval_seconds=600)
-            
-            # Check if program was just activated and show activation success notification
-            if self.trial_manager._settings.get('just_activated', False):
-                logger.info("Program was just activated, showing success notification")
-                try:
-                    from notification_manager import show_system_notification_fallback
-                    show_system_notification_fallback(
-                        "Activation Successful",
-                        "Thank you for purchasing SecureVault Pro! The program is now activated for life. Enjoy secure password management!"
-                    )
-                    # Clear the flag after showing the notification
-                    self.trial_manager._settings['just_activated'] = False
-                    self.trial_manager._save_activation_state()
-                except Exception as e:
-                    logger.error(f"Failed to show activation notification: {e}")
             
             self.show_loading_main_ui()
             self.root.after(100, self.show_main_interface)
@@ -1621,13 +1559,13 @@ class ModernPasswordManagerGUI:
                 return
 
             if self.auth_guardian.is_locked_out():
-                self.trial_manager.show_lockout_dialog(self.auth_guardian.get_remaining_lockout_time())
+                self.show_message("error", "Account locked", msg_type="error")
                 self.root.quit()
             else:
                 remaining_attempts = self.auth_guardian.MAX_ATTEMPTS_BEFORE_LOCKOUT - self.auth_guardian.failed_attempts
                 self.show_message("error", "invalid_master_password_error", msg_type="error", attempts=remaining_attempts)
                 if self.auth_guardian.is_locked_out(): # Re-check after message
-                    self.trial_manager.show_lockout_dialog(self.auth_guardian.get_remaining_lockout_time())
+                    self.show_message("error", "Account locked", msg_type="error")
                     self.root.quit()
 
     def disable_login_button_with_countdown(self):
@@ -2365,11 +2303,6 @@ class ModernPasswordManagerGUI:
             toolbar.pack(fill="x", padx=10, pady=10)
             toolbar.pack_propagate(False)
             
-            if self.trial_manager and self.trial_manager.is_trial_active:
-                self.trial_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
-                self.trial_frame.pack(side="left", padx=20, pady=8)
-                self.update_trial_status_periodically()
-            
             left_toolbar_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
             left_toolbar_frame.pack(side="left", fill="y", padx=25, pady=10)
 
@@ -2447,9 +2380,6 @@ class ModernPasswordManagerGUI:
             self.main_panel = ctk.CTkFrame(content_frame)
             self.main_panel.pack(side="right", fill="both", expand=True, padx=10, pady=10)
             
-            if self.trial_manager and self.trial_manager.is_trial_active:
-                self._start_trial_check_timer()
-
             self.show_passwords()
         
             # DEFERRED: Start expensive operations after UI is visible
@@ -2479,66 +2409,6 @@ class ModernPasswordManagerGUI:
             # Using a longer delay (500ms) to ensure UI is fully visible before heavy work
             self.root.after(500, deferred_startup_tasks)    
     
-    def update_trial_status_periodically(self):
-        """Updates the trial status UI periodically."""
-        if not self.trial_manager or not self.trial_manager.is_trial_active:
-            return
-
-        # Clear previous widgets
-        for widget in self.trial_frame.winfo_children():
-            widget.destroy()
-
-        remaining_seconds = self.trial_manager.get_remaining_seconds()
-        
-        if remaining_seconds <= 0:
-            self.trial_frame.pack_forget()
-            return
-
-        remaining_minutes = int(remaining_seconds / 60)
-        remaining_hours = remaining_minutes // 60
-        remaining_days = remaining_hours // 24
-
-        def _english_time(n, unit):
-            if unit == "day":
-                return f"{n} day" if n == 1 else f"{n} days"
-            if unit == "hour":
-                return f"{n} hour" if n == 1 else f"{n} hours"
-            # minutes
-            return f"{n} minute" if n == 1 else f"{n} minutes"
-
-        if remaining_days > 0:
-            time_text = _english_time(remaining_days, "day")
-        elif remaining_hours > 0:
-            time_text = _english_time(remaining_hours, "hour")
-        else:
-            time_text = _english_time(remaining_minutes, "minute")
-            
-        text_color = "red" if remaining_days < 1 else "#FF7A18"
-
-        primary_label = ctk.CTkLabel(
-            self.trial_frame,
-            text=f"⏳ Trial — {time_text} remaining",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            text_color=text_color,
-            anchor="w",
-            justify="left"
-        )
-        primary_label.pack(anchor="w")
-
-        secondary_label = ctk.CTkLabel(
-            self.trial_frame,
-            text="When the trial ends, you'll need to activate the full version to continue.",
-            font=ctk.CTkFont(size=11),
-            text_color="#6B7280",
-            anchor="w",
-            justify="left"
-        )
-        secondary_label.pack(anchor="w", pady=(4, 0))
-        
-        # Schedule the next update (e.g., every hour)
-        TRIAL_UI_UPDATE_INTERVAL_MS = 3600000  # 1 hour
-        self.root.after(TRIAL_UI_UPDATE_INTERVAL_MS, self.update_trial_status_periodically)
-
     # 5. Add the backup window method
     def show_backup_window(self):
         """Show backup creation window"""
@@ -2998,53 +2868,6 @@ class ModernPasswordManagerGUI:
                     hover_color="#DC2626").pack(side="right")
 
 
-    def _start_trial_check_timer(self):
-        """Starts a recurring timer to check the trial status."""
-        self.trial_notification_sent = False
-        self.trial_timer_id = None
-
-        def _check():
-            if not self.trial_manager or not self.trial_manager.is_trial_active:
-                self.trial_timer_id = None
-                return  # Stop the timer if trial is no longer active
-
-            remaining_seconds = self.trial_manager.get_remaining_seconds()
-
-            if remaining_seconds <= 20 and not self.trial_notification_sent:
-                try:
-                    logger.info(f"Sending trial ending soon notification. {int(remaining_seconds)} seconds remaining.")
-                    from notification_manager import send_trial_notification_sync
-                    
-                    # Use the synchronous wrapper for the async notification system
-                    success = send_trial_notification_sync(f"{int(remaining_seconds)} seconds")
-                    if success:
-                        logger.info("Trial notification sent successfully")
-                    else:
-                        logger.warning("Trial notification failed to send")
-                    self.trial_notification_sent = True
-                except Exception as e:
-                    logger.error(f"Failed to send trial notification: {e}")
-                    # Still mark as sent to prevent spam
-                    self.trial_notification_sent = True
-                    
-            if remaining_seconds <= 0:
-                logger.warning("Trial has expired. Closing application.")
-                self.trial_manager.show_trial_expired_dialog(from_runtime=True)
-                self.trial_timer_id = None
-                self.root.quit()
-                return  # Stop timer
-
-            # Reschedule the check
-            self.trial_timer_id = self.root.after(1000, _check)
-
-        # Start the first check
-        self.trial_timer_id = self.root.after(1000, _check)
-
-    def _stop_trial_check_timer(self):
-        """Stops the trial check timer if it's running."""
-        if hasattr(self, 'trial_timer_id') and self.trial_timer_id:
-            self.root.after_cancel(self.trial_timer_id)
-            self.trial_timer_id = None
     def create_sidebar(self, parent):
         self.sidebar = ctk.CTkFrame(parent, width=280)
         self.sidebar.pack(side="left", fill="y", padx=10, pady=10)
@@ -3116,26 +2939,6 @@ class ModernPasswordManagerGUI:
         btn.pack(side="bottom", fill="x", padx=15, pady=10)
         self.sidebar_buttons.append(btn)
 
-        if self.trial_manager and self.trial_manager.is_trial_active:
-            activation_config = (self.lang_manager.get_string("activation"), activation_icon, self.show_activation_dialog)
-            text, icon, command = activation_config
-            btn = ctk.CTkButton(
-                self.sidebar,
-                text=text,
-                image=icon,
-                compound="left",
-                anchor="w",
-                command=lambda cmd=command, txt=text: self.handle_sidebar_click(cmd, txt),
-                height=60,
-                font=ctk.CTkFont(size=18),
-                corner_radius=10,
-                fg_color=("#3B82F6", "#1E40AF"),
-                hover_color=("#2563EB", "#1D4ED8"),
-                text_color=("white", "white")
-            )
-            btn.pack(side="bottom", fill="x", padx=15, pady=10)
-            self.sidebar_buttons.append(btn)
-
         settings_config = (self.lang_manager.get_string("settings"), settings, self.show_settings)
         text, icon, command = settings_config
         btn = ctk.CTkButton(
@@ -3157,192 +2960,6 @@ class ModernPasswordManagerGUI:
         if self.sidebar_buttons:
             self.set_active_button(self.sidebar_buttons[0])
     
-    def show_activation_dialog(self):
-        if self.trial_manager.is_activation_locked_out():
-            lockout_time = self.trial_manager.get_remaining_activation_lockout_time()
-            self.show_message(
-                "error",
-                "activation_locked_out_message",
-                msg_type="error",
-                lockout_time=f"{lockout_time // 60} minutes"
-            )
-            return
-
-        # Create modern activation dialog
-        dialog = ThemedToplevel(self.root)
-        dialog.title(self.lang_manager.get_string("activation"))
-        dialog.grab_set()
-        
-        # Center the dialog
-        dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (325)
-        y = (dialog.winfo_screenheight() // 2) - (265)
-        dialog.geometry(f"650x480+{x}+{y}")
-        dialog.resizable(False, False)
-        
-        result = {"license_key": None}
-        
-        # Main container with padding
-        main_frame = ctk.CTkFrame(dialog, corner_radius=15)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        # Header section
-        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        header_frame.pack(fill="x", pady=(20, 15))
-        
-        title_label = ctk.CTkLabel(
-            header_frame,
-            text="🔑 " + self.lang_manager.get_string("activation"),
-            font=ctk.CTkFont(size=24, weight="bold")
-        )
-        title_label.pack()
-        
-        subtitle_label = ctk.CTkLabel(
-            header_frame,
-            text="Activate your full version of SecureVault Pro",
-            font=ctk.CTkFont(size=14),
-            text_color=("gray60", "gray40")
-        )
-        subtitle_label.pack(pady=(5, 0))
-        
-        # Content section
-        content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        content_frame.pack(fill="both", expand=True, padx=30, pady=10)
-        
-        # Machine ID Section
-        machine_id_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        machine_id_frame.pack(fill="x", pady=(10, 15))
-        
-        machine_id_label = ctk.CTkLabel(
-            machine_id_frame,
-            text="Your Machine ID:",
-            font=ctk.CTkFont(size=16, weight="bold"),
-            anchor="w"
-        )
-        machine_id_label.pack(fill="x", pady=(0, 5))
-        
-        machine_id = generate_machine_id()
-        
-        machine_id_entry_frame = ctk.CTkFrame(machine_id_frame, fg_color="transparent")
-        machine_id_entry_frame.pack(fill="x")
-        
-        machine_id_entry = ctk.CTkEntry(
-            machine_id_entry_frame,
-            height=45,
-            font=ctk.CTkFont(size=12)
-        )
-        machine_id_entry.insert(0, machine_id)
-        machine_id_entry.configure(state="readonly")
-        machine_id_entry.pack(side="left", fill="x", expand=True)
-
-        def copy_machine_id():
-            self.root.clipboard_clear()
-            self.root.clipboard_append(machine_id)
-            copy_button.configure(text="Copied!")
-            dialog.after(2000, lambda: copy_button.configure(text="Copy"))
-
-        copy_button = ctk.CTkButton(
-            machine_id_entry_frame,
-            text="Copy",
-            command=copy_machine_id,
-            width=80,
-            height=45
-        )
-        copy_button.pack(side="left", padx=(10, 0))
-        
-        # License key input
-        input_label = ctk.CTkLabel(
-            content_frame,
-            text=self.lang_manager.get_string("activation_prompt"),
-            font=ctk.CTkFont(size=16, weight="bold"),
-            anchor="w"
-        )
-        input_label.pack(fill="x", pady=(10, 10))
-        
-        license_entry = ctk.CTkEntry(
-            content_frame,
-            placeholder_text="Enter your license key here...",
-            width=400,
-            height=45
-        )
-        license_entry.pack(fill="x", pady=(0, 15))
-        license_entry.focus()
-        
-        info_text = ctk.CTkLabel(
-            content_frame,
-            text="Your license key was provided when you purchased SecureVault Pro.\nIf you don't have a license key, contact our support team.",
-            font=ctk.CTkFont(size=12),
-            text_color=("gray50", "gray50"),
-            justify="center"
-        )
-        info_text.pack(pady=(0, 20))
-        
-        def on_ok():
-            license_key = license_entry.get().strip()
-            if not license_key:
-                self.show_message("error", "Please enter a license key", msg_type="error")
-                license_entry.focus()
-                return
-            result["license_key"] = license_key
-            dialog.destroy()
-        
-        def on_cancel():
-            result["license_key"] = None
-            dialog.destroy()
-        
-        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        button_frame.pack(fill="x", padx=30, pady=(0, 20))
-        
-        cancel_btn = ctk.CTkButton(
-            button_frame,
-            text=self.lang_manager.get_string("cancel_button"),
-            command=on_cancel,
-            width=120,
-            height=45,
-            font=ctk.CTkFont(size=16),
-            fg_color=("gray70", "gray30"),
-            hover_color=("gray60", "gray40")
-        )
-        cancel_btn.pack(side="left")
-        
-        ok_btn = ctk.CTkButton(
-            button_frame,
-            text=self.lang_manager.get_string("ok_button"),
-            command=on_ok,
-            width=120,
-            height=45,
-            font=ctk.CTkFont(size=16, weight="bold"),
-            fg_color=("#2B6CB0", "#1E40AF"),
-            hover_color=("#2563EB", "#1D4ED8")
-        )
-        ok_btn.pack(side="right")
-        
-        dialog.bind('<Return>', lambda e: on_ok())
-        dialog.bind('<Escape>', lambda e: on_cancel())
-        
-        dialog.wait_window()
-        license_key = result["license_key"]
-
-        if license_key:
-            if self.trial_manager.validate_and_activate(license_key):
-                if self.show_message(
-                    "activation_success_title",
-                    "activation_success_message",
-                    ask="yesno"
-                ):
-                    self.restart_program()
-            else:
-                attempts_left = 3 - self.trial_manager.failed_activation_attempts
-                if attempts_left > 0:
-                    self.show_message(
-                        "activation_failed_title",
-                        "activation_failed_message",
-                        msg_type="error",
-                        attempts_left=attempts_left
-                    )
-                else:
-                    self.show_activation_dialog()
-                    
     def handle_sidebar_click(self, command, button_text):
         clicked_button = next((btn for btn in self.sidebar_buttons if btn.cget("text") == button_text), None)
         if clicked_button:
@@ -3368,10 +2985,6 @@ class ModernPasswordManagerGUI:
         try:
             if self.password_reminder:
                 self.password_reminder.stop()
-            # Stop trial check timer when locking vault
-            self._stop_trial_check_timer()
-            if self.trial_manager and self.trial_manager.anchor:
-                self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
             if hasattr(self, 'tamper_manager'):
                 self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
             if self.secure_file_manager and self.authenticated:
@@ -3407,7 +3020,6 @@ class ModernPasswordManagerGUI:
 
     def force_logout(self):
         logger.info("Logging out due to inactivity.")
-        self._stop_trial_check_timer()
         self.lock_vault()
         self.root.quit()
 
@@ -3435,9 +3047,6 @@ class ModernPasswordManagerGUI:
             
             def shutdown_cleanup():
                 try:
-                    if self.trial_manager and self.trial_manager.anchor:
-                        logger.info("Updating anchor shutdown status to SHUTDOWN_CLEAN")
-                        self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
                     if hasattr(self, 'tamper_manager'):
                         logger.info("Updating tamper manager shutdown status")
                         self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
@@ -4432,8 +4041,6 @@ class ModernPasswordManagerGUI:
         import subprocess
         try:
             logger.info("Initiating secure program restart...")
-            if self.trial_manager and self.trial_manager.anchor:
-                self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN')
             if hasattr(self, 'tamper_manager'):
                 self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
             if self.secure_file_manager and self.authenticated:
@@ -6474,7 +6081,7 @@ class ModernPasswordManagerGUI:
             remaining_time = self.get_remaining_lockout_time()
             minutes, seconds = divmod(remaining_time, 60)
             logger.info(f"User is locked out on startup - {minutes:02d}:{seconds:02d} remaining")
-            self.trial_manager.show_lockout_dialog(remaining_time)
+            self.show_message("error", "Account locked", msg_type="error")
             self.root.quit()
             return True
         return False
@@ -6551,13 +6158,6 @@ class ModernPasswordManagerGUI:
             
             logger.info("User confirmed logout")
             
-            # Step 2: Stop trial check timer if running
-            try:
-                self._stop_trial_check_timer()
-                logger.info("Trial check timer stopped")
-            except Exception as e:
-                logger.error(f"Error stopping trial check timer: {e}")
-            
             # Step 3: Stop password reminder thread
             try:
                 if self.password_reminder:
@@ -6570,13 +6170,6 @@ class ModernPasswordManagerGUI:
             try:
                 def update_status_bg():
                     try:
-                        if self.trial_manager and self.trial_manager.anchor:
-                            logger.info("Updating anchor shutdown status to SHUTDOWN_CLEAN")
-                            if self.trial_manager.anchor.update_shutdown_status('SHUTDOWN_CLEAN'):
-                                logger.info("Anchor shutdown status updated successfully")
-                            else:
-                                logger.error("Failed to update anchor shutdown status")
-                        
                         if hasattr(self, 'tamper_manager'):
                             logger.info("Updating tamper manager shutdown status")
                             self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')

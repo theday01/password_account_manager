@@ -22,7 +22,7 @@ class TamperManager:
             self.app_files = [sys.executable]
         else:
             self.app_files = app_files_to_monitor or [
-                'main.py', 'trial_manager.py', 'tamper_manager.py',
+                'main.py', 'tamper_manager.py',
                 'machine_id_utils.py', 'secure_file_manager.py'
             ]
         
