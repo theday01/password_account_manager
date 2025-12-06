@@ -21,6 +21,9 @@ from machine_id_utils import generate_machine_id
 
 logger = logging.getLogger(__name__)
 
+# Import activation protector (lazy import to avoid circular dependency)
+_activation_protector = None
+
 
 class TrialActivationManager:
     """
@@ -56,6 +59,9 @@ class TrialActivationManager:
         
         # Generate machine ID for this system
         self.machine_id = generate_machine_id()
+        
+        # Initialize activation protector
+        self._init_activation_protector()
         
         logger.info(f"TrialActivationManager initialized")
         logger.info(f"Storage path: {self.storage_path}")
@@ -282,6 +288,10 @@ class TrialActivationManager:
             
             # Save activation
             if self._save_trial_data(data):
+                # Synchronize with activation protector
+                if self._activation_protector:
+                    self._activation_protector.synchronize_with_trial_manager()
+                
                 logger.info("✅ Application activated successfully")
                 return True, "Activation successful"
             else:
@@ -318,6 +328,54 @@ class TrialActivationManager:
         """Get the machine ID for this system."""
         return self.machine_id
     
+    def _init_activation_protector(self):
+        """Initialize the activation state protector."""
+        global _activation_protector
+        try:
+            from activation_state_protector import get_activation_protector
+            _activation_protector = get_activation_protector(trial_manager=self)
+            self._activation_protector = _activation_protector
+            
+            # Synchronize initial state
+            self._activation_protector.synchronize_with_trial_manager()
+            
+            # Start monitoring
+            self._activation_protector.start_monitoring()
+            
+            logger.info("Activation protector initialized and monitoring started")
+        except Exception as e:
+            logger.error(f"Failed to initialize activation protector: {e}")
+            self._activation_protector = None
+    
+    def check_activation_integrity(self) -> Tuple[bool, str]:
+        """
+        Check activation integrity across all protected locations.
+        
+        Returns:
+            Tuple[bool, str]: (is_valid, reason)
+        """
+        if not self._activation_protector:
+            return True, "protection_not_available"
+        
+        # Check for tampering
+        if self._activation_protector.is_tampered():
+            logger.critical("ACTIVATION TAMPERING DETECTED!")
+            return False, "tampered"
+        
+        # Load and verify state
+        state = self._activation_protector.load_activation_state()
+        if state is None:
+            logger.warning("Activation state unavailable or corrupted")
+            return False, "state_unavailable"
+        
+        # Verify consistency with trial manager
+        trial_status = self.get_trial_status()
+        if state.is_activated != trial_status['is_activated']:
+            logger.error("Activation state mismatch detected")
+            return False, "state_mismatch"
+        
+        return True, "valid"
+    
     def get_activation_info(self) -> Dict:
         """
         Get detailed activation information for display.
@@ -328,7 +386,7 @@ class TrialActivationManager:
         data = self._load_trial_data()
         status = self.get_trial_status()
         
-        return {
+        info = {
             'machine_id': self.machine_id,
             'is_activated': status['is_activated'],
             'activation_date': data.get('activation_date'),
@@ -337,6 +395,14 @@ class TrialActivationManager:
             'days_remaining': status.get('days_remaining'),
             'expected_license_key': self.generate_expected_license_key()
         }
+        
+        # Add protection status
+        if self._activation_protector:
+            protection_status = self._activation_protector.get_protection_status()
+            info['protection_active'] = protection_status['is_monitoring']
+            info['tamper_detected'] = protection_status['tamper_detected']
+        
+        return info
 
 
 # Singleton instance

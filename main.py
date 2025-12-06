@@ -1318,6 +1318,18 @@ class ModernPasswordManagerGUI:
         # Initialize trial manager
         self.trial_manager = get_trial_manager()
         
+        # CRITICAL: Check activation integrity FIRST
+        integrity_valid, integrity_reason = self.trial_manager.check_activation_integrity()
+        if not integrity_valid:
+            if integrity_reason == "tampered":
+                # Tampering detected - show critical error and block access
+                self.show_tamper_detected_screen()
+                return
+            elif integrity_reason in ["state_unavailable", "state_mismatch"]:
+                # State corruption detected - attempt recovery
+                logger.warning(f"Activation state issue detected: {integrity_reason}")
+                # The protector will attempt auto-recovery through synchronization
+        
         # Check trial/activation status BEFORE authentication
         can_access, reason = self.trial_manager.is_access_allowed()
         
@@ -1660,6 +1672,251 @@ class ModernPasswordManagerGUI:
         ).pack(side="right", padx=10)
         
         license_entry.bind("<Return>", lambda e: perform_activation())
+    
+    def show_tamper_detected_screen(self):
+        """Show critical tamper detection screen that blocks all access."""
+        # Center the main window on screen
+        self.root.update_idletasks()
+        window_width = 900
+        window_height = 700
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.root.resizable(False, False)
+        
+        for widget in self.main_frame.winfo_children():
+            widget.destroy()
+        
+        # Make window always on top
+        self.root.attributes('-topmost', True)
+        
+        container = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        container.place(relx=0.5, rely=0.5, anchor="center")
+        
+        card = ctk.CTkFrame(container, corner_radius=15, fg_color=("#FEE2E2", "#450A0A"))
+        card.pack(padx=40, pady=40)
+        
+        # Critical error icon
+        ctk.CTkLabel(
+            card,
+            text="⛔",
+            font=ctk.CTkFont(size=72)
+        ).pack(pady=(30, 10))
+        
+        # Title
+        ctk.CTkLabel(
+            card,
+            text="CRITICAL SECURITY ALERT",
+            font=ctk.CTkFont(size=32, weight="bold"),
+            text_color="#DC2626"
+        ).pack(pady=(10, 5))
+        
+        # Subtitle
+        ctk.CTkLabel(
+            card,
+            text="Activation Tampering Detected",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color="#991B1B"
+        ).pack(pady=(5, 20))
+        
+        # Warning message
+        warning_text = (
+            "Unauthorized modification to the activation system has been detected.\n"
+            "This may indicate:\n\n"
+            "• Manual tampering with activation files\n"
+            "• Malicious software activity\n"
+            "• Unauthorized attempts to bypass licensing\n\n"
+            "For your security, all access to SecureVault Pro has been blocked."
+        )
+        
+        ctk.CTkLabel(
+            card,
+            text=warning_text,
+            font=ctk.CTkFont(size=13),
+            text_color="#7F1D1D",
+            justify="center"
+        ).pack(pady=(0, 20), padx=50)
+        
+        # Developer contact info
+        info_frame = ctk.CTkFrame(card, fg_color=("#FED7AA", "#78350F"), corner_radius=10)
+        info_frame.pack(fill="x", padx=40, pady=15)
+        
+        ctk.CTkLabel(
+            info_frame,
+            text="🔧 Contact Developer to Restore Access",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color="#92400E"
+        ).pack(pady=(15, 5), padx=20)
+        
+        ctk.CTkLabel(
+            info_frame,
+            text="Email: developer@securevaultpro.com\nSupport: https://support.securevaultpro.com",
+            font=ctk.CTkFont(size=12),
+            text_color="#78350F",
+            justify="center"
+        ).pack(pady=(5, 15), padx=20)
+        
+        # Machine ID for support
+        machine_id = self.trial_manager.get_machine_id()
+        
+        support_frame = ctk.CTkFrame(card, fg_color=("#E5E7EB", "#1F2937"), corner_radius=10)
+        support_frame.pack(fill="x", padx=40, pady=15)
+        
+        ctk.CTkLabel(
+            support_frame,
+            text="Machine ID (for support):",
+            font=ctk.CTkFont(size=11, weight="bold")
+        ).pack(pady=(10, 5), padx=20)
+        
+        id_entry = ctk.CTkEntry(
+            support_frame,
+            width=500,
+            height=35,
+            font=ctk.CTkFont(size=10, family="monospace"),
+            justify="center"
+        )
+        id_entry.pack(pady=(5, 10), padx=20)
+        id_entry.insert(0, machine_id)
+        id_entry.configure(state="readonly")
+        
+        # Copy button
+        def copy_machine_id():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(machine_id)
+            copy_btn.configure(text="✅ Copied!")
+            self.root.after(2000, lambda: copy_btn.configure(text="Copy Machine ID"))
+        
+        copy_btn = ctk.CTkButton(
+            card,
+            text="Copy Machine ID",
+            command=copy_machine_id,
+            width=180,
+            height=35,
+            fg_color=("#6B7280", "#4B5563")
+        )
+        copy_btn.pack(pady=(0, 15))
+        
+        # Developer recovery option
+        def show_recovery_dialog():
+            recovery_dialog = ThemedToplevel(self.root)
+            recovery_dialog.title("Developer Recovery")
+            recovery_dialog.grab_set()
+            recovery_dialog.resizable(False, False)
+            self.center_window(recovery_dialog, 500, 350)
+            
+            main_frame = ctk.CTkFrame(recovery_dialog, fg_color="transparent")
+            main_frame.pack(fill="both", expand=True, padx=30, pady=30)
+            
+            ctk.CTkLabel(
+                main_frame,
+                text="🔐 Developer Recovery",
+                font=ctk.CTkFont(size=20, weight="bold")
+            ).pack(pady=(0, 10))
+            
+            ctk.CTkLabel(
+                main_frame,
+                text="Enter the developer recovery key provided by support",
+                font=ctk.CTkFont(size=12),
+                text_color="#888888"
+            ).pack(pady=(0, 20))
+            
+            recovery_entry = ctk.CTkEntry(
+                main_frame,
+                width=400,
+                height=45,
+                placeholder_text="Enter recovery key",
+                font=ctk.CTkFont(size=12)
+            )
+            recovery_entry.pack(pady=(0, 15))
+            recovery_entry.focus()
+            
+            status_label = ctk.CTkLabel(
+                main_frame,
+                text="",
+                font=ctk.CTkFont(size=11)
+            )
+            status_label.pack(pady=(0, 15))
+            
+            def perform_recovery():
+                recovery_key = recovery_entry.get().strip()
+                
+                if not recovery_key:
+                    status_label.configure(text="⚠️ Please enter a recovery key", text_color="#FF9500")
+                    return
+                
+                status_label.configure(text="🔄 Verifying recovery key...", text_color="#4A90E2")
+                recovery_dialog.update()
+                
+                # Get activation protector
+                if hasattr(self.trial_manager, '_activation_protector'):
+                    protector = self.trial_manager._activation_protector
+                    if protector and protector.reset_after_developer_recovery(recovery_key):
+                        status_label.configure(text="✅ Recovery successful!", text_color="#10B981")
+                        recovery_dialog.update()
+                        
+                        self.show_message("success", 
+                            "Developer recovery successful!\n\nThe application will now restart.",
+                            msg_type="info")
+                        
+                        recovery_dialog.destroy()
+                        self.restart_program()
+                    else:
+                        status_label.configure(text="❌ Invalid recovery key", text_color="#EF4444")
+                else:
+                    status_label.configure(text="❌ Recovery system unavailable", text_color="#EF4444")
+            
+            button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+            button_frame.pack(pady=(10, 0))
+            
+            ctk.CTkButton(
+                button_frame,
+                text="Cancel",
+                command=recovery_dialog.destroy,
+                width=120,
+                height=40,
+                fg_color=("#999999", "#555555")
+            ).pack(side="left", padx=10)
+            
+            ctk.CTkButton(
+                button_frame,
+                text="Recover",
+                command=perform_recovery,
+                width=150,
+                height=40,
+                font=ctk.CTkFont(size=14, weight="bold"),
+                fg_color="#10B981",
+                hover_color="#059669"
+            ).pack(side="right", padx=10)
+            
+            recovery_entry.bind("<Return>", lambda e: perform_recovery())
+        
+        # Buttons
+        button_frame = ctk.CTkFrame(card, fg_color="transparent")
+        button_frame.pack(pady=(10, 30))
+        
+        ctk.CTkButton(
+            button_frame,
+            text="🔧 Developer Recovery",
+            command=show_recovery_dialog,
+            width=200,
+            height=45,
+            font=ctk.CTkFont(size=13),
+            fg_color="#F59E0B",
+            hover_color="#D97706"
+        ).pack(side="left", padx=10)
+        
+        ctk.CTkButton(
+            button_frame,
+            text="Exit Application",
+            command=self.root.quit,
+            width=200,
+            height=45,
+            font=ctk.CTkFont(size=13),
+            fg_color=("#DC2626", "#991B1B"),
+            hover_color=("#B91C1C", "#7F1D1D")
+        ).pack(side="right", padx=10)
     
     def show_activation_modal(self):
         """Show activation modal with program ID and activation input."""
@@ -3553,16 +3810,10 @@ class ModernPasswordManagerGUI:
         btn.pack(side="bottom", fill="x", padx=15, pady=(20, 10))
         self.sidebar_buttons.append(btn)
         
-        # Add Activation button (between Settings and Check for Updates)
-        try:
-            icon_activation = ctk.CTkImage(Image.open("icons/security.png"), size=(24, 24))
-        except:
-            icon_activation = None
-        
         activation_btn = ctk.CTkButton(
             self.sidebar,
             text="Activation",
-            image=icon_activation,
+            image=activation_icon,
             compound="left",
             anchor="w",
             command=lambda: self.handle_sidebar_click(self.show_activation_modal, "Activation"),
