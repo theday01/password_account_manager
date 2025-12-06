@@ -46,7 +46,7 @@ from datetime import datetime
 from backup import BackupManager
 from encrypted_db import get_encrypted_connection, create_encrypted_database, Row as EncryptedRow
 from enhanced_loading_screen import EnhancedLoadingScreen
-
+from trial_activation_manager import get_trial_manager
 
 logger = logging.getLogger(__name__)
 
@@ -1314,6 +1314,18 @@ class ModernPasswordManagerGUI:
     def setup_ui(self):
         self.main_frame = ctk.CTkFrame(self.root)
         self.main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Initialize trial manager
+        self.trial_manager = get_trial_manager()
+        
+        # Check trial/activation status BEFORE authentication
+        can_access, reason = self.trial_manager.is_access_allowed()
+        
+        if not can_access:
+            # Trial expired - show activation screen
+            self.show_activation_required_screen()
+            return
+        
         if self.check_startup_lockout():
             return
         
@@ -1440,6 +1452,561 @@ class ModernPasswordManagerGUI:
             self.update_lockout_countdown()
         self.update_login_button_states()
 
+    def show_activation_required_screen(self):
+        """Show professional activation screen when trial expires."""
+        # Center the main window on screen
+        self.root.update_idletasks()
+        window_width = 800
+        window_height = 650
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.root.resizable(False, False)
+        
+        for widget in self.main_frame.winfo_children():
+            widget.destroy()
+        
+        container = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        container.place(relx=0.5, rely=0.5, anchor="center")
+        
+        card = ctk.CTkFrame(container, corner_radius=15, fg_color=("#F5F5F5", "#1E1E1E"))
+        card.pack(padx=40, pady=40)
+        
+        # Lock icon
+        ctk.CTkLabel(
+            card,
+            text="🔒",
+            font=ctk.CTkFont(size=64)
+        ).pack(pady=(30, 10))
+        
+        # Title
+        ctk.CTkLabel(
+            card,
+            text="Activation Required",
+            font=ctk.CTkFont(size=28, weight="bold")
+        ).pack(pady=(10, 5))
+        
+        # Message
+        ctk.CTkLabel(
+            card,
+            text="Your 7-day trial period has expired.\nPlease activate SecureVault Pro to continue.",
+            font=ctk.CTkFont(size=14),
+            text_color="#666666",
+            justify="center"
+        ).pack(pady=(5, 20), padx=40)
+        
+        # Machine ID display
+        machine_id = self.trial_manager.get_machine_id()
+        
+        id_frame = ctk.CTkFrame(card, fg_color=("#E8E8E8", "#2A2A2A"), corner_radius=10)
+        id_frame.pack(fill="x", padx=40, pady=15)
+        
+        ctk.CTkLabel(
+            id_frame,
+            text="Your Machine ID:",
+            font=ctk.CTkFont(size=12, weight="bold")
+        ).pack(pady=(15, 5), padx=20)
+        
+        id_entry = ctk.CTkEntry(
+            id_frame,
+            width=400,
+            height=40,
+            font=ctk.CTkFont(size=11, family="monospace"),
+            justify="center"
+        )
+        id_entry.pack(pady=(5, 15), padx=20)
+        id_entry.insert(0, machine_id)
+        id_entry.configure(state="readonly")
+        
+        # Copy button for Machine ID
+        def copy_machine_id():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(machine_id)
+            copy_btn.configure(text="✅ Copied!")
+            self.root.after(2000, lambda: copy_btn.configure(text="Copy Machine ID"))
+        
+        copy_btn = ctk.CTkButton(
+            card,
+            text="Copy Machine ID",
+            command=copy_machine_id,
+            width=200,
+            height=40,
+            fg_color=("#4A90E2", "#357ABD")
+        )
+        copy_btn.pack(pady=(0, 15))
+        
+        # Activate button
+        ctk.CTkButton(
+            card,
+            text="🔑 Activate Now",
+            command=self.show_activation_dialog,
+            width=250,
+            height=50,
+            font=ctk.CTkFont(size=16, weight="bold"),
+            fg_color="#10B981",
+            hover_color="#059669"
+        ).pack(pady=(10, 20))
+        
+        # Exit button
+        ctk.CTkButton(
+            card,
+            text="Exit Program",
+            command=self.root.quit,
+            width=200,
+            height=40,
+            fg_color=("#999999", "#555555")
+        ).pack(pady=(0, 30))
+
+    def show_activation_dialog(self):
+        """Show activation dialog for entering license key."""
+        dialog = ThemedToplevel(self.root)
+        dialog.title("Activate SecureVault Pro")
+        dialog.grab_set()
+        dialog.resizable(False, False)
+        self.center_window(dialog, 500, 400)
+        
+        main_frame = ctk.CTkFrame(dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Header
+        ctk.CTkLabel(
+            main_frame,
+            text="🔑 Activate SecureVault Pro",
+            font=ctk.CTkFont(size=20, weight="bold")
+        ).pack(pady=(0, 10))
+        
+        ctk.CTkLabel(
+            main_frame,
+            text="Enter your license key to activate the application",
+            font=ctk.CTkFont(size=12),
+            text_color="#888888"
+        ).pack(pady=(0, 20))
+        
+        # License key entry
+        ctk.CTkLabel(
+            main_frame,
+            text="License Key:",
+            font=ctk.CTkFont(size=13, weight="bold")
+        ).pack(anchor="w", padx=20)
+        
+        license_entry = ctk.CTkEntry(
+            main_frame,
+            width=440,
+            height=45,
+            font=ctk.CTkFont(size=12, family="monospace"),
+            placeholder_text="Enter your 64-character license key"
+        )
+        license_entry.pack(pady=(5, 15), padx=20)
+        license_entry.focus()
+        
+        # Status label
+        status_label = ctk.CTkLabel(
+            main_frame,
+            text="",
+            font=ctk.CTkFont(size=11)
+        )
+        status_label.pack(pady=(0, 15))
+        
+        def perform_activation():
+            license_key = license_entry.get().strip()
+            
+            if not license_key:
+                status_label.configure(text="⚠️ Please enter a license key", text_color="#FF9500")
+                return
+            
+            status_label.configure(text="🔄 Verifying license key...", text_color="#4A90E2")
+            dialog.update()
+            
+            # Verify and activate
+            success, message = self.trial_manager.activate(license_key)
+            
+            if success:
+                status_label.configure(text="✅ Activation successful!", text_color="#10B981")
+                dialog.update()
+                
+                self.show_message("success", 
+                    "Thank you for activating SecureVault Pro!\n\nThe application will now restart to complete activation.",
+                    msg_type="info")
+                
+                dialog.destroy()
+                self.restart_program()
+            else:
+                status_label.configure(text=f"❌ {message}", text_color="#EF4444")
+        
+        # Buttons
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(pady=(10, 0))
+        
+        ctk.CTkButton(
+            button_frame,
+            text="Cancel",
+            command=dialog.destroy,
+            width=120,
+            height=40,
+            fg_color=("#999999", "#555555")
+        ).pack(side="left", padx=10)
+        
+        ctk.CTkButton(
+            button_frame,
+            text="Activate",
+            command=perform_activation,
+            width=150,
+            height=40,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color="#10B981",
+            hover_color="#059669"
+        ).pack(side="right", padx=10)
+        
+        license_entry.bind("<Return>", lambda e: perform_activation())
+    
+    def show_activation_modal(self):
+        """Show activation modal with program ID and activation input."""
+        dialog = ThemedToplevel(self.root)
+        dialog.title("Product Activation")
+        dialog.grab_set()
+        dialog.resizable(False, False)
+        self.center_window(dialog, 600, 600)
+        
+        # Main container
+        main_frame = ctk.CTkFrame(dialog)
+        main_frame.pack(fill="both", expand=True, padx=0, pady=0)
+        
+        # Header Section
+        header_frame = ctk.CTkFrame(main_frame, fg_color=("#2E3440", "#1E1E1E"), height=100)
+        header_frame.pack(fill="x", padx=0, pady=0)
+        header_frame.pack_propagate(False)
+        
+        header_content = ctk.CTkFrame(header_frame, fg_color="transparent")
+        header_content.pack(fill="both", expand=True, padx=25, pady=20)
+        
+        ctk.CTkLabel(
+            header_content,
+            text="🔑 Product Activation",
+            font=ctk.CTkFont(size=24, weight="bold"),
+            text_color=("white", "white")
+        ).pack(anchor="w")
+        
+        ctk.CTkLabel(
+            header_content,
+            text="Activate your SecureVault Pro license",
+            font=ctk.CTkFont(size=13),
+            text_color=("#B0B0B0", "#B0B0B0")
+        ).pack(anchor="w", pady=(5, 0))
+        
+        # Content Section
+        content_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        content_frame.pack(fill="both", expand=True, padx=25, pady=25)
+        
+        # Get activation info
+        if hasattr(self, 'trial_manager'):
+            activation_info = self.trial_manager.get_activation_info()
+            machine_id = activation_info.get('machine_id', 'N/A')
+            is_activated = activation_info.get('is_activated', False)
+        else:
+            machine_id = "Trial Manager Not Available"
+            is_activated = False
+        
+        # Activation Status
+        status_frame = ctk.CTkFrame(content_frame, fg_color=("gray90", "gray20"), corner_radius=10)
+        status_frame.pack(fill="x", pady=(0, 20))
+        
+        status_content = ctk.CTkFrame(status_frame, fg_color="transparent")
+        status_content.pack(fill="x", padx=20, pady=15)
+        
+        if is_activated:
+            status_text = "✅ Product Activated"
+            status_color = "#10B981"
+            activation_date = activation_info.get('activation_date', 'Unknown')
+            if activation_date and activation_date != 'Unknown':
+                try:
+                    from datetime import datetime
+                    date_obj = datetime.fromisoformat(activation_date)
+                    activation_date = date_obj.strftime("%Y-%m-%d %H:%M")
+                except:
+                    pass
+            status_detail = f"Activated on: {activation_date}"
+        else:
+            status_text = "⚠️ Product Not Activated"
+            status_color = "#F59E0B"
+            days_remaining = activation_info.get('days_remaining', 0)
+            status_detail = f"Trial: {days_remaining} day{'s' if days_remaining != 1 else ''} remaining"
+        
+        ctk.CTkLabel(
+            status_content,
+            text=status_text,
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color=status_color
+        ).pack(anchor="w")
+        
+        ctk.CTkLabel(
+            status_content,
+            text=status_detail,
+            font=ctk.CTkFont(size=12),
+            text_color=("gray40", "gray60")
+        ).pack(anchor="w", pady=(3, 0))
+        
+        # Program ID Section
+        id_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        id_frame.pack(fill="x", pady=(0, 15))
+        
+        ctk.CTkLabel(
+            id_frame,
+            text="Program ID:",
+            font=ctk.CTkFont(size=14, weight="bold")
+        ).pack(anchor="w", pady=(0, 8))
+        
+        # Program ID display with copy button
+        id_display_frame = ctk.CTkFrame(id_frame, fg_color=("gray85", "gray25"), corner_radius=8)
+        id_display_frame.pack(fill="x")
+        
+        id_inner_frame = ctk.CTkFrame(id_display_frame, fg_color="transparent")
+        id_inner_frame.pack(fill="x", padx=15, pady=12)
+        
+        program_id_entry = ctk.CTkEntry(
+            id_inner_frame,
+            width=400,
+            height=40,
+            font=ctk.CTkFont(size=11, family="monospace"),
+            state="readonly",
+            fg_color=("white", "gray15")
+        )
+        program_id_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        program_id_entry.configure(state="normal")
+        program_id_entry.insert(0, machine_id)
+        program_id_entry.configure(state="readonly")
+        
+        def copy_program_id():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(machine_id)
+            copy_btn.configure(text="✓ Copied")
+            dialog.after(2000, lambda: copy_btn.configure(text="Copy"))
+        
+        copy_btn = ctk.CTkButton(
+            id_inner_frame,
+            text="Copy",
+            command=copy_program_id,
+            width=90,
+            height=40,
+            font=ctk.CTkFont(size=12)
+        )
+        copy_btn.pack(side="right")
+        
+        # Activation Code Section
+        code_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        code_frame.pack(fill="x", pady=(0, 20))
+        
+        ctk.CTkLabel(
+            code_frame,
+            text="Activation Code:",
+            font=ctk.CTkFont(size=14, weight="bold")
+        ).pack(anchor="w", pady=(0, 8))
+        
+        activation_code_entry = ctk.CTkEntry(
+            code_frame,
+            width=550,
+            height=45,
+            font=ctk.CTkFont(size=12, family="monospace"),
+            placeholder_text="Enter your 64-character activation code",
+            fg_color=("white", "gray15")
+        )
+        activation_code_entry.pack(fill="x")
+        
+        if not is_activated:
+            activation_code_entry.focus()
+        else:
+            activation_code_entry.configure(state="disabled")
+        
+        # Status Label
+        status_label = ctk.CTkLabel(
+            content_frame,
+            text="",
+            font=ctk.CTkFont(size=12)
+        )
+        status_label.pack(pady=(5, 15))
+        
+        # Action Buttons
+        button_frame = ctk.CTkFrame(main_frame, fg_color=("gray90", "gray15"), height=80)
+        button_frame.pack(fill="x", padx=0, pady=0, side="bottom")
+        button_frame.pack_propagate(False)
+        
+        buttons_inner = ctk.CTkFrame(button_frame, fg_color="transparent")
+        buttons_inner.pack(fill="both", expand=True, padx=25, pady=18)
+        
+        def perform_activation():
+            activation_code = activation_code_entry.get().strip()
+            
+            if not activation_code:
+                status_label.configure(text="⚠️ Please enter an activation code", text_color="#F59E0B")
+                return
+            
+            if not hasattr(self, 'trial_manager'):
+                status_label.configure(text="❌ Activation system not available", text_color="#EF4444")
+                return
+            
+            status_label.configure(text="🔄 Verifying activation code...", text_color="#3B82F6")
+            dialog.update()
+            
+            # Verify and activate
+            success, message = self.trial_manager.activate(activation_code)
+            
+            if success:
+                status_label.configure(text="✅ Activation successful!", text_color="#10B981")
+                dialog.update()
+                
+                self.show_message("success", 
+                    "Thank you for activating SecureVault Pro!\n\nThe application will now restart to complete activation.",
+                    msg_type="info")
+                
+                dialog.destroy()
+                self.restart_program()
+            else:
+                status_label.configure(text=f"❌ {message}", text_color="#EF4444")
+        
+        def contact_developer():
+            """Open contact information for developer support."""
+            contact_dialog = ThemedToplevel(dialog)
+            contact_dialog.title("Contact Developer")
+            contact_dialog.grab_set()
+            contact_dialog.resizable(False, False)
+            self.center_window(contact_dialog, 500, 500)
+            
+            contact_frame = ctk.CTkFrame(contact_dialog)
+            contact_frame.pack(fill="both", expand=True, padx=20, pady=20)
+            
+            ctk.CTkLabel(
+                contact_frame,
+                text="Developer Support",
+                font=ctk.CTkFont(size=20, weight="bold")
+            ).pack(pady=(0, 15))
+            
+            ctk.CTkLabel(
+                contact_frame,
+                text="For activation support or inquiries, please contact:",
+                font=ctk.CTkFont(size=12),
+                wraplength=450
+            ).pack(pady=(0, 20))
+            
+            # Contact Information
+            info_frame = ctk.CTkFrame(contact_frame, fg_color=("gray90", "gray20"), corner_radius=10)
+            info_frame.pack(fill="x", pady=(0, 20))
+            
+            info_content = ctk.CTkFrame(info_frame, fg_color="transparent")
+            info_content.pack(fill="x", padx=20, pady=20)
+            
+            contact_info = [
+                ("Developer:", "Hamza Saadi"),
+                ("Company:", "EAGLESHADOW"),
+                ("Email:", "support@eagleshadow.com"),
+                ("WhatsApp:", "(+212) 6234222858"),
+                ("Website:", "www.eagleshadow.com")
+            ]
+            
+            # Items that should have copy buttons (Email, WhatsApp, Website)
+            copyable_items = {"Email:", "WhatsApp:", "Website:"}
+            
+            for label, value in contact_info:
+                row = ctk.CTkFrame(info_content, fg_color="transparent")
+                row.pack(fill="x", pady=5)
+                
+                ctk.CTkLabel(
+                    row,
+                    text=label,
+                    font=ctk.CTkFont(size=12, weight="bold"),
+                    width=120,
+                    anchor="w"
+                ).pack(side="left")
+                
+                value_label = ctk.CTkLabel(
+                    row,
+                    text=value,
+                    font=ctk.CTkFont(size=12),
+                    anchor="w"
+                )
+                value_label.pack(side="left", fill="x", expand=True)
+                
+                # Add copy button for Email, WhatsApp, and Website
+                if label in copyable_items:
+                    def make_copy_function(text_to_copy, btn_ref):
+                        def copy_text():
+                            self.root.clipboard_clear()
+                            self.root.clipboard_append(text_to_copy)
+                            original_text = btn_ref.cget("text")
+                            btn_ref.configure(text="✓ Copied")
+                            contact_dialog.after(2000, lambda: btn_ref.configure(text=original_text))
+                        return copy_text
+                    
+                    copy_btn = ctk.CTkButton(
+                        row,
+                        text="Copy",
+                        command=lambda: None,  # Will be set below
+                        width=70,
+                        height=28,
+                        font=ctk.CTkFont(size=11)
+                    )
+                    copy_btn.configure(command=make_copy_function(value, copy_btn))
+                    copy_btn.pack(side="right", padx=(10, 0))
+            
+            ctk.CTkLabel(
+                contact_frame,
+                text="Include your Program ID when contacting support.",
+                font=ctk.CTkFont(size=11),
+                text_color="gray",
+                wraplength=450
+            ).pack(pady=(0, 10))
+            
+            ctk.CTkButton(
+                contact_frame,
+                text="Close",
+                command=contact_dialog.destroy,
+                width=120,
+                height=40
+            ).pack(pady=(10, 0))
+        
+        # Cancel Button
+        ctk.CTkButton(
+            buttons_inner,
+            text="Cancel",
+            command=dialog.destroy,
+            width=130,
+            height=45,
+            font=ctk.CTkFont(size=14),
+            fg_color=("gray70", "gray30"),
+            hover_color=("gray60", "gray40")
+        ).pack(side="left")
+        
+        # Contact Developer Button
+        ctk.CTkButton(
+            buttons_inner,
+            text="Contact Developer",
+            command=contact_developer,
+            width=180,
+            height=45,
+            font=ctk.CTkFont(size=14),
+            fg_color=("#3B82F6", "#2563EB"),
+            hover_color=("#2563EB", "#1D4ED8")
+        ).pack(side="left", padx=10)
+        
+        # Activate Button
+        activate_btn = ctk.CTkButton(
+            buttons_inner,
+            text="✓ Activate",
+            command=perform_activation,
+            width=130,
+            height=45,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color="#10B981",
+            hover_color="#059669"
+        )
+        activate_btn.pack(side="right")
+        
+        if is_activated:
+            activate_btn.configure(state="disabled")
+        
+        # Bind Enter key to activate
+        activation_code_entry.bind("<Return>", lambda e: perform_activation())
+    
     def authenticate_user(self):
         if self.enforce_lockout(show_error=True):
             return
@@ -1782,7 +2349,7 @@ class ModernPasswordManagerGUI:
 
         self.copy_password_btn = ctk.CTkButton(
             password_frame,
-            text="📋",
+            text="",
             width=40,
             height=40,
             command=copy_password_to_clipboard,
@@ -2302,6 +2869,36 @@ class ModernPasswordManagerGUI:
             toolbar = ctk.CTkFrame(self.main_frame, height=70)
             toolbar.pack(fill="x", padx=10, pady=10)
             toolbar.pack_propagate(False)
+            
+            # Trial/Activation indicator (LEFT SIDE - before title)
+            if hasattr(self, 'trial_manager'):
+                status = self.trial_manager.get_trial_status()
+                if not status['is_activated'] and status['days_remaining'] is not None:
+                    trial_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
+                    trial_frame.pack(side="left", padx=15, pady=10)
+                    
+                    days_remaining = status['days_remaining']
+                    days_text = f"🕒 {days_remaining} day{'s' if days_remaining != 1 else ''} remaining"
+                    
+                    # Change color to red if 3 days or less remaining
+                    if days_remaining <= 3:
+                        text_color = "#EF4444"  # Red color for urgency
+                    else:
+                        text_color = "#FF9500"  # Orange color for normal trial
+                    
+                    ctk.CTkLabel(
+                        trial_frame,
+                        text=days_text,
+                        font=ctk.CTkFont(size=14, weight="bold"),
+                        text_color=text_color
+                    ).pack(anchor="w")
+                    
+                    ctk.CTkLabel(
+                        trial_frame,
+                        text="Access will be restricted after trial expires",
+                        font=ctk.CTkFont(size=10),
+                        text_color="#888888"
+                    ).pack(anchor="w", pady=(2, 0))
             
             left_toolbar_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
             left_toolbar_frame.pack(side="left", fill="y", padx=25, pady=10)
@@ -2909,7 +3506,6 @@ class ModernPasswordManagerGUI:
             )
             btn.pack(fill="x", padx=15, pady=10)
             self.sidebar_buttons.append(btn)
-
             
         # Add programmer credits at the bottom of the sidebar
         credits_label = ctk.CTkLabel(
@@ -2956,6 +3552,28 @@ class ModernPasswordManagerGUI:
         )
         btn.pack(side="bottom", fill="x", padx=15, pady=(20, 10))
         self.sidebar_buttons.append(btn)
+        
+        # Add Activation button (between Settings and Check for Updates)
+        try:
+            icon_activation = ctk.CTkImage(Image.open("icons/security.png"), size=(24, 24))
+        except:
+            icon_activation = None
+        
+        activation_btn = ctk.CTkButton(
+            self.sidebar,
+            text="Activation",
+            image=icon_activation,
+            compound="left",
+            anchor="w",
+            command=lambda: self.handle_sidebar_click(self.show_activation_modal, "Activation"),
+            height=60,
+            font=ctk.CTkFont(size=18),
+            corner_radius=10,
+            fg_color=("#10B981", "#059669"),
+            hover_color=("#059669", "#047857")
+        )
+        activation_btn.pack(side="bottom", fill="x", padx=15, pady=10)
+        self.sidebar_buttons.append(activation_btn)
         
         if self.sidebar_buttons:
             self.set_active_button(self.sidebar_buttons[0])
@@ -3151,68 +3769,136 @@ class ModernPasswordManagerGUI:
             return False
 
     def show_settings(self, parent_window=None):
-        if parent_window:
-            parent_window.destroy()
+            if parent_window:
+                parent_window.destroy()
 
-        settings_window = ThemedToplevel(self.root)
-        settings_window.title(self.lang_manager.get_string("settings"))
-        settings_window.grab_set()
-        settings_window.resizable(False, False)
-        self.center_window(settings_window, 600, 580)
-        
-        # Store reference to settings window for closing on successful changes
-        self.settings_window = settings_window
-        
-        main_frame = ctk.CTkFrame(settings_window)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("security_settings_title"), 
-                    font=ctk.CTkFont(size=24, weight="bold")).pack(pady=20)
-        
-        password_frame = ctk.CTkFrame(main_frame)
-        password_frame.pack(fill="x", pady=10)
-        
-        ctk.CTkLabel(password_frame, text=self.lang_manager.get_string("master_password_label"), 
-                    font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
-        
-        ctk.CTkButton(password_frame, text=self.lang_manager.get_string("change_master_password_button"),
-                    command=self.change_master_password_dialog,
-                    height=40).pack(pady=10)
+            settings_window = ThemedToplevel(self.root)
+            settings_window.title(self.lang_manager.get_string("settings"))
+            settings_window.grab_set()
+            settings_window.resizable(False, False)
+            self.center_window(settings_window, 720, 710)
+            
+            # Store reference to settings window for closing on successful changes
+            self.settings_window = settings_window
+            
+            container = ctk.CTkFrame(settings_window)
+            container.pack(fill="both", expand=True, padx=20, pady=20)
+            
+            # Header section with modern styling
+            header = ctk.CTkFrame(container, fg_color=("#2E3440", "#1E1E1E"), height=90)
+            header.pack(fill="x", padx=0, pady=(0, 10))
+            header.pack_propagate(False)
+            
+            header_content = ctk.CTkFrame(header, fg_color="transparent")
+            header_content.pack(fill="both", expand=True, padx=20, pady=15)
+            
+            ctk.CTkLabel(header_content, text=self.lang_manager.get_string("security_settings_title"), 
+                        font=ctk.CTkFont(size=26, weight="bold")).pack(anchor="w")
+            
+            ctk.CTkLabel(header_content, text="Manage your security and privacy settings", 
+                        font=ctk.CTkFont(size=12), text_color="#B0B0B0").pack(anchor="w")
+            
+            # Content area (regular frame instead of scrollable)
+            content_frame = ctk.CTkFrame(container, fg_color="transparent")
+            content_frame.pack(fill="both", expand=True)
+            
+            # License Status Section
+            license_frame = ctk.CTkFrame(content_frame, fg_color=("#2E3440", "#1E1E1E"), corner_radius=12)
+            license_frame.pack(fill="x", pady=(0, 15))
+            
+            license_content = ctk.CTkFrame(license_frame, fg_color="transparent")
+            license_content.pack(fill="x", padx=20, pady=15)
+            
+            # Get license status
+            if hasattr(self, 'trial_manager'):
+                activation_info = self.trial_manager.get_activation_info()
+                is_activated = activation_info.get('is_activated', False)
+                
+                if is_activated:
+                    # Get Windows username
+                    user_name = "User"
+                    try:
+                        # Get Windows username from environment variable
+                        user_name = os.getenv('USERNAME') or os.getenv('USER') or "User"
+                    except Exception as e:
+                        logger.error(f"Failed to retrieve Windows username: {e}")
+                    
+                    license_status_text = f"Activated - {user_name}"
+                    license_status_color = "#10B981"
+                    license_icon = "✅"
+                else:
+                    license_status_text = "Pro Trial"
+                    license_status_color = "#F59E0B"
+                    license_icon = "🕒"
+                    
+                    # Add days remaining info
+                    days_remaining = activation_info.get('days_remaining', 0)
+                    if days_remaining is not None:
+                        license_status_text += f" ({days_remaining} day{'s' if days_remaining != 1 else ''} remaining)"
+            else:
+                license_status_text = "License information unavailable"
+                license_status_color = "gray"
+                license_icon = "ℹ️"
+            
+            # License status label
+            ctk.CTkLabel(
+                license_content,
+                text="License Status:",
+                font=ctk.CTkFont(size=14, weight="bold"),
+                anchor="w"
+            ).pack(anchor="w", pady=(0, 5))
+            
+            status_display = ctk.CTkLabel(
+                license_content,
+                text=f"{license_icon} {license_status_text}",
+                font=ctk.CTkFont(size=15),
+                text_color=license_status_color,
+                anchor="w"
+            )
+            status_display.pack(anchor="w")
+            
+            password_frame = ctk.CTkFrame(content_frame, fg_color=("#2E3440", "#1E1E1E"), corner_radius=12)
+            password_frame.pack(fill="x", pady=10)
+            
+            ctk.CTkLabel(password_frame, text=self.lang_manager.get_string("master_password_label"), 
+                        font=ctk.CTkFont(size=20, weight="bold")).pack(pady=(15, 10))
+            
+            ctk.CTkButton(password_frame, text=self.lang_manager.get_string("change_master_password_button"),
+                        command=self.change_master_password_dialog,
+                        height=40).pack(pady=10)
 
-        # Two-Factor Authentication Section
-        tfa_frame = ctk.CTkFrame(main_frame)
-        tfa_frame.pack(fill="x", pady=10)
+            tfa_frame = ctk.CTkFrame(content_frame, fg_color=("#2E3440", "#1E1E1E"), corner_radius=12)
+            tfa_frame.pack(fill="x", pady=10)
 
-        ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("two_factor_auth_title"), 
-                    font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
+            ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("two_factor_auth_title"), 
+                        font=ctk.CTkFont(size=20, weight="bold")).pack(pady=(15, 10))
 
-        ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("two_factor_auth_description"),
-                    font=ctk.CTkFont(size=12), wraplength=600, justify="left").pack(pady=5, padx=10)
+            ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("two_factor_auth_description"),
+                        font=ctk.CTkFont(size=12), wraplength=600, justify="left").pack(pady=5, padx=10)
 
-        # Show 2FA status
-        if hasattr(self, 'auth_guardian') and self.auth_guardian and self.auth_guardian.is_tfa_enabled():
-            status_label = ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("two_factor_auth_enabled"),
-                        font=ctk.CTkFont(size=14, weight="bold"), text_color="#00FF00")
-            status_label.pack(pady=5)
-            ctk.CTkButton(tfa_frame, text=self.lang_manager.get_string("disable_2fa_button"),
-                        command=self.disable_2fa_dialog, height=40, fg_color="#FF4444",
-                        hover_color="#CC0000").pack(pady=10)
-        else:
-            status_label = ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("two_factor_auth_disabled"),
-                        font=ctk.CTkFont(size=14), text_color="#FFAA00")
-            status_label.pack(pady=5)
-            ctk.CTkButton(tfa_frame, text=self.lang_manager.get_string("enable_2fa_button"),
-                        command=self.enable_2fa_dialog, height=40).pack(pady=10)
+            # Show 2FA status
+            if hasattr(self, 'auth_guardian') and self.auth_guardian and self.auth_guardian.is_tfa_enabled():
+                status_label = ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("two_factor_auth_enabled"),
+                            font=ctk.CTkFont(size=14, weight="bold"), text_color="#00FF00")
+                status_label.pack(pady=5)
+                ctk.CTkButton(tfa_frame, text=self.lang_manager.get_string("disable_2fa_button"),
+                            command=self.disable_2fa_dialog, height=40, fg_color="#FF4444",
+                            hover_color="#CC0000").pack(pady=10)
+            else:
+                status_label = ctk.CTkLabel(tfa_frame, text=self.lang_manager.get_string("two_factor_auth_disabled"),
+                            font=ctk.CTkFont(size=14), text_color="#FFAA00")
+                status_label.pack(pady=5)
+                ctk.CTkButton(tfa_frame, text=self.lang_manager.get_string("enable_2fa_button"),
+                            command=self.enable_2fa_dialog, height=40).pack(pady=10)
 
-        timeout_frame = ctk.CTkFrame(main_frame)
-        timeout_frame.pack(fill="x", pady=10)
+            timeout_frame = ctk.CTkFrame(content_frame, fg_color=("#2E3440", "#1E1E1E"), corner_radius=12)
+            timeout_frame.pack(fill="x", pady=10)
 
-        ctk.CTkLabel(timeout_frame, text=self.lang_manager.get_string("auto_logout_title"),
-                    font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
+            ctk.CTkLabel(timeout_frame, text=self.lang_manager.get_string("auto_logout_title"),
+                        font=ctk.CTkFont(size=20, weight="bold")).pack(pady=(15, 10))
 
-        ctk.CTkLabel(timeout_frame, text=self.lang_manager.get_string("auto_logout_message"),
-                    font=ctk.CTkFont(size=12)).pack(pady=10)
-        
+            ctk.CTkLabel(timeout_frame, text=self.lang_manager.get_string("auto_logout_message"),
+                        font=ctk.CTkFont(size=12)).pack(pady=10)        
 
     def show_about_dialog(self):
         about_dialog = ThemedToplevel(self.root)
@@ -5383,7 +6069,7 @@ class ModernPasswordManagerGUI:
         button_frame = ctk.CTkFrame(password_display_frame, fg_color="transparent")
         button_frame.pack(fill="x")
         
-        ctk.CTkButton(button_frame, text="📋 Copy", 
+        ctk.CTkButton(button_frame, text="Copy", 
                     height=40,
                     command=self.copy_generated_password,
                     font=ctk.CTkFont(size=12),

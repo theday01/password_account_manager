@@ -2,38 +2,10 @@ __pycache__
 /__pycache__
 .__pycache__
 
-____problms
-.____problms
-/____problms
-/____problms/
-
-
-t
-/t
-.t
-t.txt
-/t.txt
-.t.txt
-
-
-
-audit.log
-/audit.log
-.audit.log
-
-/_____backup_manager.py
-_____backup_manager.py
-._____backup_manager.py
-
-
-____restore_helper.py
-/____restore_helper.py
-.____restore_helper.py
-
-
-____validate_backups.py
-/____validate_backups.py
-.____validate_backups.py
+problms
+.problms
+/problms
+/problms/
 
 
 .icons
@@ -57,23 +29,6 @@ backups
 .backups/
 
 
-
-___guardian_anchor.py
-.___guardian_anchor.py
-/___guardian_anchor.py
-
-
-
-___trial_cleanup.py
-.___trial_cleanup.py
-/___trial_cleanup.py
-
-
-___trial_manager.py
-.___trial_manager.py
-/___trial_manager.py
-
-
-___trial_notification.py
-.___trial_notification.py
-/___trial_notification.py
+*.dat
+*.log
+*.txt
