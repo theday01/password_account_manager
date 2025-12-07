@@ -1139,7 +1139,7 @@ class ModernPasswordManagerGUI:
         self.backup_manager = None
 
     def start_periodic_tampering_check(self):
-        """Periodically check for tampering and show the remediation screen if detected."""
+        """
         if not self.authenticated:
             return  # Stop checking if the user has logged out
 
@@ -1151,6 +1151,8 @@ class ModernPasswordManagerGUI:
 
         # Schedule the next check
         self.root.after(30000, self.start_periodic_tampering_check)
+        """
+        pass
 
     def show_message(self, title_key: str, message_key: str, msg_type: str = "info", ask: str = None, **kwargs) -> bool:
         current_lang = self.lang_manager.language
@@ -1326,14 +1328,48 @@ class ModernPasswordManagerGUI:
         return legacy_exists
 
     def setup_ui(self):
-        """Enhanced setup_ui with comprehensive tampering detection."""
+        """Enhanced setup_ui with proper activation handling."""
         self.main_frame = ctk.CTkFrame(self.root)
         self.main_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
         # Initialize enhanced trial manager
         self.trial_manager = get_trial_manager()
         
-        # CRITICAL: Check for permanent lockout FIRST
+        # CRITICAL: Check if activated FIRST - before ANY security checks
+        try:
+            # Get the raw activation info without triggering security checks
+            activation_info = self.trial_manager.get_activation_info()
+            is_activated = activation_info.get('is_activated', False)
+            
+            if is_activated:
+                logger.info("✅ Program is ACTIVATED - Skipping trial security checks")
+                
+                # Clear any lingering tampering flags for activated users
+                self.trial_manager.tampering_detected = False
+                self.trial_manager.permanent_lockout = False
+                
+                # Normal startup for activated users
+                if self.check_startup_lockout():
+                    return
+                
+                if not self.is_vault_initialized():
+                    logger.info("Vault not initialized, showing setup wizard")
+                    self.show_login_screen()
+                    self.update_login_button_states()
+                    return
+                
+                self.show_login_screen()
+                self.update_login_button_states()
+                return
+                
+        except Exception as e:
+            logger.error(f"Error checking activation status: {e}")
+            # Continue to security checks if we can't determine activation status
+        
+        # Only run these checks for NON-ACTIVATED users
+        logger.info("Program not activated - performing trial security checks")
+        
+        # Check for permanent lockout
         is_locked, lockout_reason = self.trial_manager._check_permanent_lockout()
         if is_locked:
             logger.critical(f"PERMANENT LOCKOUT DETECTED: {lockout_reason}")
@@ -1346,12 +1382,10 @@ class ModernPasswordManagerGUI:
             self.show_permanent_lockout_screen("Security tripwires compromised")
             return
         
-        # Comprehensive integrity check
+        # Load and verify trial state
         try:
-            # Load and verify trial state
             trial_state = self.trial_manager._load_trial_state()
             
-            # If state loading failed due to tampering, lockout was already triggered
             if self.trial_manager.tampering_detected:
                 logger.critical("TAMPERING DETECTED DURING STATE LOAD")
                 self.show_permanent_lockout_screen("Trial state tampering detected")
@@ -1366,18 +1400,16 @@ class ModernPasswordManagerGUI:
         
         if not can_access:
             if "locked" in reason:
-                # Permanent lockout
                 self.show_permanent_lockout_screen(reason)
                 return
             elif "trial_expired" in reason:
-                # Trial expired - require activation
                 self.show_activation_required_screen()
                 return
         
-        # Start monitoring AFTER successful verification
+        # Start monitoring for trial users
         self.trial_manager.start_monitoring()
         
-        # Continue with normal startup...
+        # Normal startup
         if self.check_startup_lockout():
             return
         
@@ -1387,10 +1419,9 @@ class ModernPasswordManagerGUI:
             self.update_login_button_states()
             return
         
-        # Normal authentication flow...
         self.show_login_screen()
         self.update_login_button_states()
-
+                
     def show_permanent_lockout_screen(self, reason: str):
         """
         Show permanent lockout screen - NO ACCESS ALLOWED.

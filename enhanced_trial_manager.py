@@ -660,38 +660,64 @@ class EnhancedTrialActivationManager:
         with self.lock:
             self.permanent_lockout = False
             self.tampering_detected = False
+            self.tampering_events.clear()
             logger.info("Lockout state cleared due to successful activation")
 
     def activate(self, license_key: str) -> Tuple[bool, str]:
         """Activate the application with license key."""
         
-        # 1. Verify license FIRST (bypass lockout check for key validation)
-        # This allows users to cure a lockout by purchasing a key
+        # 1. Verify license FIRST 
         if self.verify_license_key(license_key):
-             # 2. If valid, clear lockout flags in memory
-             self._clear_lockout_state()
-             
-             # 3. Load current state (or create new if missing/corrupted)
-             # We use _read_encrypted_file directly on one location if load fails
-             data = self._load_trial_state() or {}
-             
-             # 4. Update state to activated
-             data['activated'] = True
-             data['activation_date'] = datetime.now().isoformat()
-             data['license_key'] = license_key
-             
-             # Remove lockout flags from data if present
-             data.pop('lockout', None)
-             data.pop('reason', None)
-             
-             # 5. Save and repair
-             if self._save_trial_state(data):
-                 # Re-initialize tripwires to ensure system is clean and compliant
-                 self._initialize_tripwire_files()
-                 logger.info("✅ Application activated successfully and lockout lifted")
-                 return True, "Activation successful"
-             else:
-                 return False, "Failed to save activation"
+            # CRITICAL FIX: Stop monitoring immediately to prevent self-detection of tampering
+            # when we write the activation files.
+            self.stop_monitoring()
+
+            # 2. If valid, clear lockout flags in memory
+            self._clear_lockout_state()
+            
+            # 3. Load current state (or create new if missing/corrupted)
+            data = self._load_trial_state() or {}
+            
+            # 4. Update state to activated
+            data['activated'] = True
+            data['activation_date'] = datetime.now().isoformat()
+            data['license_key'] = license_key
+            
+            # Remove lockout flags from data if present
+            data.pop('lockout', None)
+            data.pop('reason', None)
+            
+            # 5. Save the activation state
+            if self._save_trial_state(data):
+                # 6. CRITICAL: Re-initialize tripwires with clean state
+                try:
+                    logger.info("Re-initializing tripwires after activation...")
+                    
+                    # Clear the old tripwires
+                    for tripwire in self.tripwire_locations:
+                        try:
+                            if tripwire.exists():
+                                tripwire.unlink()
+                        except Exception as e:
+                            logger.warning(f"Could not remove old tripwire {tripwire}: {e}")
+                    
+                    # Create fresh tripwires with clean state
+                    self._initialize_tripwire_files()
+                    logger.info("Tripwires re-initialized successfully")
+                    
+                except Exception as e:
+                    logger.error(f"Error re-initializing tripwires: {e}")
+                
+                # 7. Clear all tampering detection flags
+                self.tampering_detected = False
+                self.tampering_events.clear()
+                
+                logger.info("✅ Application activated successfully and lockout lifted")
+                return True, "Activation successful"
+            else:
+                # If save failed, restart monitoring just in case
+                self.start_monitoring()
+                return False, "Failed to save activation"
         
         # 6. If license is invalid, THEN enforce lockout checks
         is_locked, reason = self._check_permanent_lockout()
@@ -699,7 +725,7 @@ class EnhancedTrialActivationManager:
             return False, f"Cannot activate: {reason}"
         
         return False, "Invalid license key for this machine"
-    
+                
     def start_monitoring(self) -> bool:
         """Start real-time monitoring of trial state files."""
         if self.is_monitoring:
