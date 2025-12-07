@@ -49,7 +49,13 @@ def get_system_uuid():
         if system == 'Windows':
             command = "wmic csproduct get uuid"
             output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
-            return output.split('\n')[1].strip()
+            # Handle Windows CRLF line endings and filter out empty/header lines
+            lines = [line.strip() for line in output.replace('\r', '').split('\n') if line.strip()]
+            # Return the first line that looks like a UUID (contains dashes and is not "UUID")
+            for line in lines:
+                if line and line != "UUID" and '-' in line:
+                    return line
+            return None
         elif system == 'Linux':
             try:
                 with open('/sys/class/dmi/id/product_uuid', 'r') as f:

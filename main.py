@@ -1894,12 +1894,28 @@ class ModernPasswordManagerGUI:
                 status_label.configure(text="✅ Activation successful!", text_color="#10B981")
                 dialog.update()
                 
-                self.show_message("success", 
-                    "Thank you for activating SecureVault Pro!\n\nThe application will now restart to complete activation.",
-                    msg_type="info")
+                # Professional Success Message
+                success_title = "Activation Complete"
+                success_message = (
+                    "Thank you for choosing SecureVault Pro.\n\n"
+                    "Your license has been successfully verified and registered to this workstation.\n\n"
+                    "To finalize the configuration and initialize all premium security modules, "
+                    "the application must be restarted.\n\n"
+                    "The program will now close. Please relaunch it manually to continue."
+                )
+                
+                # Using CustomMessageBox directly for better formatting control
+                CustomMessageBox(
+                    title=success_title, 
+                    message=success_message, 
+                    msg_type="info"
+                ).show()
                 
                 dialog.destroy()
-                self.restart_program()
+                
+                # Clean shutdown instead of automatic restart
+                # This breaks the main loop and triggers the cleanup in run()
+                self.root.quit()
             else:
                 status_label.configure(text=f"❌ {message}", text_color="#EF4444")
         
@@ -1928,7 +1944,7 @@ class ModernPasswordManagerGUI:
         ).pack(side="right", padx=10)
         
         license_entry.bind("<Return>", lambda e: perform_activation())
-    
+
     def show_tamper_detected_screen(self):
         """Show critical tamper detection screen that blocks all access."""
         # Center the main window on screen
