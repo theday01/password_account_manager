@@ -1706,6 +1706,12 @@ class ModernPasswordManagerGUI:
             font=ctk.CTkFont(size=16)
         )
         self.master_password_entry.pack(side="left", padx=(0, 5))
+        
+        # --- DISABLE COPY/PASTE FOR LOGIN ---
+        # Returns "break" to stop the event from propagating, effectively blocking the action
+        self._block_copy_paste_comprehensive(self.master_password_entry)
+        # ------------------------------------
+
         def toggle_password_visibility():
             if self.master_password_entry.cget("show") == "*":
                 self.master_password_entry.configure(show="")
@@ -1750,7 +1756,7 @@ class ModernPasswordManagerGUI:
         if self.auth_guardian.is_locked_out():
             self.update_lockout_countdown()
         self.update_login_button_states()
-
+        
     def show_activation_required_screen(self):
         """Show professional activation screen when trial expires."""
         # Center the main window on screen
@@ -2703,6 +2709,61 @@ class ModernPasswordManagerGUI:
                     self.show_message("error", "Account locked", msg_type="error")
                     self.root.quit()
 
+    def _block_copy_paste_comprehensive(self, widget, include_cut=True):
+        """
+        Comprehensive method to block copy/paste/cut operations regardless of Caps Lock state.
+        Binds to all possible keyboard combinations including uppercase variations.
+        
+        Args:
+            widget: The widget to apply the restrictions to
+            include_cut: Whether to also block cut operations (default: True)
+        """
+        def block_event(event):
+            """Block the event and return 'break' to prevent propagation"""
+            return "break"
+        
+        # Block right-click context menu
+        widget.bind("<Button-3>", block_event)
+        widget.bind("<Button-2>", block_event)  # Middle mouse button
+        
+        # Block all variations of copy/paste/cut shortcuts
+        # Handle both lowercase and uppercase to account for Caps Lock
+        shortcuts = [
+            "<Control-v>", "<Control-V>",  # Paste
+            "<Control-c>", "<Control-C>",  # Copy
+            "<Control-a>", "<Control-A>",  # Select all (often used with copy)
+        ]
+        
+        if include_cut:
+            shortcuts.extend(["<Control-x>", "<Control-X>"])  # Cut
+        
+        # Bind all variations
+        for shortcut in shortcuts:
+            widget.bind(shortcut, block_event)
+        
+        # Also bind to key press events to catch any other combinations
+        def block_key_event(event):
+            """Block copy/paste/cut on key press level"""
+            # Check if Control key is pressed (mask 0x4 = Control)
+            # Also check for Control+Shift combinations
+            if event.state & 0x4:  # Control key mask
+                key = event.keysym.lower()
+                # Block 'v' (paste), 'c' (copy), 'x' (cut), 'a' (select all)
+                # This works regardless of Caps Lock state since we use .lower()
+                if key in ['v', 'c', 'x', 'a']:
+                    return "break"
+            # Check for Shift+Insert (alternative paste)
+            if event.state & 0x1 and event.keysym == "Insert":  # Shift key mask
+                return "break"
+            return None
+        
+        widget.bind("<KeyPress>", block_key_event)
+        widget.bind("<KeyRelease>", block_key_event)
+        
+        # Prevent clipboard access via menu shortcuts
+        widget.bind("<Shift-Insert>", block_event)  # Alternative paste
+        widget.bind("<Control-Insert>", block_event)  # Alternative copy
+
     def disable_login_button_with_countdown(self):
         if hasattr(self, 'login_btn'):
             self.login_btn.configure(state="disabled")
@@ -2805,8 +2866,6 @@ class ModernPasswordManagerGUI:
         self.update_login_button_states()
 
         # Informational security warning shown when user starts first-time setup.
-        # This warns about malware risks (which can bypass/enumerate local secrets)
-        # and reminds the user to choose a long, strong, unguessable master password.
         try:
             security_msg = (
                 "Important security notice:\n\n"
@@ -2817,7 +2876,6 @@ class ModernPasswordManagerGUI:
             )
             messagebox.showinfo("Security Notice", security_msg)
         except Exception:
-            # If the GUI warning fails for any reason, proceed silently.
             logger.exception("Failed to display security notice dialog")
         self.setup_window = ThemedToplevel(self.root)
         self.setup_window.title(self.lang_manager.get_string("setup_wizard_title"))
@@ -2877,6 +2935,13 @@ class ModernPasswordManagerGUI:
         )
         self.setup_master_password.pack(side="left")
 
+        # --- DISABLE COPY/PASTE FOR SETUP FIELDS ---
+        # Applying restrictions to Full Name, Email, and Password fields
+        self._block_copy_paste_comprehensive(self.setup_full_name_entry, include_cut=False)
+        self._block_copy_paste_comprehensive(self.setup_email_entry, include_cut=False)
+        self._block_copy_paste_comprehensive(self.setup_master_password, include_cut=True)
+        # -------------------------------------------
+
         self.toggle_master_password_btn = ctk.CTkButton(
             password_frame,
             text="👁️",
@@ -2904,27 +2969,6 @@ class ModernPasswordManagerGUI:
         )
         self.generate_password_btn.pack(side="left", padx=(5, 0))
 
-        def copy_password_to_clipboard():
-            """Copy the generated password to clipboard"""
-            password = self.setup_master_password.get()
-            if password:
-                self.root.clipboard_clear()
-                self.root.clipboard_append(password)
-                logger.info("Master password copied to clipboard")
-                messagebox.showinfo("Copied", "Password copied to clipboard!")
-            else:
-                messagebox.showwarning("Empty", "Please generate a password first!")
-
-        self.copy_password_btn = ctk.CTkButton(
-            password_frame,
-            text="",
-            width=40,
-            height=40,
-            command=copy_password_to_clipboard,
-            fg_color="#10B981",
-            hover_color="#059669"
-        )
-        self.copy_password_btn.pack(side="left", padx=(5, 0))
 
         confirm_password_frame = ctk.CTkFrame(step1_frame, fg_color="transparent")
         confirm_password_frame.pack(pady=10)
@@ -2935,6 +2979,10 @@ class ModernPasswordManagerGUI:
             show="*", width=300, height=40
         )
         self.setup_confirm_password.pack(side="left")
+
+        # --- DISABLE COPY/PASTE FOR CONFIRM PASSWORD ---
+        self._block_copy_paste_comprehensive(self.setup_confirm_password, include_cut=True)
+        # -----------------------------------------------
 
         self.toggle_confirm_password_btn = ctk.CTkButton(
             confirm_password_frame,
@@ -3059,7 +3107,7 @@ class ModernPasswordManagerGUI:
         # Don't pack finish_btn yet
 
         self.show_step()
-        
+                
     def on_question_toggle(self, index):
         """Handle when a question checkbox is toggled"""
         # Clear the entry if checkbox is unchecked
