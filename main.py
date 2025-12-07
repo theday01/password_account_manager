@@ -46,7 +46,7 @@ from datetime import datetime
 from backup import BackupManager
 from encrypted_db import get_encrypted_connection, create_encrypted_database, Row as EncryptedRow
 from enhanced_loading_screen import EnhancedLoadingScreen
-from trial_activation_manager import get_trial_manager
+from enhanced_trial_manager import get_trial_manager
 
 logger = logging.getLogger(__name__)
 
@@ -1138,6 +1138,20 @@ class ModernPasswordManagerGUI:
 
         self.backup_manager = None
 
+    def start_periodic_tampering_check(self):
+        """Periodically check for tampering and show the remediation screen if detected."""
+        if not self.authenticated:
+            return  # Stop checking if the user has logged out
+
+        is_valid, reason = self.trial_manager.check_activation_integrity()
+        if not is_valid:
+            logger.critical(f"Tampering detected during periodic check: {reason}")
+            self.show_tampering_remediate_screen()
+            return  # Stop further checks
+
+        # Schedule the next check
+        self.root.after(30000, self.start_periodic_tampering_check)
+
     def show_message(self, title_key: str, message_key: str, msg_type: str = "info", ask: str = None, **kwargs) -> bool:
         current_lang = self.lang_manager.language
         self.lang_manager.set_language("English")
@@ -1312,67 +1326,309 @@ class ModernPasswordManagerGUI:
         return legacy_exists
 
     def setup_ui(self):
+        """Enhanced setup_ui with comprehensive tampering detection."""
         self.main_frame = ctk.CTkFrame(self.root)
         self.main_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # Initialize trial manager
+        # Initialize enhanced trial manager
         self.trial_manager = get_trial_manager()
         
-        # CRITICAL: Check activation integrity FIRST
-        integrity_valid, integrity_reason = self.trial_manager.check_activation_integrity()
-        if not integrity_valid:
-            if integrity_reason == "tampered":
-                # Tampering detected - show critical error and block access
-                self.show_tamper_detected_screen()
-                return
-            elif integrity_reason in ["state_unavailable", "state_mismatch"]:
-                # State corruption detected - attempt recovery
-                logger.warning(f"Activation state issue detected: {integrity_reason}")
-                # The protector will attempt auto-recovery through synchronization
+        # CRITICAL: Check for permanent lockout FIRST
+        is_locked, lockout_reason = self.trial_manager._check_permanent_lockout()
+        if is_locked:
+            logger.critical(f"PERMANENT LOCKOUT DETECTED: {lockout_reason}")
+            self.show_permanent_lockout_screen(lockout_reason)
+            return
         
-        # Check trial/activation status BEFORE authentication
+        # Check tripwire integrity
+        if not self.trial_manager._check_tripwires():
+            logger.critical("TRIPWIRE INTEGRITY FAILURE")
+            self.show_permanent_lockout_screen("Security tripwires compromised")
+            return
+        
+        # Comprehensive integrity check
+        try:
+            # Load and verify trial state
+            trial_state = self.trial_manager._load_trial_state()
+            
+            # If state loading failed due to tampering, lockout was already triggered
+            if self.trial_manager.tampering_detected:
+                logger.critical("TAMPERING DETECTED DURING STATE LOAD")
+                self.show_permanent_lockout_screen("Trial state tampering detected")
+                return
+        except Exception as e:
+            logger.critical(f"CRITICAL ERROR DURING INTEGRITY CHECK: {e}")
+            self.show_permanent_lockout_screen("Security verification failed")
+            return
+        
+        # Check trial/activation status
         can_access, reason = self.trial_manager.is_access_allowed()
         
         if not can_access:
-            # Trial expired - show activation screen
-            self.show_activation_required_screen()
-            return
+            if "locked" in reason:
+                # Permanent lockout
+                self.show_permanent_lockout_screen(reason)
+                return
+            elif "trial_expired" in reason:
+                # Trial expired - require activation
+                self.show_activation_required_screen()
+                return
         
+        # Start monitoring AFTER successful verification
+        self.trial_manager.start_monitoring()
+        
+        # Continue with normal startup...
         if self.check_startup_lockout():
             return
         
-        # Check if vault is initialized BEFORE attempting authentication
         if not self.is_vault_initialized():
             logger.info("Vault not initialized, showing setup wizard")
             self.show_login_screen()
             self.update_login_button_states()
             return
         
-        # --- Verification Bypass --- (only if vault exists)
-        self.authenticated = True
-        master_password = "a_very_secret_dev_password_for_testing_only"
-        
-        if self.secure_file_manager:
-            self.secure_file_manager.initialize_encryption(master_password)
-            self.secure_file_manager.load_files_to_temp()
+        # Normal authentication flow...
+        self.show_login_screen()
+        self.update_login_button_states()
 
-        db_path = "manageyouraccount"
-        self.database = DatabaseManager(db_path, self.crypto, self.secure_file_manager)
-        auth_success = self.database.authenticate(master_password)
+    def show_permanent_lockout_screen(self, reason: str):
+        """
+        Show permanent lockout screen - NO ACCESS ALLOWED.
+        Only developer recovery can restore access.
+        """
+        # Center and configure window
+        self.root.update_idletasks()
+        window_width = 1000
+        window_height = 800
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.root.resizable(False, False)
         
-        if auth_success:
-            self.secure_file_manager.encryption_key = self.database.encryption_key
-            self.auth_guardian.reload_settings()
-            self.load_settings()
-            self.show_main_interface()
-        else:
-            # If auth fails, show login to avoid crashing
-            self.show_login_screen()
-            self.update_login_button_states()
+        for widget in self.main_frame.winfo_children():
+            widget.destroy()
         
-        if not self.is_vault_initialized():
-            self.root.after(100, self.show_welcome_dialog)
-    
+        # Make window always on top temporarily
+        self.root.attributes('-topmost', True)
+        self.root.after(100, lambda: self.root.attributes('-topmost', False))
+        
+        # Main container with gradient-like background
+        main_container = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        main_container.pack(fill="both", expand=True)
+        
+        # Animated warning header
+        header_frame = ctk.CTkFrame(main_container, fg_color=("#DC2626", "#7F1D1D"), height=120)
+        header_frame.pack(fill="x", padx=0, pady=0)
+        header_frame.pack_propagate(False)
+        
+        header_content = ctk.CTkFrame(header_frame, fg_color="transparent")
+        header_content.pack(fill="both", expand=True, padx=40, pady=20)
+        
+        # Warning icon and title
+        icon_title_frame = ctk.CTkFrame(header_content, fg_color="transparent")
+        icon_title_frame.pack(fill="x")
+        
+        ctk.CTkLabel(
+            icon_title_frame,
+            text="⛔",
+            font=ctk.CTkFont(size=64)
+        ).pack(side="left", padx=(0, 20))
+        
+        title_stack = ctk.CTkFrame(icon_title_frame, fg_color="transparent")
+        title_stack.pack(side="left", fill="x", expand=True)
+        
+        ctk.CTkLabel(
+            title_stack,
+            text="SECURITY LOCKOUT ACTIVATED",
+            font=ctk.CTkFont(size=32, weight="bold"),
+            text_color="white"
+        ).pack(anchor="w")
+        
+        ctk.CTkLabel(
+            title_stack,
+            text="⚠️ Unauthorized Tampering Detected",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color=("#FEE2E2", "#FFE5E5")
+        ).pack(anchor="w", pady=(5, 0))
+        
+        # Scrollable content area
+        content_scroll = ctk.CTkScrollableFrame(main_container, fg_color="transparent")
+        content_scroll.pack(fill="both", expand=True, padx=30, pady=20)
+        
+        # Lockout reason card
+        reason_card = ctk.CTkFrame(content_scroll, fg_color=("#FED7AA", "#78350F"), corner_radius=12)
+        reason_card.pack(fill="x", pady=(0, 20))
+        
+        ctk.CTkLabel(
+            reason_card,
+            text="🛡️ Lockout Reason",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color="#92400E"
+        ).pack(pady=(20, 8), padx=25, anchor="w")
+        
+        ctk.CTkLabel(
+            reason_card,
+            text=reason,
+            font=ctk.CTkFont(size=13),
+            text_color="#78350F",
+            wraplength=850,
+            justify="left"
+        ).pack(pady=(0, 20), padx=25, anchor="w")
+        
+        # Warning details card
+        details_card = ctk.CTkFrame(content_scroll, fg_color=("#F5F5F5", "#1E1E1E"), corner_radius=12)
+        details_card.pack(fill="x", pady=(0, 20))
+        
+        ctk.CTkLabel(
+            details_card,
+            text="⚠️ Security Violation Details",
+            font=ctk.CTkFont(size=16, weight="bold")
+        ).pack(pady=(20, 15), padx=25, anchor="w")
+        
+        violations = [
+            ("🚫 Trial Manipulation", "Attempts to extend or bypass the trial period"),
+            ("📁 File Tampering", "Unauthorized modification of protected system files"),
+            ("🕐 Clock Manipulation", "System time has been altered to circumvent restrictions"),
+            ("🔓 Security Bypass", "Attempts to disable or circumvent security mechanisms")
+        ]
+        
+        for title, desc in violations:
+            violation_item = ctk.CTkFrame(details_card, fg_color=("gray90", "gray25"), corner_radius=8)
+            violation_item.pack(fill="x", padx=20, pady=5)
+            
+            ctk.CTkLabel(
+                violation_item,
+                text=title,
+                font=ctk.CTkFont(size=13, weight="bold")
+            ).pack(anchor="w", padx=15, pady=(10, 2))
+            
+            ctk.CTkLabel(
+                violation_item,
+                text=desc,
+                font=ctk.CTkFont(size=11),
+                text_color="gray"
+            ).pack(anchor="w", padx=15, pady=(0, 10))
+        
+        ctk.CTkLabel(
+            details_card,
+            text="⛔ Access to SecureVault Pro has been permanently blocked for security reasons.",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color="#DC2626"
+        ).pack(pady=(10, 20), padx=25)
+        
+        # Recovery options card
+        recovery_card = ctk.CTkFrame(content_scroll, fg_color=("#E0F2FE", "#1E3A5F"), corner_radius=12)
+        recovery_card.pack(fill="x", pady=(0, 20))
+        
+        ctk.CTkLabel(
+            recovery_card,
+            text="🔓 Access Restoration Options",
+            font=ctk.CTkFont(size=16, weight="bold")
+        ).pack(pady=(20, 15), padx=25, anchor="w")
+        
+        options = [
+            "1 - Purchase and activate a valid license key to restore full access",
+            "2 - Contact the developer for assistance ",
+            "3 - Provide your Machine ID below for faster support resolution"
+        ]
+        
+        for option in options:
+            ctk.CTkLabel(
+                recovery_card,
+                text=option,
+                font=ctk.CTkFont(size=12),
+                text_color=("#1E40AF", "#93C5FD")
+            ).pack(anchor="w", padx=35, pady=3)
+        
+        ctk.CTkLabel(
+            recovery_card,
+            text="",
+            height=10
+        ).pack()
+        
+        # Machine ID section
+        machine_id = self.trial_manager.get_machine_id()
+        
+        id_card = ctk.CTkFrame(content_scroll, fg_color=("#F3F4F6", "#2D2D2D"), corner_radius=12)
+        id_card.pack(fill="x", pady=(0, 20))
+        
+        ctk.CTkLabel(
+            id_card,
+            text="🔑 Machine ID (Required for Support)",
+            font=ctk.CTkFont(size=14, weight="bold")
+        ).pack(pady=(15, 10), padx=20, anchor="w")
+        
+        id_display_frame = ctk.CTkFrame(id_card, fg_color="transparent")
+        id_display_frame.pack(fill="x", padx=20, pady=(0, 15))
+        
+        id_entry = ctk.CTkEntry(
+            id_display_frame,
+            width=750,
+            height=45,
+            font=ctk.CTkFont(size=11, family="monospace"),
+            justify="center",
+            fg_color=("white", "#1A1A1A"),
+            border_width=2,
+            border_color=("#3B82F6", "#2563EB")
+        )
+        id_entry.pack(side="left", padx=(0, 10))
+        id_entry.insert(0, machine_id)
+        id_entry.configure(state="readonly")
+        
+        def copy_machine_id():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(machine_id)
+            copy_btn.configure(text="✅ Copied", fg_color="#10B981")
+            self.root.after(2000, lambda: copy_btn.configure(text="📋 Copy", fg_color="#6B7280"))
+        
+        copy_btn = ctk.CTkButton(
+            id_display_frame,
+            text="📋 Copy",
+            command=copy_machine_id,
+            width=100,
+            height=45,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#6B7280",
+            hover_color="#4B5563"
+        )
+        copy_btn.pack(side="right")
+        
+        # Action buttons
+        button_frame = ctk.CTkFrame(main_container, fg_color=("#F9FAFB", "#1A1A1A"), height=90)
+        button_frame.pack(fill="x", padx=0, pady=0, side="bottom")
+        button_frame.pack_propagate(False)
+        
+        buttons_inner = ctk.CTkFrame(button_frame, fg_color="transparent")
+        buttons_inner.pack(fill="both", expand=True, padx=30, pady=20)
+        
+        # Exit button
+        ctk.CTkButton(
+            buttons_inner,
+            text="❌ Exit Program",
+            command=self.root.quit,
+            width=200,
+            height=50,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color=("#DC2626", "#991B1B"),
+            hover_color=("#B91C1C", "#7F1D1D"),
+            corner_radius=10
+        ).pack(side="left")
+        
+        # Activate button
+        ctk.CTkButton(
+            buttons_inner,
+            text="🔓 Activate License Key",
+            command=self.show_activation_dialog,
+            width=250,
+            height=50,
+            font=ctk.CTkFont(size=14, weight="bold"),
+            fg_color="#10B981",
+            hover_color="#059669",
+            corner_radius=10
+        ).pack(side="right")
+
     def show_login_screen(self):
         for widget in self.main_frame.winfo_children():
             widget.destroy()
@@ -1797,116 +2053,24 @@ class ModernPasswordManagerGUI:
             fg_color=("#6B7280", "#4B5563")
         )
         copy_btn.pack(pady=(0, 15))
-        
-        # Developer recovery option
-        def show_recovery_dialog():
-            recovery_dialog = ThemedToplevel(self.root)
-            recovery_dialog.title("Developer Recovery")
-            recovery_dialog.grab_set()
-            recovery_dialog.resizable(False, False)
-            self.center_window(recovery_dialog, 500, 350)
-            
-            main_frame = ctk.CTkFrame(recovery_dialog, fg_color="transparent")
-            main_frame.pack(fill="both", expand=True, padx=30, pady=30)
-            
-            ctk.CTkLabel(
-                main_frame,
-                text="🔐 Developer Recovery",
-                font=ctk.CTkFont(size=20, weight="bold")
-            ).pack(pady=(0, 10))
-            
-            ctk.CTkLabel(
-                main_frame,
-                text="Enter the developer recovery key provided by support",
-                font=ctk.CTkFont(size=12),
-                text_color="#888888"
-            ).pack(pady=(0, 20))
-            
-            recovery_entry = ctk.CTkEntry(
-                main_frame,
-                width=400,
-                height=45,
-                placeholder_text="Enter recovery key",
-                font=ctk.CTkFont(size=12)
-            )
-            recovery_entry.pack(pady=(0, 15))
-            recovery_entry.focus()
-            
-            status_label = ctk.CTkLabel(
-                main_frame,
-                text="",
-                font=ctk.CTkFont(size=11)
-            )
-            status_label.pack(pady=(0, 15))
-            
-            def perform_recovery():
-                recovery_key = recovery_entry.get().strip()
                 
-                if not recovery_key:
-                    status_label.configure(text="⚠️ Please enter a recovery key", text_color="#FF9500")
-                    return
-                
-                status_label.configure(text="🔄 Verifying recovery key...", text_color="#4A90E2")
-                recovery_dialog.update()
-                
-                # Get activation protector
-                if hasattr(self.trial_manager, '_activation_protector'):
-                    protector = self.trial_manager._activation_protector
-                    if protector and protector.reset_after_developer_recovery(recovery_key):
-                        status_label.configure(text="✅ Recovery successful!", text_color="#10B981")
-                        recovery_dialog.update()
-                        
-                        self.show_message("success", 
-                            "Developer recovery successful!\n\nThe application will now restart.",
-                            msg_type="info")
-                        
-                        recovery_dialog.destroy()
-                        self.restart_program()
-                    else:
-                        status_label.configure(text="❌ Invalid recovery key", text_color="#EF4444")
-                else:
-                    status_label.configure(text="❌ Recovery system unavailable", text_color="#EF4444")
-            
-            button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-            button_frame.pack(pady=(10, 0))
-            
-            ctk.CTkButton(
-                button_frame,
-                text="Cancel",
-                command=recovery_dialog.destroy,
-                width=120,
-                height=40,
-                fg_color=("#999999", "#555555")
-            ).pack(side="left", padx=10)
-            
-            ctk.CTkButton(
-                button_frame,
-                text="Recover",
-                command=perform_recovery,
-                width=150,
-                height=40,
-                font=ctk.CTkFont(size=14, weight="bold"),
-                fg_color="#10B981",
-                hover_color="#059669"
-            ).pack(side="right", padx=10)
-            
-            recovery_entry.bind("<Return>", lambda e: perform_recovery())
-        
         # Buttons
         button_frame = ctk.CTkFrame(card, fg_color="transparent")
         button_frame.pack(pady=(10, 30))
         
+        # Activate button
         ctk.CTkButton(
             button_frame,
-            text="🔧 Developer Recovery",
-            command=show_recovery_dialog,
+            text="Activate License",
+            command=self.show_activation_dialog,
             width=200,
             height=45,
             font=ctk.CTkFont(size=13),
-            fg_color="#F59E0B",
-            hover_color="#D97706"
+            fg_color="#10B981",
+            hover_color="#059669"
         ).pack(side="left", padx=10)
         
+        # Exit
         ctk.CTkButton(
             button_frame,
             text="Exit Application",
@@ -1917,7 +2081,106 @@ class ModernPasswordManagerGUI:
             fg_color=("#DC2626", "#991B1B"),
             hover_color=("#B91C1C", "#7F1D1D")
         ).pack(side="right", padx=10)
-    
+
+    def show_tampering_remediate_screen(self):
+        """Show a less severe screen for tampering detected post-startup, prompting for activation."""
+        self.root.update_idletasks()
+        window_width = 800
+        window_height = 650
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.root.resizable(False, False)
+
+        for widget in self.main_frame.winfo_children():
+            widget.destroy()
+
+        container = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        container.place(relx=0.5, rely=0.5, anchor="center")
+
+        card = ctk.CTkFrame(container, corner_radius=15, fg_color=("#F5F5F5", "#1E1E1E"))
+        card.pack(padx=40, pady=40)
+
+        ctk.CTkLabel(
+            card,
+            text="🛡️",
+            font=ctk.CTkFont(size=64)
+        ).pack(pady=(30, 10))
+
+        ctk.CTkLabel(
+            card,
+            text="Activation State Modified",
+            font=ctk.CTkFont(size=28, weight="bold")
+        ).pack(pady=(10, 5))
+
+        ctk.CTkLabel(
+            card,
+            text="A modification to the trial or activation files has been detected.\nPlease activate to continue.",
+            font=ctk.CTkFont(size=14),
+            text_color="#666666",
+            justify="center"
+        ).pack(pady=(5, 20), padx=40)
+
+        machine_id = self.trial_manager.get_machine_id()
+
+        id_frame = ctk.CTkFrame(card, fg_color=("#E8E8E8", "#2A2A2A"), corner_radius=10)
+        id_frame.pack(fill="x", padx=40, pady=15)
+
+        ctk.CTkLabel(
+            id_frame,
+            text="Your Machine ID:",
+            font=ctk.CTkFont(size=12, weight="bold")
+        ).pack(pady=(15, 5), padx=20)
+
+        id_entry = ctk.CTkEntry(
+            id_frame,
+            width=400,
+            height=40,
+            font=ctk.CTkFont(size=11, family="monospace"),
+            justify="center"
+        )
+        id_entry.pack(pady=(5, 15), padx=20)
+        id_entry.insert(0, machine_id)
+        id_entry.configure(state="readonly")
+
+        def copy_machine_id():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(machine_id)
+            copy_btn.configure(text="✅ Copied!")
+            self.root.after(2000, lambda: copy_btn.configure(text="Copy Machine ID"))
+
+        copy_btn = ctk.CTkButton(
+            card,
+            text="Copy Machine ID",
+            command=copy_machine_id,
+            width=200,
+            height=40,
+            fg_color=("#4A90E2", "#357ABD")
+        )
+        copy_btn.pack(pady=(0, 15))
+
+        ctk.CTkButton(
+            card,
+            text="🔑 Activate Now",
+            command=self.show_activation_dialog,
+            width=250,
+            height=50,
+            font=ctk.CTkFont(size=16, weight="bold"),
+            fg_color="#10B981",
+            hover_color="#059669"
+        ).pack(pady=(10, 20))
+
+        ctk.CTkButton(
+            card,
+            text="Exit Program",
+            command=self.root.quit,
+            width=200,
+            height=40,
+            fg_color=("#999999", "#555555")
+        ).pack(pady=(0, 30))
+
     def show_activation_modal(self):
         """Show activation modal with program ID and activation input."""
         dialog = ThemedToplevel(self.root)
@@ -2367,6 +2630,7 @@ class ModernPasswordManagerGUI:
             
             self.show_loading_main_ui()
             self.root.after(100, self.show_main_interface)
+            self.root.after(1000, self.start_periodic_tampering_check)
 
         else:
             if hasattr(self.database, 'last_integrity_error') and self.database.last_integrity_error:
@@ -3910,32 +4174,24 @@ class ModernPasswordManagerGUI:
         try:
             self.root.mainloop()
         finally:
-            # CRITICAL: Update shutdown status FIRST before any other cleanup
-            # Do this in a separate thread to avoid blocking the main thread
-            logger.info("Application shutting down - updating guardian status")
+            # Stop trial monitoring
+            if hasattr(self, 'trial_manager') and self.trial_manager:
+                logger.info("Stopping trial monitoring")
+                self.trial_manager.stop_monitoring()
             
-            def shutdown_cleanup():
+            # Rest of cleanup...
+            logger.info("Application shutting down")
+            asyncio_manager.stop()
+            
+            if self.secure_file_manager:
+                logger.info("Performing final sync and cleanup...")
                 try:
-                    if hasattr(self, 'tamper_manager'):
-                        logger.info("Updating tamper manager shutdown status")
-                        self.tamper_manager.update_shutdown_status('SHUTDOWN_CLEAN')
+                    if self.authenticated:
+                        self.secure_file_manager.sync_all_files()
+                    self.secure_file_manager.cleanup_temp_files()
+                    logger.info("Secure cleanup completed")
                 except Exception as e:
-                    logger.error(f"Error updating shutdown status: {e}")
-                finally:
-                    # Stop the asyncio event loop manager
-                    logger.info("Stopping asyncio event loop manager")
-                    asyncio_manager.stop()
-                    
-                    # Sync and cleanup secure files
-                    if self.secure_file_manager:
-                        logger.info("Performing final sync and cleanup...")
-                        try:
-                            if self.authenticated:
-                                self.secure_file_manager.sync_all_files()
-                            self.secure_file_manager.cleanup_temp_files()
-                            logger.info("Secure cleanup completed")
-                        except Exception as e:
-                            logger.error(f"Cleanup error: {e}")
+                    logger.error(f"Cleanup error: {e}")
             
             # Run cleanup in a background thread with timeout
             import threading
