@@ -5172,6 +5172,10 @@ class ModernPasswordManagerGUI:
             self.show_message("info", "2fa_not_configured", msg_type="info")
             return
         
+        # First, verify master password for security
+        if not self.verify_master_password_dialog():
+            return
+        
         result = messagebox.askyesno(
             self.lang_manager.get_string("2fa_disable_confirm_title"),
             self.lang_manager.get_string("2fa_disable_confirm_message"),
