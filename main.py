@@ -90,6 +90,94 @@ activation_icon = ctk.CTkImage(
     light_image=Image.open("icons/activation.png"),
     size=(24, 24)
 )
+class ToolTip:
+    """
+    A simple tooltip class for CustomTkinter widgets.
+    Shows a popup message when hovering over a widget.
+    """
+    def __init__(self, widget, text: str, delay: int = 500):
+        """
+        Initialize tooltip.
+        
+        Args:
+            widget: The widget to attach the tooltip to
+            text: The tooltip message to display
+            delay: Delay in milliseconds before showing tooltip
+        """
+        self.widget = widget
+        self.text = text
+        self.delay = delay
+        self.tooltip_window = None
+        self.scheduled_id = None
+        
+        # Bind events
+        self.widget.bind("<Enter>", self._on_enter)
+        self.widget.bind("<Leave>", self._on_leave)
+        self.widget.bind("<Button-1>", self._on_leave)
+    
+    def _on_enter(self, event=None):
+        """Schedule tooltip display on mouse enter."""
+        self._cancel_scheduled()
+        self.scheduled_id = self.widget.after(self.delay, self._show_tooltip)
+    
+    def _on_leave(self, event=None):
+        """Hide tooltip and cancel scheduled display on mouse leave."""
+        self._cancel_scheduled()
+        self._hide_tooltip()
+    
+    def _cancel_scheduled(self):
+        """Cancel any scheduled tooltip display."""
+        if self.scheduled_id:
+            self.widget.after_cancel(self.scheduled_id)
+            self.scheduled_id = None
+    
+    def _show_tooltip(self):
+        """Display the tooltip window."""
+        if self.tooltip_window:
+            return
+        
+        # Get widget position
+        x = self.widget.winfo_rootx()
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        
+        # Create tooltip window
+        self.tooltip_window = tk.Toplevel(self.widget)
+        self.tooltip_window.wm_overrideredirect(True)
+        self.tooltip_window.wm_geometry(f"+{x}+{y}")
+        
+        # Make tooltip stay on top
+        self.tooltip_window.attributes("-topmost", True)
+        
+        # Create tooltip frame with border
+        frame = tk.Frame(
+            self.tooltip_window,
+            background="#2D3748",
+            borderwidth=1,
+            relief="solid"
+        )
+        frame.pack(fill="both", expand=True)
+        
+        # Create tooltip label
+        label = tk.Label(
+            frame,
+            text=self.text,
+            justify="left",
+            background="#2D3748",
+            foreground="#F7FAFC",
+            font=("Segoe UI", 10),
+            padx=10,
+            pady=8,
+            wraplength=300
+        )
+        label.pack()
+    
+    def _hide_tooltip(self):
+        """Hide and destroy the tooltip window."""
+        if self.tooltip_window:
+            self.tooltip_window.destroy()
+            self.tooltip_window = None
+
+
 class SecurityLevel(Enum):
     LOW = 1
     MEDIUM = 2
@@ -3536,31 +3624,56 @@ class ModernPasswordManagerGUI:
                 anchor="w"
             ).pack(anchor="w", pady=(5, 0))
         
-            # Add Backup button (before About button)
-            backup_icon = ctk.CTkImage(Image.open("icons/uploadbk.png"), size=(24, 24))  # You'll need this icon
-            ctk.CTkButton(
+            # Check if program is activated (for enabling/disabling backup/restore)
+            is_activated = False
+            if hasattr(self, 'trial_manager'):
+                trial_status = self.trial_manager.get_trial_status()
+                is_activated = trial_status.get('is_activated', False)
+            
+            # Professional tooltip message for disabled features
+            trial_tooltip_msg = "🔒 Premium Feature\n\nThis feature will be enabled once you activate the full version of the application."
+            
+            # Add Backup button (before About button) - disabled during trial
+            backup_icon = ctk.CTkImage(Image.open("icons/uploadbk.png"), size=(24, 24))
+            backup_btn = ctk.CTkButton(
                 toolbar,
                 text=self.lang_manager.get_string("backup"),
                 width=120,
                 height=55,
                 image=backup_icon,
                 compound="left",
-                command=self.show_backup_window,
-                font=ctk.CTkFont(size=18)
-            ).pack(side="right", padx=10, pady=8)
+                command=self.show_backup_window if is_activated else None,
+                font=ctk.CTkFont(size=18),
+                state="normal" if is_activated else "disabled",
+                fg_color=None if is_activated else ("#888888", "#555555"),
+                hover_color=None if is_activated else ("#888888", "#555555")
+            )
+            backup_btn.pack(side="right", padx=10, pady=8)
             
-            # Add Restore button
-            restore_icon = ctk.CTkImage(Image.open("icons/backup.png"), size=(24, 24))  # You'll need this icon
-            ctk.CTkButton(
+            # Add tooltip for disabled backup button
+            if not is_activated:
+                ToolTip(backup_btn, trial_tooltip_msg)
+            
+            # Add Restore button - disabled during trial
+            restore_icon = ctk.CTkImage(Image.open("icons/backup.png"), size=(24, 24))
+            restore_btn = ctk.CTkButton(
                 toolbar,
                 text=self.lang_manager.get_string("restore"),
                 width=120,
                 height=55,
                 image=restore_icon,
                 compound="left",
-                command=self.show_restore_window,
-                font=ctk.CTkFont(size=18)
-            ).pack(side="right", padx=10, pady=8)
+                command=self.show_restore_window if is_activated else None,
+                font=ctk.CTkFont(size=18),
+                state="normal" if is_activated else "disabled",
+                fg_color=None if is_activated else ("#888888", "#555555"),
+                hover_color=None if is_activated else ("#888888", "#555555")
+            )
+            restore_btn.pack(side="right", padx=10, pady=8)
+            
+            # Add tooltip for disabled restore button
+            if not is_activated:
+                ToolTip(restore_btn, trial_tooltip_msg)
             
             ctk.CTkButton(
                 toolbar,
@@ -4485,9 +4598,22 @@ class ModernPasswordManagerGUI:
             ctk.CTkLabel(password_frame, text=self.lang_manager.get_string("master_password_label"), 
                         font=ctk.CTkFont(size=20, weight="bold")).pack(pady=(15, 10))
             
-            ctk.CTkButton(password_frame, text=self.lang_manager.get_string("change_master_password_button"),
-                        command=self.change_master_password_dialog,
-                        height=40).pack(pady=10)
+            # Change Master Password button - disabled during trial
+            change_pwd_btn = ctk.CTkButton(
+                password_frame, 
+                text=self.lang_manager.get_string("change_master_password_button"),
+                command=self.change_master_password_dialog if is_activated else None,
+                height=40,
+                state="normal" if is_activated else "disabled",
+                fg_color=None if is_activated else ("#888888", "#555555"),
+                hover_color=None if is_activated else ("#888888", "#555555")
+            )
+            change_pwd_btn.pack(pady=10)
+            
+            # Add tooltip for disabled button
+            if not is_activated:
+                trial_tooltip_msg = "🔒 Premium Feature\n\nThis feature will be enabled once you activate the full version of the application."
+                ToolTip(change_pwd_btn, trial_tooltip_msg)
 
             tfa_frame = ctk.CTkFrame(content_frame, fg_color=("#2E3440", "#1E1E1E"), corner_radius=12)
             tfa_frame.pack(fill="x", pady=10)
