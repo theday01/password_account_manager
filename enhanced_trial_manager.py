@@ -61,6 +61,10 @@ class TrialMonitorEventHandler(FileSystemEventHandler):
         if event.is_directory:
             return
         
+        # Skip monitoring during graceful shutdown
+        if self.trial_manager._is_shutting_down:
+            return
+        
         # Check if this is a trial state file
         if any(str(loc) in event.src_path for loc in self.trial_manager.storage_locations):
             current_time = time.time()
@@ -72,6 +76,10 @@ class TrialMonitorEventHandler(FileSystemEventHandler):
     
     def on_deleted(self, event):
         if event.is_directory:
+            return
+        
+        # Skip monitoring during graceful shutdown
+        if self.trial_manager._is_shutting_down:
             return
         
         if any(str(loc) in event.src_path for loc in self.trial_manager.storage_locations):
@@ -123,6 +131,9 @@ class EnhancedTrialActivationManager:
         self.tampering_detected = False
         self.tampering_events = []
         self.permanent_lockout = False
+        
+        # Shutdown flag to prevent false positive tampering detection
+        self._is_shutting_down = False
         
         # Last known good timestamp (for anti-rollback)
         self.last_known_timestamp = None
@@ -764,15 +775,20 @@ class EnhancedTrialActivationManager:
         return True
     
     def stop_monitoring(self):
-        """Stop monitoring."""
+        """Stop monitoring gracefully."""
+        # Set shutdown flag FIRST to prevent false positive tampering detection
+        self._is_shutting_down = True
         self.is_monitoring = False
         
+        # Stop file observer first before any file operations
         if self.file_observer:
             try:
                 self.file_observer.stop()
-                self.file_observer.join(timeout=5)
-            except:
+                self.file_observer.join(timeout=2)
+            except Exception:
                 pass
+            finally:
+                self.file_observer = None
         
         logger.info("Trial monitoring stopped")
     
