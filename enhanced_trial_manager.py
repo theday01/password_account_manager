@@ -100,6 +100,7 @@ class EnhancedTrialActivationManager:
     # Security configuration
     VERIFICATION_INTERVAL = 30  # Check integrity every 30 seconds
     MAX_TIME_DRIFT = 300  # Allow 5 minutes of system time drift
+    TRIAL_LOG_INTERVAL = 120  # Log trial time remaining every 2 minutes
     
     def __init__(self):
         """Initialize the Enhanced Trial Activation Manager."""
@@ -125,6 +126,9 @@ class EnhancedTrialActivationManager:
         
         # Last known good timestamp (for anti-rollback)
         self.last_known_timestamp = None
+        
+        # Counter for trial time logging (tracks seconds since last log)
+        self._trial_log_counter = 0
         
         logger.info("EnhancedTrialActivationManager initialized")
         logger.info(f"Storage locations: {len(self.storage_locations)}")
@@ -779,11 +783,75 @@ class EnhancedTrialActivationManager:
                 # Periodic integrity check
                 self._verify_integrity()
                 
+                # Increment counter and check if we should log trial time
+                self._trial_log_counter += self.VERIFICATION_INTERVAL
+                if self._trial_log_counter >= self.TRIAL_LOG_INTERVAL:
+                    self._trial_log_counter = 0
+                    self._log_trial_time_remaining()
+                
                 # Sleep
                 time.sleep(self.VERIFICATION_INTERVAL)
             except Exception as e:
                 logger.error(f"Monitoring error: {e}")
                 time.sleep(self.VERIFICATION_INTERVAL)
+    
+    def _log_trial_time_remaining(self):
+        """Log the trial time remaining to the terminal for developer visibility."""
+        try:
+            status = self.get_trial_status()
+            
+            if status.get('is_activated'):
+                print(f"\n{'='*50}")
+                print(f"🔑 APPLICATION ACTIVATED")
+                print(f"   Activation Date: {status.get('activation_date', 'N/A')}")
+                print(f"{'='*50}\n")
+                return
+            
+            if status.get('is_locked'):
+                print(f"\n{'='*50}")
+                print(f"🔒 APPLICATION LOCKED")
+                print(f"   Reason: {status.get('lockout_reason', 'Unknown')}")
+                print(f"{'='*50}\n")
+                return
+            
+            if status.get('is_expired'):
+                print(f"\n{'='*50}")
+                print(f"⏰ TRIAL EXPIRED")
+                print(f"   Trial ended on: {status.get('trial_end_date', 'N/A')}")
+                print(f"   Please activate to continue using the application")
+                print(f"{'='*50}\n")
+                return
+            
+            # Calculate remaining time more precisely
+            if 'trial_end_date' in status:
+                try:
+                    trial_end = datetime.fromisoformat(status['trial_end_date'])
+                    now = datetime.now()
+                    remaining = trial_end - now
+                    
+                    days = remaining.days
+                    hours, remainder = divmod(remaining.seconds, 3600)
+                    minutes, seconds = divmod(remainder, 60)
+                    
+                    print(f"\n{'='*50}")
+                    print(f"⏱️  TRIAL TIME REMAINING")
+                    print(f"   {days} days, {hours} hours, {minutes} minutes")
+                    print(f"   Trial ends: {trial_end.strftime('%Y-%m-%d %H:%M')}")
+                    print(f"{'='*50}\n")
+                except Exception as e:
+                    logger.debug(f"Error calculating precise time: {e}")
+                    days_remaining = status.get('days_remaining', 0)
+                    print(f"\n{'='*50}")
+                    print(f"⏱️  TRIAL TIME REMAINING: {days_remaining} days")
+                    print(f"{'='*50}\n")
+            else:
+                days_remaining = status.get('days_remaining', 0)
+                print(f"\n{'='*50}")
+                print(f"⏱️  TRIAL TIME REMAINING: {days_remaining} days")
+                print(f"{'='*50}\n")
+                
+        except Exception as e:
+            logger.error(f"Error logging trial time: {e}")
     
     def _verify_integrity(self):
         """Periodic integrity verification."""

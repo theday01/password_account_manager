@@ -1172,7 +1172,9 @@ class ModernPasswordManagerGUI:
         self.auth_guardian = AuthGuardian(self.secure_file_manager)
         self.settings = self.auth_guardian._settings
         self.inactivity_timer = None
+        self.inactivity_warning_timer = None
         self.INACTIVITY_TIMEOUT = 15 * 60 * 1000  # 15 minutes in milliseconds
+        self.INACTIVITY_WARNING_TIMEOUT = 13 * 60 * 1000  # 13 minutes (2 minutes before logout)
         self.load_settings()
         self.setup_ui()
         self.start_lockout_validation_timer()
@@ -4242,9 +4244,27 @@ class ModernPasswordManagerGUI:
             self.show_login_screen()
 
     def reset_inactivity_timer(self, event=None):
+        # Cancel existing timers
         if self.inactivity_timer:
             self.root.after_cancel(self.inactivity_timer)
+        if self.inactivity_warning_timer:
+            self.root.after_cancel(self.inactivity_warning_timer)
+        # Set the warning timer (2 minutes before logout)
+        self.inactivity_warning_timer = self.root.after(self.INACTIVITY_WARNING_TIMEOUT, self._send_inactivity_warning)
+        # Set the logout timer
         self.inactivity_timer = self.root.after(self.INACTIVITY_TIMEOUT, self.force_logout)
+
+    def _send_inactivity_warning(self):
+        """Send a Windows notification warning about imminent auto-logout."""
+        logger.info("Sending inactivity warning notification (2 minutes until auto-logout).")
+        try:
+            from notification_manager import show_system_notification_fallback
+            show_system_notification_fallback(
+                "SecureVault Pro - Inactivity Warning",
+                "The application will close in 2 minutes due to inactivity. Move your mouse or press a key to stay logged in."
+            )
+        except Exception as e:
+            logger.error(f"Failed to send inactivity warning notification: {e}")
 
     def force_logout(self):
         logger.info("Logging out due to inactivity.")
@@ -5263,11 +5283,17 @@ class ModernPasswordManagerGUI:
                         entry.configure(border_color="#EF4444")
                     
                     def reset_after_error():
+                        # Check if dialog still exists before manipulating widgets
+                        if not verify_dialog.winfo_exists():
+                            return
                         for entry in digit_entries:
-                            entry.delete(0, tk.END)
-                            entry.configure(border_color="#3B82F6")
-                        digit_entries[0].focus()
-                        status_label.configure(text="")
+                            if entry.winfo_exists():
+                                entry.delete(0, tk.END)
+                                entry.configure(border_color="#3B82F6")
+                        if digit_entries[0].winfo_exists():
+                            digit_entries[0].focus()
+                        if status_label.winfo_exists():
+                            status_label.configure(text="")
                     
                     verify_dialog.after(1500, reset_after_error)
             
