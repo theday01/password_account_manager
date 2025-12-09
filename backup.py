@@ -156,14 +156,9 @@ class BackupManager:
                 for row in cursor:
                     account_id, encrypted_data = row
                     
-                    # Master account must be included as-is (with password) for authentication to work
+                    # Master account is intentionally skipped to prevent including it in the backup
                     if account_id == 'master_account':
-                        # Include master account directly without filtering - needed for authentication
-                        filtered_conn.execute("""
-                            INSERT INTO credentials (account_id, encrypted_data)
-                            VALUES (?, ?)
-                        """, (account_id, encrypted_data))
-                        logger.info("Master account included in backup (required for authentication)")
+                        logger.info("Skipping master account - not included in backup")
                         continue
                     
                     try:
@@ -304,8 +299,7 @@ class BackupManager:
                              f"Accounts: {accounts_count}\n"
                              f"Size: {file_size / (1024*1024):.2f} MB\n"
                              f"Location: {backup_path}\n\n"
-                             f"⚠️ Note: Regular account passwords are NOT included.\n"
-                             f"Master account is included for authentication purposes.")
+                             f"⚠️ Note: Regular account passwords are NOT included.\n")
                 
                 return True, success_msg, backup_path
                 

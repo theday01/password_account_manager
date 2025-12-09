@@ -602,6 +602,7 @@ class DatabaseManager:
                 test_row = cursor.fetchone()
                 sensitive_conn.close()
                 if test_row:
+                    # Master account exists - verify password
                     try:
                         decrypted_json = self.crypto.decrypt_data(test_row[0], self.encryption_key)
                         master_data = json.loads(decrypted_json)
@@ -617,8 +618,54 @@ class DatabaseManager:
                         logger.error(f"An unexpected error occurred during test decryption: {decrypt_error}")
                         return False
                 else:
-                    logger.error("No master account found for test decryption. Authentication cannot proceed.")
-                    return False
+                    # Master account doesn't exist - create it with the provided password
+                    # This allows users to set a new master password after restoring a backup
+                    logger.info("No master account found. Creating new master account with provided password (e.g., after backup restore).")
+                    try:
+                        master_data = {
+                            "name": "Master Account",
+                            "username": "master",
+                            "password": master_password,
+                            "email": "",
+                            "url": "",
+                            "notes": "System account for authentication verification",
+                            "tags": [],
+                            "security_level": SecurityLevel.CRITICAL.value,
+                            "recovery_email": "",
+                            "phone_number": "",
+                            "account_type": "System",
+                            "category": "Critical",
+                            "two_factor_enabled": 0,
+                            "last_password_change": datetime.now().isoformat()
+                        }
+                        encrypted_data = self.crypto.encrypt_data(json.dumps(master_data), self.encryption_key)
+                        
+                        # Create metadata entry
+                        metadata_conn = self._get_metadata_connection()
+                        metadata_conn.execute("""
+                            INSERT OR REPLACE INTO accounts (id, created_at, updated_at)
+                            VALUES (?, ?, ?)
+                        """, (
+                            "master_account",
+                            datetime.now().isoformat(),
+                            datetime.now().isoformat()
+                        ))
+                        metadata_conn.commit()
+                        metadata_conn.close()
+                        
+                        # Create sensitive entry
+                        sensitive_conn = self._get_sensitive_connection()
+                        sensitive_conn.execute("""
+                            INSERT OR REPLACE INTO credentials (account_id, encrypted_data)
+                            VALUES (?, ?)
+                        """, ("master_account", encrypted_data))
+                        sensitive_conn.commit()
+                        sensitive_conn.close()
+                        
+                        logger.info("Master account created successfully with new password")
+                    except Exception as create_error:
+                        logger.error(f"Failed to create master account: {create_error}")
+                        return False
             except Exception as test_error:
                 logger.error(f"Database test failed: {test_error}")
                 return False
@@ -3055,7 +3102,8 @@ class ModernPasswordManagerGUI:
         # Applying restrictions to Full Name, Email, and Password fields
         self._block_copy_paste_comprehensive(self.setup_full_name_entry, include_cut=False)
         self._block_copy_paste_comprehensive(self.setup_email_entry, include_cut=False)
-        self._block_copy_paste_comprehensive(self.setup_master_password, include_cut=True)
+        # DEVELOPMENT/DEBUGGING: Temporarily commented out to allow copy/paste for testing
+        # self._block_copy_paste_comprehensive(self.setup_master_password, include_cut=True)
         # -------------------------------------------
 
         self.toggle_master_password_btn = ctk.CTkButton(
@@ -3097,7 +3145,8 @@ class ModernPasswordManagerGUI:
         self.setup_confirm_password.pack(side="left")
 
         # --- DISABLE COPY/PASTE FOR CONFIRM PASSWORD ---
-        self._block_copy_paste_comprehensive(self.setup_confirm_password, include_cut=True)
+        # DEVELOPMENT/DEBUGGING: Temporarily commented out to allow copy/paste for testing
+        # self._block_copy_paste_comprehensive(self.setup_confirm_password, include_cut=True)
         # -----------------------------------------------
 
         self.toggle_confirm_password_btn = ctk.CTkButton(
