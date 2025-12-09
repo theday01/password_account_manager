@@ -1799,7 +1799,8 @@ class ModernPasswordManagerGUI:
         
         # --- DISABLE COPY/PASTE FOR LOGIN ---
         # Returns "break" to stop the event from propagating, effectively blocking the action
-        self._block_copy_paste_comprehensive(self.master_password_entry)
+        # DEVELOPMENT/TESTING: Commented out to allow copy/paste for testing purposes
+        # self._block_copy_paste_comprehensive(self.master_password_entry)
         # ------------------------------------
 
         def toggle_password_visibility():
@@ -6241,12 +6242,27 @@ class ModernPasswordManagerGUI:
 
     def open_website(self, account: dict):
         url = account.get('url')
-        if url:
-            if not url.startswith(('http://', 'https://')):
-                url = f"https://{url}"
-            webbrowser.open_new_tab(url)
-        else:
+        if not url:
             self.show_message("error", "no_url_for_account", msg_type="error")
+            return
+        
+        # Step 1: Verify master password first
+        if not self.verify_master_password_dialog():
+            return
+        
+        # Step 2: Ask for confirmation before opening
+        if not url.startswith(('http://', 'https://')):
+            url = f"https://{url}"
+        
+        account_name = account.get('name', 'Unknown')
+        result = messagebox.askyesno(
+            "Confirm Open Link",
+            f"Are you sure you want to open this link?\n\n{url}\n\nAccount: {account_name}",
+            parent=self.root
+        )
+        
+        if result:
+            webbrowser.open_new_tab(url)
 
 
     def show_account_dialog(self, account: Optional[dict] = None):

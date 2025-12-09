@@ -57,16 +57,29 @@ class TrialMonitorEventHandler(FileSystemEventHandler):
         self.trial_manager = trial_manager
         self.last_alert = 0
     
+    def _should_process_event(self) -> bool:
+        """Check if we should process file system events (not shutting down)."""
+        # Double-check both flags to avoid race conditions
+        if self.trial_manager._is_shutting_down:
+            return False
+        if not self.trial_manager.is_monitoring:
+            return False
+        return True
+    
     def on_modified(self, event):
         if event.is_directory:
             return
         
-        # Skip monitoring during graceful shutdown
-        if self.trial_manager._is_shutting_down:
+        # Skip monitoring during graceful shutdown - check multiple flags
+        if not self._should_process_event():
             return
         
         # Check if this is a trial state file
         if any(str(loc) in event.src_path for loc in self.trial_manager.storage_locations):
+            # Double-check shutdown flag again before taking any action
+            if self.trial_manager._is_shutting_down:
+                return
+            
             current_time = time.time()
             # Rate limit alerts (max once per 5 seconds)
             if current_time - self.last_alert > 5:
@@ -78,11 +91,15 @@ class TrialMonitorEventHandler(FileSystemEventHandler):
         if event.is_directory:
             return
         
-        # Skip monitoring during graceful shutdown
-        if self.trial_manager._is_shutting_down:
+        # Skip monitoring during graceful shutdown - check multiple flags
+        if not self._should_process_event():
             return
         
         if any(str(loc) in event.src_path for loc in self.trial_manager.storage_locations):
+            # Double-check shutdown flag again before taking any action
+            if self.trial_manager._is_shutting_down:
+                return
+            
             logger.critical(f"TAMPERING DETECTED: Trial state file deleted: {event.src_path}")
             self.trial_manager._handle_tampering_detected("file_deletion", event.src_path)
 
@@ -783,12 +800,18 @@ class EnhancedTrialActivationManager:
         # Stop file observer first before any file operations
         if self.file_observer:
             try:
+                # Unschedule all watchers first to stop receiving new events
+                self.file_observer.unschedule_all()
                 self.file_observer.stop()
-                self.file_observer.join(timeout=2)
-            except Exception:
-                pass
+                # Wait longer to ensure all pending events are processed with shutdown flag set
+                self.file_observer.join(timeout=5)
+            except Exception as e:
+                logger.debug(f"Error stopping file observer: {e}")
             finally:
                 self.file_observer = None
+        
+        # Give a small delay to ensure any in-flight events see the shutdown flag
+        time.sleep(0.1)
         
         logger.info("Trial monitoring stopped")
     
