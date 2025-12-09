@@ -118,6 +118,8 @@ LANGUAGES = {
         "delete_confirm_message": "Are you sure you want to delete '{account_name}'?\\n\\nThis action cannot be undone!",
         "delete_success_title": "Deleted",
         "delete_success_message": "Account '{account_name}' has been deleted.",
+        "update_confirm_title": "Confirm Update",
+        "update_confirm_message": "Are you sure you want to update '{account_name}'?\n\nThe current data will be replaced with the new data you entered.",
         "delete_failed_message": "Failed to delete account: {error}",
         "account_details_title": "Account Details - {account_name}",
         "view_details_title": "🔍 {account_name}",
@@ -306,7 +308,8 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "activation_locked_out_message": "Too many incorrect activation attempts. For your security, activation has been temporarily blocked for {lockout_time}.",
         "password_change_reminder_title": "Password Change Reminder",
         "password_change_reminder": "It's been 5 minutes since you created the account '{account_name}'.\n\nWould you like to change the password now?",
-        "weak_password_recommendation": "(please change the password !!)",
+        "weak_password_recommendation": "(We do not recommend continuing to use this password)",
+        "medium_password_warning": "(It could be vulnerable to hacking at any time)",
         "master_password_warning": "Please be aware: Your Master Password is the only key to your vault. If you forget it, your data cannot be recovered. We recommend storing it in a secure, offline location.",
         "password_req_length": "At least 16 characters",
         "password_req_uppercase": "An uppercase letter (A-Z)",
@@ -332,7 +335,8 @@ You can view, edit, or delete your accounts at any time from the main list.""",
         "backup": "Backup",
         "restore": "Restore",
         "restore_confirm_title": "Confirm Restore",
-        "restart_title": "Restart Required"
+        "restart_title": "Restart Required",
+        "verify_button": "Verify"
     }
 }
 

@@ -10,16 +10,17 @@ logging.basicConfig(
 )
 
 class PasswordReminder:
-    def __init__(self, db_manager, parent_window):
-        self.db_manager = db_manager
-        self.parent_window = parent_window
-        self.REMINDER_INTERVAL = 600  # Check every 600 seconds (10 minutes)
-        self.reminded_accounts = set()
-        self.timer = None
-        self.logger = logging.getLogger(__name__)
+    def __init__(self, database_manager, parent_ui):
+        self.database = database_manager
+        self.parent_ui = parent_ui
         
-        self.logger.info("PasswordReminder initialized")
-        self.start()
+        # ✅ Store reminder data in separate location from trial files
+        self.reminder_data_file = os.path.join(
+            os.getenv('LOCALAPPDATA'),
+            'SecureVaultPro',
+            '.reminders',  # Separate directory
+            'password_reminders.dat'
+        )
 
     def _check_accounts(self):
         try:

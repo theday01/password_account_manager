@@ -1114,9 +1114,17 @@ class SecurityQuestionsDialog(ThemedToplevel):
         self.result = False
 
         self.title(self.lang_manager.get_string("security_questions_title"))
-        self.geometry("500x400")
         self.grab_set()
         self.resizable(False, False)
+
+        self.update_idletasks()
+        w = 500
+        h = 350
+        ws = self.winfo_screenwidth()
+        hs = self.winfo_screenheight()
+        x = (ws // 2) - (w // 2)
+        y = (hs // 2) - (h // 2)
+        self.geometry(f"{w}x{h}+{x}+{y}")
 
         main_frame = ctk.CTkFrame(self)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -4375,7 +4383,7 @@ class ModernPasswordManagerGUI:
             from notification_manager import show_system_notification_fallback
             show_system_notification_fallback(
                 "SecureVault Pro - Inactivity Warning",
-                "The application will close in 2 minutes due to inactivity. Move your mouse or press a key to stay logged in."
+                "The application will close in 2 minutes due to inactivity"
             )
         except Exception as e:
             logger.error(f"Failed to send inactivity warning notification: {e}")
@@ -4384,7 +4392,6 @@ class ModernPasswordManagerGUI:
         logger.info("Logging out due to inactivity.")
         self.lock_vault()
         self.root.quit()
-
         
     def show_loading_main_ui(self):
         for widget in self.main_frame.winfo_children():
@@ -5770,8 +5777,11 @@ class ModernPasswordManagerGUI:
                 # Apply filter option
                 if filter_option and filter_option != self.lang_manager.get_string("filter_show_all"):
                     if filter_option == self.lang_manager.get_string("filter_expired_passwords"):
-                        expired_ids = self.password_reminder.get_reminded_accounts()
-                        filtered_accounts = [acc for acc in filtered_accounts if acc['id'] in expired_ids]
+                        if self.password_reminder:
+                            expired_ids = self.password_reminder.get_reminded_accounts()
+                            filtered_accounts = [acc for acc in filtered_accounts if acc['id'] in expired_ids]
+                        else:
+                            filtered_accounts = []  # No reminder system, no expired passwords to show
                     elif filter_option == self.lang_manager.get_string("filter_weak_passwords"):
                         filtered_accounts = [acc for acc in filtered_accounts if self.is_password_weak(acc.get('password', ''))]
 
@@ -5787,9 +5797,10 @@ class ModernPasswordManagerGUI:
                 self.root.after(0, _update_ui)
 
             except Exception as e:
+                error_msg = str(e)  # Capture error before it goes out of scope
                 def _show_error():
                     loading_label.destroy()
-                    self.show_error_message(f"Error loading accounts: {e}")
+                    self.show_error_message(f"Error loading accounts: {error_msg}")
                 self.root.after(0, _show_error)
 
         threading.Thread(target=_load_in_background, daemon=True).start()
@@ -6090,9 +6101,10 @@ class ModernPasswordManagerGUI:
         strength_text = self.lang_manager.get_string("strength_template", strength=strength)
         if strength in ["Weak", "Very Weak"]:
             strength_text += f" {self.lang_manager.get_string('weak_password_recommendation')}"
+        elif strength == "Medium":
+            strength_text += f" {self.lang_manager.get_string('medium_password_warning')}"
         ctk.CTkLabel(right_frame, text=strength_text, 
-                     text_color=strength_color, font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(0, 10))
-        
+                     text_color=strength_color, font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(0, 10))        
         self.create_action_buttons(right_frame, account)
 
     def get_strength_color(self, strength):
@@ -6137,7 +6149,8 @@ class ModernPasswordManagerGUI:
                           fg_color=color).pack(side="left", padx=5)
 
     def delete_account(self, account: dict):
-        if not self.verify_master_password_dialog():
+        # First, verify with security questions instead of master password
+        if not self.verify_security_questions():
             return
 
         account_name = account.get('name', 'this account')
@@ -6152,7 +6165,7 @@ class ModernPasswordManagerGUI:
                 self.load_password_cards()
             except Exception as e:
                 self.show_message("error", "delete_failed_message", msg_type="error", error=str(e))
-
+                
     def view_account_details(self, account_id: str):
         if not self.verify_master_password_dialog():
             return
@@ -6267,6 +6280,12 @@ class ModernPasswordManagerGUI:
 
     def show_account_dialog(self, account: Optional[dict] = None):
         is_edit = account is not None
+        
+        # Require master password verification before showing edit dialog
+        if is_edit:
+            if not self.verify_master_password_dialog():
+                return
+        
         title = self.lang_manager.get_string("edit_account_title", account_name=account['name']) if is_edit else self.lang_manager.get_string("add_account_title")
         
         dialog = ThemedToplevel(self.root)
@@ -6288,9 +6307,67 @@ class ModernPasswordManagerGUI:
                     command=dialog.destroy, width=120, height=45).pack(side="left", padx=15)
         
         save_text = self.lang_manager.get_string("update_account_button") if is_edit else self.lang_manager.get_string("add_account_button")
-        ctk.CTkButton(button_frame, text=save_text, 
+        save_button = ctk.CTkButton(button_frame, text=save_text, 
                     command=lambda: self.save_enhanced_account(dialog, entries, account),
-                    width=150, height=45, font=ctk.CTkFont(size=16, weight="bold")).pack(side="right", padx=15)
+                    width=150, height=45, font=ctk.CTkFont(size=16, weight="bold"))
+        save_button.pack(side="right", padx=15)
+        
+        # For edit mode, disable the update button until changes are made
+        if is_edit:
+            save_button.configure(state="disabled")
+            
+            # Store original values
+            original_values = {
+                "name": account.get('name', ''),
+                "account_type": account.get('account_type', 'Email'),
+                "username": account.get('username', ''),
+                "password": account.get('password', ''),
+                "recovery_email": account.get('recovery_email', ''),
+                "phone_number": account.get('phone_number', ''),
+                "two_factor_enabled": account.get('two_factor_enabled', 0),
+                "url": account.get('url', ''),
+                "notes": account.get('notes', ''),
+                "category": account.get('category', 'Medium Priority'),
+            }
+            
+            def check_for_changes(*args):
+                """Check if any field has been modified from original values"""
+                try:
+                    current_values = {
+                        "name": entries["name"].get().strip(),
+                        "account_type": entries["account_type"].get(),
+                        "username": entries["username"].get().strip(),
+                        "password": entries["password"].get(),
+                        "recovery_email": entries["recovery_email"].get().strip(),
+                        "phone_number": entries["phone_number"].get().strip(),
+                        "two_factor_enabled": entries["two_factor_enabled"].get(),
+                        "url": entries["url"].get().strip(),
+                        "notes": entries["notes"].get("1.0", tk.END).strip(),
+                        "category": entries["category"].get(),
+                    }
+                    
+                    has_changes = any(
+                        str(current_values[key]) != str(original_values[key])
+                        for key in original_values
+                    )
+                    
+                    if has_changes:
+                        save_button.configure(state="normal")
+                    else:
+                        save_button.configure(state="disabled")
+                except Exception:
+                    pass  # Ignore errors during widget destruction
+            
+            # Bind change detection to all form fields
+            for key, widget in entries.items():
+                if key == "notes":
+                    widget.bind("<KeyRelease>", check_for_changes)
+                elif key == "two_factor_enabled":
+                    widget.configure(command=check_for_changes)
+                elif key in ["account_type", "category"]:
+                    widget.configure(command=check_for_changes)
+                else:
+                    widget.bind("<KeyRelease>", check_for_changes)
 
 
     def _create_enhanced_account_form(self, parent, account: Optional[dict] = None):
@@ -6631,7 +6708,17 @@ class ModernPasswordManagerGUI:
             }
 
             if account:  # Edit existing
+                # Require master password verification before saving edits
                 if not self.verify_master_password_dialog():
+                    return
+                
+                # Show confirmation that old data will be replaced with new data
+                confirm_result = messagebox.askyesno(
+                    self.lang_manager.get_string("update_confirm_title"),
+                    self.lang_manager.get_string("update_confirm_message", account_name=name),
+                    parent=dialog
+                )
+                if not confirm_result:
                     return
 
                 # Fetch the full existing account data to merge with changes
