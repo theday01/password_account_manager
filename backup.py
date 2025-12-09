@@ -1,12 +1,10 @@
 """
-backup.py - Comprehensive Backup and Restore Manager for SecureVault Pro
+backup.py - Simplified Backup and Restore Manager for SecureVault Pro
 
-This module provides encrypted backup and restore functionality with:
-- Full database backup with encryption
-- Selective backup options
+This module provides encrypted backup and restore functionality for accounts only:
+- Backs up account metadata (name, username, email, URL, notes, tags, etc.)
+- Excludes passwords and sensitive settings
 - Backup verification
-- Automatic backup scheduling
-- Cloud storage support (optional)
 - Backup history tracking
 """
 
@@ -18,13 +16,10 @@ import zipfile
 import hashlib
 import logging
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Tuple
 from dataclasses import dataclass, asdict
-import threading
-import schedule
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -38,24 +33,20 @@ class BackupMetadata:
     accounts_count: int
     file_size: int
     checksum: str
-    backup_type: str  # 'full', 'accounts_only', 'settings_only'
     encrypted: bool
-    compression: str  # 'zip', 'tar.gz', etc.
     created_by: str
 
 
 def get_program_directory():
     """Get the directory where the program is running from"""
     if getattr(sys, 'frozen', False):
-        # Running as compiled executable
         return os.path.dirname(sys.executable)
     else:
-        # Running as script
         return os.path.dirname(os.path.abspath(__file__))
 
 
 class BackupManager:
-    """Manages backup and restore operations for SecureVault Pro"""
+    """Manages backup and restore operations for SecureVault Pro (Accounts Only)"""
     
     def __init__(self, database_manager, secure_file_manager, crypto_manager):
         """
@@ -84,11 +75,6 @@ class BackupManager:
         # Backup history file
         self.history_file = self.backup_root / "backup_history.json"
         self.backup_history = self._load_backup_history()
-        
-        # Auto-backup settings
-        self.auto_backup_enabled = False
-        self.auto_backup_interval = 7  # days
-        self.auto_backup_thread = None
         
         logger.info(f"BackupManager initialized successfully")
         logger.info(f"Backup directory: {self.backup_root}")
@@ -132,22 +118,116 @@ class BackupManager:
             logger.error(f"Failed to get accounts count: {e}")
             return 0
     
-    def create_backup(self, backup_type: str = 'full', 
-                     password: Optional[str] = None,
-                     description: str = "") -> Tuple[bool, str, Optional[Path]]:
+    def _create_accounts_backup(self, temp_dir: Path):
+        """Create a backup containing only account metadata without passwords"""
+        try:
+            # Copy metadata database
+            if os.path.exists(self.database.metadata_db):
+                shutil.copy2(self.database.metadata_db, temp_dir / "metadata.db")
+                logger.info("Metadata database copied")
+            
+            # Copy salt file - CRITICAL for encryption key derivation
+            if os.path.exists(self.secure_file_manager.salt_path):
+                shutil.copy2(self.secure_file_manager.salt_path, temp_dir / "salt_file")
+                logger.info("Salt file copied")
+            else:
+                logger.warning("Salt file not found - backup may not be restorable!")
+            
+            # Create a filtered sensitive database with only non-sensitive account data
+            if os.path.exists(self.database.sensitive_db):
+                filtered_db_path = temp_dir / "sensitive.db"
+                
+                # Connect to original sensitive database
+                original_conn = sqlite3.connect(self.database.sensitive_db)
+                
+                # Create new filtered database
+                filtered_conn = sqlite3.connect(filtered_db_path)
+                filtered_conn.execute("""
+                    CREATE TABLE credentials (
+                        account_id TEXT PRIMARY KEY,
+                        encrypted_data BLOB NOT NULL
+                    )
+                """)
+                
+                # Process each account and remove sensitive data
+                cursor = original_conn.execute("SELECT account_id, encrypted_data FROM credentials")
+                accounts_processed = 0
+                
+                for row in cursor:
+                    account_id, encrypted_data = row
+                    
+                    # Master account must be included as-is (with password) for authentication to work
+                    if account_id == 'master_account':
+                        # Include master account directly without filtering - needed for authentication
+                        filtered_conn.execute("""
+                            INSERT INTO credentials (account_id, encrypted_data)
+                            VALUES (?, ?)
+                        """, (account_id, encrypted_data))
+                        logger.info("Master account included in backup (required for authentication)")
+                        continue
+                    
+                    try:
+                        # Decrypt the data
+                        decrypted_json = self.database.crypto.decrypt_data(encrypted_data, self.database.encryption_key)
+                        account_data = json.loads(decrypted_json)
+                        
+                        # Remove sensitive fields (passwords)
+                        filtered_account_data = {
+                            "name": account_data.get("name", ""),
+                            "username": account_data.get("username", ""),
+                            "email": account_data.get("email", ""),
+                            "url": account_data.get("url", ""),
+                            "notes": account_data.get("notes", ""),
+                            "tags": account_data.get("tags", []),
+                            "security_level": account_data.get("security_level", ""),
+                            "account_type": account_data.get("account_type", ""),
+                            "category": account_data.get("category", ""),
+                            "two_factor_enabled": account_data.get("two_factor_enabled", 0),
+                            "last_password_change": account_data.get("last_password_change", ""),
+                            "recovery_email": account_data.get("recovery_email", ""),
+                            "phone_number": account_data.get("phone_number", ""),
+                            # PASSWORD IS EXCLUDED
+                        }
+                        
+                        # Encrypt the filtered data
+                        filtered_encrypted_data = self.database.crypto.encrypt_data(
+                            json.dumps(filtered_account_data), 
+                            self.database.encryption_key
+                        )
+                        
+                        # Insert into filtered database
+                        filtered_conn.execute("""
+                            INSERT INTO credentials (account_id, encrypted_data)
+                            VALUES (?, ?)
+                        """, (account_id, filtered_encrypted_data))
+                        
+                        accounts_processed += 1
+                        
+                    except Exception as e:
+                        logger.error(f"Error processing account {account_id}: {e}")
+                
+                filtered_conn.commit()
+                filtered_conn.close()
+                original_conn.close()
+                
+                logger.info(f"Filtered sensitive database created with {accounts_processed} accounts")
+                
+        except Exception as e:
+            logger.error(f"Failed to create accounts backup: {e}")
+            raise
+    
+    def create_backup(self, description: str = "") -> Tuple[bool, str, Optional[Path]]:
         """
-        Create a backup of the vault
+        Create a backup of accounts only (no passwords)
         
         Args:
-            backup_type: Type of backup ('full', 'accounts_only', 'settings_only')
-            password: Optional password for backup encryption (uses master password if None)
             description: Optional backup description
             
         Returns:
             Tuple of (success: bool, message: str, backup_path: Optional[Path])
         """
         try:
-            logger.info(f"Starting {backup_type} backup creation...")
+            logger.info(f"Starting accounts-only backup creation...")
             
             # Generate backup ID and timestamp
             backup_id = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -158,39 +238,13 @@ class BackupManager:
             temp_dir.mkdir(exist_ok=True)
             
             try:
-                # Copy database files based on backup type
-                if backup_type in ['full', 'accounts_only']:
-                    # Copy metadata database
-                    if os.path.exists(self.database.metadata_db):
-                        shutil.copy2(self.database.metadata_db, 
-                                   temp_dir / "metadata.db")
-                    
-                    # Copy sensitive database
-                    if os.path.exists(self.database.sensitive_db):
-                        shutil.copy2(self.database.sensitive_db, 
-                                   temp_dir / "sensitive.db")
+                # Create filtered backup with only account metadata (no passwords)
+                self._create_accounts_backup(temp_dir)
                 
-                if backup_type in ['full', 'settings_only']:
-                    # Copy salt file
-                    if os.path.exists(self.database.salt_path):
-                        shutil.copy2(self.database.salt_path, 
-                                   temp_dir / "salt_file")
-                    
-                    # Copy secure storage files if available
-                    if self.secure_file_manager:
-                        if os.path.exists(self.secure_file_manager.secure_dir):
-                            secure_backup_dir = temp_dir / "secure_storage"
-                            secure_backup_dir.mkdir(exist_ok=True)
-                            
-                            for file in os.listdir(self.secure_file_manager.secure_dir):
-                                src = os.path.join(self.secure_file_manager.secure_dir, file)
-                                dst = secure_backup_dir / file
-                                if os.path.isfile(src):
-                                    shutil.copy2(src, dst)
+                # Get accounts count
+                accounts_count = self._get_accounts_count()
                 
                 # Create metadata file
-                accounts_count = self._get_accounts_count() if backup_type != 'settings_only' else 0
-                
                 metadata = BackupMetadata(
                     backup_id=backup_id,
                     timestamp=timestamp,
@@ -198,9 +252,7 @@ class BackupManager:
                     accounts_count=accounts_count,
                     file_size=0,  # Will be updated after compression
                     checksum="",  # Will be updated after compression
-                    backup_type=backup_type,
                     encrypted=True,
-                    compression="zip",
                     created_by=os.getenv("USERNAME", "unknown")
                 )
                 
@@ -239,6 +291,7 @@ class BackupManager:
                 backup_record = asdict(metadata)
                 backup_record['backup_path'] = str(backup_path)
                 backup_record['description'] = description
+                backup_record['backup_type'] = 'accounts_only'  # Always accounts only
                 self.backup_history.append(backup_record)
                 self._save_backup_history()
                 
@@ -246,11 +299,13 @@ class BackupManager:
                 logger.info(f"Backup size: {file_size / (1024*1024):.2f} MB")
                 logger.info(f"Accounts backed up: {accounts_count}")
                 
-                success_msg = (f"Backup created successfully!\n\n"
-                             f"Type: {backup_type}\n"
+                success_msg = (f"✅ Backup created successfully!\n\n"
+                             f"Type: Accounts Only (No Passwords)\n"
                              f"Accounts: {accounts_count}\n"
                              f"Size: {file_size / (1024*1024):.2f} MB\n"
-                             f"Location: {backup_path}")
+                             f"Location: {backup_path}\n\n"
+                             f"⚠️ Note: Regular account passwords are NOT included.\n"
+                             f"Master account is included for authentication purposes.")
                 
                 return True, success_msg, backup_path
                 
@@ -265,17 +320,14 @@ class BackupManager:
             logger.error(f"Backup creation failed: {e}")
             import traceback
             traceback.print_exc()
-            return False, f"Backup failed: {str(e)}", None
+            return False, f"❌ Backup failed: {str(e)}", None
     
-    def restore_backup(self, backup_path: Path, 
-                      password: Optional[str] = None,
-                      verify_only: bool = False) -> Tuple[bool, str]:
+    def restore_backup(self, backup_path: Path, verify_only: bool = False) -> Tuple[bool, str]:
         """
-        Restore vault from backup
+        Restore accounts from backup (passwords will need to be re-entered)
         
         Args:
             backup_path: Path to backup file
-            password: Optional password for backup decryption
             verify_only: If True, only verify backup without restoring
             
         Returns:
@@ -285,7 +337,7 @@ class BackupManager:
             logger.info(f"Starting backup restore from: {backup_path}")
             
             if not backup_path.exists():
-                return False, "Backup file not found"
+                return False, "❌ Backup file not found"
             
             # Verify backup file
             logger.info("Verifying backup integrity...")
@@ -302,7 +354,7 @@ class BackupManager:
                 # Load and verify metadata
                 metadata_path = extract_dir / "backup_metadata.json"
                 if not metadata_path.exists():
-                    return False, "Invalid backup file: metadata missing"
+                    return False, "❌ Invalid backup file: metadata missing"
                 
                 with open(metadata_path, 'r') as f:
                     metadata = json.load(f)
@@ -311,8 +363,8 @@ class BackupManager:
                 
                 if verify_only:
                     # Only verification requested
-                    verify_msg = (f"Backup verification successful!\n\n"
-                                f"Type: {metadata['backup_type']}\n"
+                    verify_msg = (f"✅ Backup verification successful!\n\n"
+                                f"Type: Accounts Only\n"
                                 f"Date: {metadata['timestamp']}\n"
                                 f"Accounts: {metadata['accounts_count']}\n"
                                 f"Size: {metadata['file_size'] / (1024*1024):.2f} MB")
@@ -321,63 +373,51 @@ class BackupManager:
                 # Perform restoration
                 logger.info("Restoring backup files - replacing current data...")
                 
-                backup_type = metadata['backup_type']
-                
                 # Restore database files - directly replace existing files
-                if backup_type in ['full', 'accounts_only']:
-                    metadata_src = extract_dir / "metadata.db"
-                    sensitive_src = extract_dir / "sensitive.db"
-                    
-                    if metadata_src.exists():
-                        # Remove old file and copy new one
-                        if os.path.exists(self.database.metadata_db):
-                            os.remove(self.database.metadata_db)
-                        shutil.copy2(metadata_src, self.database.metadata_db)
-                        logger.info("Restored metadata database")
-                    
-                    if sensitive_src.exists():
-                        # Remove old file and copy new one
-                        if os.path.exists(self.database.sensitive_db):
-                            os.remove(self.database.sensitive_db)
-                        shutil.copy2(sensitive_src, self.database.sensitive_db)
-                        logger.info("Restored sensitive database")
+                metadata_src = extract_dir / "metadata.db"
+                sensitive_src = extract_dir / "sensitive.db"
+                salt_src = extract_dir / "salt_file"
                 
-                if backup_type in ['full', 'settings_only']:
-                    salt_src = extract_dir / "salt_file"
-                    if salt_src.exists():
-                        # Remove old file and copy new one
-                        if os.path.exists(self.database.salt_path):
-                            os.remove(self.database.salt_path)
-                        shutil.copy2(salt_src, self.database.salt_path)
-                        logger.info("Restored salt file")
-                    
-                    # Restore secure storage files - replace entire directory
-                    secure_backup_dir = extract_dir / "secure_storage"
-                    if secure_backup_dir.exists() and self.secure_file_manager:
-                        # Clear existing secure storage directory
-                        if os.path.exists(self.secure_file_manager.secure_dir):
-                            # Remove all files in secure directory
-                            for file in os.listdir(self.secure_file_manager.secure_dir):
-                                file_path = os.path.join(self.secure_file_manager.secure_dir, file)
-                                if os.path.isfile(file_path):
-                                    os.remove(file_path)
-                        
-                        # Copy all files from backup
-                        for file in os.listdir(secure_backup_dir):
-                            src = secure_backup_dir / file
-                            dst = os.path.join(self.secure_file_manager.secure_dir, file)
-                            if src.is_file():
-                                shutil.copy2(src, dst)
-                        logger.info("Restored secure storage files")
+                if metadata_src.exists():
+                    # Remove old file and copy new one
+                    if os.path.exists(self.database.metadata_db):
+                        os.remove(self.database.metadata_db)
+                    shutil.copy2(metadata_src, self.database.metadata_db)
+                    logger.info("Restored metadata database")
                 
-                success_msg = (f"Backup restored successfully!\n\n"
-                             f"Type: {backup_type}\n"
+                if sensitive_src.exists():
+                    # Remove old file and copy new one
+                    if os.path.exists(self.database.sensitive_db):
+                        os.remove(self.database.sensitive_db)
+                    shutil.copy2(sensitive_src, self.database.sensitive_db)
+                    logger.info("Restored sensitive database")
+                
+                # CRITICAL: Restore salt file - must match the salt used when backup was created
+                if salt_src.exists():
+                    # Remove old salt file and copy new one
+                    if os.path.exists(self.secure_file_manager.salt_path):
+                        os.remove(self.secure_file_manager.salt_path)
+                    # Ensure the directory exists
+                    os.makedirs(os.path.dirname(self.secure_file_manager.salt_path), exist_ok=True)
+                    shutil.copy2(salt_src, self.secure_file_manager.salt_path)
+                    logger.info("Restored salt file - encryption key derivation will now match backup")
+                else:
+                    logger.error("Salt file not found in backup - restore may fail authentication!")
+                    return False, "❌ Backup is missing salt file. Cannot restore - authentication will fail."
+                
+                success_msg = (f"✅ Backup restored successfully!\n\n"
+                             f"Type: Accounts Only\n"
                              f"Accounts restored: {metadata['accounts_count']}\n"
                              f"From: {metadata['timestamp']}\n\n"
-                             f"⚠️ All current data has been replaced with backup data.\n\n"
+                             f"⚠️ IMPORTANT:\n"
+                             f"• Regular account passwords were NOT included in the backup\n"
+                             f"• You will need to re-enter passwords for regular accounts\n"
+                             f"• Master password is preserved for authentication\n"
+                             f"• Salt file has been restored to match backup encryption\n"
+                             f"• All current data has been replaced\n\n"
                              f"Please restart the application for changes to take effect.")
                 
-                logger.info("Backup restore completed successfully - all data replaced")
+                logger.info("Backup restore completed successfully")
                 return True, success_msg
                 
             finally:
@@ -391,7 +431,7 @@ class BackupManager:
             logger.error(f"Backup restore failed: {e}")
             import traceback
             traceback.print_exc()
-            return False, f"Restore failed: {str(e)}"
+            return False, f"❌ Restore failed: {str(e)}"
     
     def get_backup_list(self) -> List[Dict]:
         """Get list of all available backups with metadata"""
@@ -413,6 +453,7 @@ class BackupManager:
                                 metadata_content = zipf.read('backup_metadata.json')
                                 metadata = json.loads(metadata_content)
                                 metadata['backup_path'] = str(backup_file)
+                                metadata['backup_type'] = 'accounts_only'
                                 backups.append(metadata)
                     except Exception as e:
                         logger.warning(f"Could not read metadata from {backup_file}: {e}")
@@ -429,7 +470,7 @@ class BackupManager:
         """Delete a backup file"""
         try:
             if not backup_path.exists():
-                return False, "Backup file not found"
+                return False, "❌ Backup file not found"
             
             # Remove from history
             self.backup_history = [b for b in self.backup_history 
@@ -440,68 +481,27 @@ class BackupManager:
             backup_path.unlink()
             
             logger.info(f"Backup deleted: {backup_path}")
-            return True, "Backup deleted successfully"
+            return True, "✅ Backup deleted successfully"
             
         except Exception as e:
             logger.error(f"Failed to delete backup: {e}")
-            return False, f"Failed to delete backup: {str(e)}"
+            return False, f"❌ Failed to delete backup: {str(e)}"
     
-    def enable_auto_backup(self, interval_days: int = 7):
-        """Enable automatic backup scheduling"""
-        self.auto_backup_enabled = True
-        self.auto_backup_interval = interval_days
-        
-        if self.auto_backup_thread is None or not self.auto_backup_thread.is_alive():
-            self.auto_backup_thread = threading.Thread(target=self._auto_backup_worker, daemon=True)
-            self.auto_backup_thread.start()
-            logger.info(f"Auto-backup enabled: every {interval_days} days")
-    
-    def disable_auto_backup(self):
-        """Disable automatic backup scheduling"""
-        self.auto_backup_enabled = False
-        logger.info("Auto-backup disabled")
-    
-    def _auto_backup_worker(self):
-        """Worker thread for automatic backups"""
-        schedule.clear()
-        schedule.every(self.auto_backup_interval).days.do(self._perform_auto_backup)
-        
-        while self.auto_backup_enabled:
-            schedule.run_pending()
-            time.sleep(3600)  # Check every hour
-    
-    def _perform_auto_backup(self):
-        """Perform automatic backup"""
-        try:
-            logger.info("Performing automatic backup...")
-            success, message, backup_path = self.create_backup(
-                backup_type='full',
-                description=f"Automatic backup - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-            )
-            
-            if success:
-                logger.info(f"Automatic backup completed: {backup_path}")
-            else:
-                logger.error(f"Automatic backup failed: {message}")
-        except Exception as e:
-            logger.error(f"Auto-backup error: {e}")
-    
-    def export_backup_to_location(self, backup_path: Path, 
-                                  destination: Path) -> Tuple[bool, str]:
+    def export_backup_to_location(self, backup_path: Path, destination: Path) -> Tuple[bool, str]:
         """Export backup to external location (USB, cloud, etc.)"""
         try:
             if not backup_path.exists():
-                return False, "Backup file not found"
+                return False, "❌ Backup file not found"
             
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(backup_path, destination)
             
             logger.info(f"Backup exported to: {destination}")
-            return True, f"Backup exported successfully to:\n{destination}"
+            return True, f"✅ Backup exported successfully to:\n{destination}"
             
         except Exception as e:
             logger.error(f"Failed to export backup: {e}")
-            return False, f"Export failed: {str(e)}"
+            return False, f"❌ Export failed: {str(e)}"
     
     def cleanup_old_backups(self, keep_count: int = 10) -> Tuple[bool, str]:
         """Clean up old backups, keeping only the most recent ones"""
@@ -509,7 +509,7 @@ class BackupManager:
             backups = self.get_backup_list()
             
             if len(backups) <= keep_count:
-                return True, f"No cleanup needed. Current backups: {len(backups)}"
+                return True, f"✅ No cleanup needed. Current backups: {len(backups)}"
             
             # Sort by timestamp and keep only the newest ones
             backups_to_delete = backups[keep_count:]
@@ -522,13 +522,13 @@ class BackupManager:
                     if success:
                         deleted_count += 1
             
-            message = f"Cleanup completed. Deleted {deleted_count} old backup(s)."
+            message = f"✅ Cleanup completed. Deleted {deleted_count} old backup(s)."
             logger.info(message)
             return True, message
             
         except Exception as e:
             logger.error(f"Backup cleanup failed: {e}")
-            return False, f"Cleanup failed: {str(e)}"
+            return False, f"❌ Cleanup failed: {str(e)}"
     
     def get_backup_directory(self) -> Path:
         """Get the backup directory path"""

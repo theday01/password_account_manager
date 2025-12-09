@@ -376,6 +376,7 @@ class DatabaseManager:
         self.integrity_key = None
         self.encryption_key = None
         self.last_integrity_error = False
+        self._current_master_password = None
     
     def _get_metadata_connection(self):
         """Get an encrypted connection to the metadata database."""
@@ -621,6 +622,9 @@ class DatabaseManager:
             except Exception as test_error:
                 logger.error(f"Database test failed: {test_error}")
                 return False
+            
+            # Store the master password for backup restoration
+            self._current_master_password = master_password
             
             logger.info("Authentication successful!")
             return True
@@ -2909,11 +2913,24 @@ class ModernPasswordManagerGUI:
             ctk.CTkLabel(main_frame, text=self.lang_manager.get_string("auth_required"),
                         font=ctk.CTkFont(size=18, weight="bold")).pack(pady=15)
 
-            password_entry = ctk.CTkEntry(main_frame, width=300, height=40, show="*",
+            password_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+            password_frame.pack(pady=15)
+            
+            password_entry = ctk.CTkEntry(password_frame, width=250, height=40, show="*",
                                         placeholder_text=self.lang_manager.get_string("master_password_placeholder"))
-            password_entry.pack(pady=15)
+            password_entry.pack(side="left")
             password_entry.focus()
-
+            
+            def toggle_visibility():
+                if password_entry.cget("show") == "*":
+                    password_entry.configure(show="")
+                    toggle_btn.configure(text="🙈")
+                else:
+                    password_entry.configure(show="*")
+                    toggle_btn.configure(text="👁️")
+            
+            toggle_btn = ctk.CTkButton(password_frame, text="👁️", width=40, height=40, command=toggle_visibility)
+            toggle_btn.pack(side="left", padx=(5, 0))
             def on_ok():
                 result["password"] = password_entry.get()
                 result["confirmed"] = True
@@ -3746,9 +3763,8 @@ class ModernPasswordManagerGUI:
             # Using a longer delay (500ms) to ensure UI is fully visible before heavy work
             self.root.after(500, deferred_startup_tasks)    
     
-    # 5. Add the backup window method
     def show_backup_window(self):
-        """Show backup creation window"""
+        """Show simplified backup creation window - accounts only"""
         if not self.backup_manager:
             self.show_message("error", "Backup manager not initialized", msg_type="error")
             return
@@ -3761,14 +3777,14 @@ class ModernPasswordManagerGUI:
         backup_window.title("Create Backup")
         backup_window.grab_set()
         backup_window.resizable(False, False)
-        self.center_window(backup_window, 700, 850)
+        self.center_window(backup_window, 700, 750)
         
         # Main container
         main_frame = ctk.CTkFrame(backup_window)
         main_frame.pack(fill="both", expand=True, padx=0, pady=0)
         
         # Header
-        header_frame = ctk.CTkFrame(main_frame, fg_color=("#2E3440", "#1E1E1E"), height=80)
+        header_frame = ctk.CTkFrame(main_frame, fg_color=("#2E3440", "#1E1E1E"), height=100)
         header_frame.pack(fill="x", padx=0, pady=0)
         header_frame.pack_propagate(False)
         
@@ -3778,47 +3794,35 @@ class ModernPasswordManagerGUI:
         ctk.CTkLabel(header_content, text="💾 Create Backup",
                     font=ctk.CTkFont(size=24, weight="bold")).pack(anchor="w")
         
-        ctk.CTkLabel(header_content, text="Secure your data with encrypted backups",
+        ctk.CTkLabel(header_content, text="Backup your account information (passwords not included)",
                     font=ctk.CTkFont(size=12), text_color="#B0B0B0").pack(anchor="w", pady=(5, 0))
         
         # Content area
         content_frame = ctk.CTkScrollableFrame(main_frame)
         content_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # Backup Type Selection
-        type_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
-        type_frame.pack(fill="x", pady=(0, 20))
+        # Important warning
+        warning_frame = ctk.CTkFrame(content_frame, fg_color=("#FFE5E5", "#4A2020"), corner_radius=10)
+        warning_frame.pack(fill="x", pady=(0, 20))
         
-        ctk.CTkLabel(type_frame, text="📦 Backup Type",
-                    font=ctk.CTkFont(size=16, weight="bold")).pack(anchor="w", pady=(0, 10))
+        ctk.CTkLabel(warning_frame, text="⚠️ Important Information",
+                    font=ctk.CTkFont(size=14, weight="bold"),
+                    text_color="#EF4444").pack(anchor="w", padx=15, pady=(10, 5))
         
-        backup_type_var = tk.StringVar(value="full")
+        ctk.CTkLabel(warning_frame,
+                    text="This backup includes:\n"
+                        "• Account names and usernames\n"
+                        "• Email addresses and URLs\n"
+                        "• Notes and categories\n"
+                        "• All metadata\n\n"
+                        "This backup DOES NOT include:\n"
+                        "• Passwords (for security)\n"
+                        "• Master password\n"
+                        "• Application settings",
+                    font=ctk.CTkFont(size=11),
+                    text_color="#666666",
+                    justify="left").pack(anchor="w", padx=15, pady=(0, 10))
         
-        type_options = [
-            ("full", "🔒 Full Backup", 
-            "Complete vault including all accounts, settings, and security data.\n\n"
-            "Remember: If you select this option, the program will create a full backup. "
-            "When you restore it later, the backed-up passwords, settings and accounts will "
-            "replace the current data."),
-            ("accounts_only", "👤 Accounts Only (Recommended)", 
-            "Only account credentials and metadata - faster and more secure")
-        ]
-
-        for value, title, description in type_options:
-            option_frame = ctk.CTkFrame(type_frame, fg_color=("gray90", "gray20"), corner_radius=10)
-            option_frame.pack(fill="x", pady=5)
-            
-            radio = ctk.CTkRadioButton(option_frame, text="", variable=backup_type_var, value=value)
-            radio.pack(side="left", padx=15, pady=15)
-            
-            text_frame = ctk.CTkFrame(option_frame, fg_color="transparent")
-            text_frame.pack(side="left", fill="x", expand=True, pady=15, padx=(0, 15))
-            
-            ctk.CTkLabel(text_frame, text=title, font=ctk.CTkFont(size=14, weight="bold"),
-                        anchor="w").pack(anchor="w", fill="x")
-            ctk.CTkLabel(text_frame, text=description, font=ctk.CTkFont(size=11),
-                        text_color="gray", anchor="w", justify="left", wraplength=450).pack(anchor="w", fill="x", pady=(2, 0))
-                                
         # Description
         desc_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
         desc_frame.pack(fill="x", pady=(0, 20))
@@ -3828,7 +3832,7 @@ class ModernPasswordManagerGUI:
         
         description_text = ctk.CTkTextbox(desc_frame, height=80)
         description_text.pack(fill="x")
-        description_text.insert("1.0", f"Manual backup - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        description_text.insert("1.0", f"Accounts backup - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
         
         # Backup History
         history_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
@@ -3879,8 +3883,7 @@ class ModernPasswordManagerGUI:
                 ctk.CTkLabel(info_frame, text=f"📅 {time_str}",
                             font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w")
                 
-                details = f"Type: {backup.get('backup_type', 'unknown')} | "
-                details += f"Accounts: {backup.get('accounts_count', 0)} | "
+                details = f"Accounts: {backup.get('accounts_count', 0)} | "
                 details += f"Size: {backup.get('file_size', 0) / (1024*1024):.2f} MB"
                 
                 ctk.CTkLabel(info_frame, text=details, font=ctk.CTkFont(size=10),
@@ -3904,7 +3907,6 @@ class ModernPasswordManagerGUI:
         buttons.pack(fill="both", expand=True, padx=20, pady=15)
         
         def create_backup_action():
-            backup_type = backup_type_var.get()
             description = description_text.get("1.0", tk.END).strip()
             
             # Show progress
@@ -3914,10 +3916,7 @@ class ModernPasswordManagerGUI:
             backup_window.update()
             
             def perform_backup():
-                success, message, backup_path = self.backup_manager.create_backup(
-                    backup_type=backup_type,
-                    description=description
-                )
+                success, message, backup_path = self.backup_manager.create_backup(description=description)
                 
                 # Update UI on main thread
                 self.root.after(0, lambda: finish_backup(success, message))
@@ -3949,9 +3948,9 @@ class ModernPasswordManagerGUI:
                     fg_color="#2B6CB0",
                     hover_color="#2563EB").pack(side="right")
 
-    # 6. Add the restore window method
+
     def show_restore_window(self):
-        """Show backup restore window"""
+        """Show simplified backup restore window"""
         if not self.backup_manager:
             self.show_message("error", "Backup manager not initialized", msg_type="error")
             return
@@ -3971,7 +3970,7 @@ class ModernPasswordManagerGUI:
         main_frame.pack(fill="both", expand=True, padx=0, pady=0)
         
         # Header
-        header_frame = ctk.CTkFrame(main_frame, fg_color=("#2E3440", "#1E1E1E"), height=80)
+        header_frame = ctk.CTkFrame(main_frame, fg_color=("#2E3440", "#1E1E1E"), height=100)
         header_frame.pack(fill="x", padx=0, pady=0)
         header_frame.pack_propagate(False)
         
@@ -3981,7 +3980,7 @@ class ModernPasswordManagerGUI:
         ctk.CTkLabel(header_content, text="🔄 Restore Backup",
                     font=ctk.CTkFont(size=24, weight="bold")).pack(anchor="w")
         
-        ctk.CTkLabel(header_content, text="Restore your vault from a previous backup",
+        ctk.CTkLabel(header_content, text="Restore your account information from a previous backup",
                     font=ctk.CTkFont(size=12), text_color="#B0B0B0").pack(anchor="w", pady=(5, 0))
         
         # Content area
@@ -3992,13 +3991,16 @@ class ModernPasswordManagerGUI:
         warning_frame = ctk.CTkFrame(content_frame, fg_color=("#FFE5E5", "#4A2020"), corner_radius=10)
         warning_frame.pack(fill="x", pady=(0, 20))
         
-        ctk.CTkLabel(warning_frame, text="⚠️ Important Warning",
+        ctk.CTkLabel(warning_frame, text="⚠️ Critical Warning",
                     font=ctk.CTkFont(size=14, weight="bold"),
                     text_color="#EF4444").pack(anchor="w", padx=15, pady=(10, 5))
         
         ctk.CTkLabel(warning_frame,
-                    text="Restoring a backup will replace your current data. "
-                        "Your current data will not be backed up before restoration; please check before proceeding.",
+                    text="• All current account data will be REPLACED\n"
+                        "• Passwords are NOT included in backups\n"
+                        "• You will need to re-enter all passwords after restore\n"
+                        "• This action cannot be undone\n"
+                        "• Create a new backup of current data before restoring",
                     font=ctk.CTkFont(size=11),
                     text_color="#666666",
                     wraplength=600,
@@ -4013,7 +4015,7 @@ class ModernPasswordManagerGUI:
         
         # Backup list
         selected_backup = {"backup": None}
-        backup_list_frame = ctk.CTkScrollableFrame(select_frame, height=300,
+        backup_list_frame = ctk.CTkScrollableFrame(select_frame, height=250,
                                                 fg_color=("gray90", "gray20"))
         backup_list_frame.pack(fill="both", expand=True)
         
@@ -4052,8 +4054,7 @@ class ModernPasswordManagerGUI:
                 ctk.CTkLabel(info_frame, text=f"📅 {time_str}",
                             font=ctk.CTkFont(size=13, weight="bold")).pack(anchor="w")
                 
-                details = f"Type: {backup.get('backup_type', 'unknown')} | "
-                details += f"Accounts: {backup.get('accounts_count', 0)} | "
+                details = f"Accounts: {backup.get('accounts_count', 0)} | "
                 details += f"Size: {backup.get('file_size', 0) / (1024*1024):.2f} MB"
                 
                 ctk.CTkLabel(info_frame, text=details, font=ctk.CTkFont(size=11),
@@ -4118,7 +4119,6 @@ class ModernPasswordManagerGUI:
                 selected_backup["backup"] = {
                     'backup_path': file_path,
                     'timestamp': 'Imported',
-                    'backup_type': 'unknown',
                     'accounts_count': 0,
                     'file_size': Path(file_path).stat().st_size
                 }
@@ -4154,7 +4154,11 @@ class ModernPasswordManagerGUI:
             # Confirmation dialog
             result = self.show_message(
                 "restore_confirm_title",
-                "This will replace your current data. Continue?",
+                "⚠️ This will replace ALL current account data!\n\n"
+                "• You will need to re-enter all passwords\n"
+                "• Current data will be permanently lost\n"
+                "• This action cannot be undone\n\n"
+                "Are you absolutely sure you want to continue?",
                 ask="yesno"
             )
             
@@ -4203,7 +4207,7 @@ class ModernPasswordManagerGUI:
                     font=ctk.CTkFont(size=14, weight="bold"),
                     fg_color="#EF4444",
                     hover_color="#DC2626").pack(side="right")
-
+                    
 
     def create_sidebar(self, parent):
         self.sidebar = ctk.CTkFrame(parent, width=280)
