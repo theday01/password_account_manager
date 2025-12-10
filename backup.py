@@ -372,6 +372,13 @@ class BackupManager:
                 sensitive_src = extract_dir / "sensitive.db"
                 salt_src = extract_dir / "salt_file"
                 
+                # Close any existing DB connections to prevent file locks (Best Effort)
+                try:
+                    if hasattr(self.database, 'close'):
+                        self.database.close()
+                except Exception as e:
+                    logger.warning(f"Could not close database connections explicitly: {e}")
+
                 if metadata_src.exists():
                     # Remove old file and copy new one
                     if os.path.exists(self.database.metadata_db):
@@ -399,6 +406,31 @@ class BackupManager:
                     logger.error("Salt file not found in backup - restore may fail authentication!")
                     return False, "❌ Backup is missing salt file. Cannot restore - authentication will fail."
                 
+                # [FIX START] Force persistence of restored files
+                # 1. Remove the integrity file to force regeneration on next login.
+                #    The current session key cannot generate a valid signature for the restored salt/files.
+                integrity_path = self.database.integrity_path
+                if os.path.exists(integrity_path):
+                    os.remove(integrity_path)
+                    logger.info("Removed old integrity file to force regeneration on next login")
+                
+                # 2. Explicitly sync the restored temporary files to the secure storage location.
+                #    We do this MANUALLY here to ensure it happens before any restart logic.
+                #    We rely on the secure_file_manager to copy the current state of temp_dir (which we just filled)
+                #    to the persistent storage.
+                try:
+                    logger.info("Forcing sync of restored files to secure storage...")
+                    # We call sync_all_files. Note: This might sign with the OLD key, which is fine
+                    # because we deleted the integrity file above or the app will detect the mismatch
+                    # and regenerate it on login. The critical part is moving the files from Temp -> Secure.
+                    self.secure_file_manager.sync_all_files() 
+                    logger.info("Restored files successfully synced to persistent storage")
+                except Exception as sync_error:
+                    logger.error(f"Failed to sync restored files: {sync_error}")
+                    # Even if this fails, we proceed, hoping the standard shutdown sync works, 
+                    # but this log is critical for debugging.
+                # [FIX END]
+
                 success_msg = (f"✅ Backup restored successfully!\n\n"
                              f"Type: Accounts Only\n"
                              f"Accounts restored: {metadata['accounts_count']}\n"
@@ -406,7 +438,7 @@ class BackupManager:
                              f"⚠️ IMPORTANT:\n"
                              f"• Regular account passwords were NOT included in the backup\n"
                              f"• You will need to re-enter passwords for regular accounts\n"
-                             f"• Master password is preserved for authentication\n"
+                             f"• Master password is preserved from backup time\n"
                              f"• Salt file has been restored to match backup encryption\n"
                              f"• All current data has been replaced\n\n"
                              f"Please restart the application for changes to take effect.")
@@ -426,7 +458,7 @@ class BackupManager:
             import traceback
             traceback.print_exc()
             return False, f"❌ Restore failed: {str(e)}"
-    
+
     def get_backup_list(self) -> List[Dict]:
         """Get list of all available backups with metadata"""
         backups = []
