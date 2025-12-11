@@ -1,140 +1,79 @@
-import hashlib
 import platform
 import subprocess
-import os
-import uuid
+import hashlib
+import re
 
-def get_mac_address():
+def _get_windows_machine_id():
     """
-    Retrieves the MAC address of the primary network interface.
+    Retrieves a unique and stable machine ID on Windows.
+    Uses the motherboard serial number, which is very unlikely to change.
     """
     try:
-        system = platform.system()
-        if system == 'Windows':
-            command = "wmic path win32_networkadapter where \"PhysicalAdapter=True and NetConnectionStatus is not null\" get MACAddress"
-            output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
-            mac_addresses = [line.strip() for line in output.split('\n') if ':' in line]
-            if mac_addresses:
-                return mac_addresses[0]
-        elif system == 'Linux':
-            try:
-                for iface in ['eth0', 'enp0s3', 'enp3s0', 'wlan0']:
-                    with open(f'/sys/class/net/{iface}/address', 'r') as f:
-                        mac = f.read().strip()
-                        if mac: return mac
-            except FileNotFoundError:
-                command = "ip link"
-                output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
-                lines = output.split('\n')
-                for i, line in enumerate(lines):
-                    if "state UP" in line and i + 1 < len(lines):
-                        next_line = lines[i+1]
-                        if "link/ether" in next_line:
-                            return next_line.split()[1]
-        elif system == 'Darwin': # macOS
-            command = "ifconfig en0 | awk '/ether/{print $2}'"
-            output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
-            if output.strip():
-                return output.strip()
-    except Exception:
+        result = subprocess.run(
+            ["wmic", "baseboard", "get", "serialnumber"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        serial = result.stdout.strip().split("\n")[-1]
+        return serial if serial and serial != "Default string" else None
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return None
-    return None
 
-def get_system_uuid():
+def _get_linux_machine_id():
     """
-    Retrieves the system's UUID.
+    Retrieves a unique and stable machine ID on Linux.
+    Tries to read the machine-id file, which is standard on modern Linux systems.
     """
     try:
-        system = platform.system()
-        if system == 'Windows':
-            command = "wmic csproduct get uuid"
-            output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
-            # Handle Windows CRLF line endings and filter out empty/header lines
-            lines = [line.strip() for line in output.replace('\r', '').split('\n') if line.strip()]
-            # Return the first line that looks like a UUID (contains dashes and is not "UUID")
-            for line in lines:
-                if line and line != "UUID" and '-' in line:
-                    return line
-            return None
-        elif system == 'Linux':
-            try:
-                with open('/sys/class/dmi/id/product_uuid', 'r') as f:
-                    return f.read().strip()
-            except FileNotFoundError:
-                with open('/var/lib/dbus/machine-id', 'r') as f:
-                    return f.read().strip()
-        elif system == 'Darwin': # macOS
-            command = "ioreg -d2 -c IOPlatformExpertDevice | awk -F\\\" '/IOPlatformUUID/{print $(NF-1)}'"
-            output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
-            return output.strip()
-    except Exception:
+        with open("/etc/machine-id", "r") as f:
+            return f.read().strip()
+    except FileNotFoundError:
         return None
-    return None
 
-def get_ram_info():
+def _get_macos_machine_id():
     """
-    Retrieves RAM serial numbers.
+    Retrieves a unique and stable machine ID on macOS.
+    Uses the IOPlatformUUID, which is a hardware-based identifier.
     """
     try:
-        system = platform.system()
-        if system == 'Windows':
-            command = "wmic memorychip get SerialNumber"
-            output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
-            serial_numbers = [line.strip() for line in output.split('\n') if line.strip() and "SerialNumber" not in line]
-            return "".join(sorted(serial_numbers))
-        elif system == 'Linux':
-            try:
-                command = "dmidecode -t memory | grep 'Serial Number:'"
-                output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
-                serial_numbers = [line.split(':')[1].strip() for line in output.split('\n') if "Serial Number:" in line]
-                # Filter out "Not Specified" or similar placeholders
-                serial_numbers = [sn for sn in serial_numbers if sn and "Not Specified" not in sn and "Unknown" not in sn]
-                return "".join(sorted(serial_numbers))
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                # Fallback if dmidecode is not available or fails
-                return None
-        elif system == 'Darwin': # macOS
-            command = "system_profiler SPMemoryDataType | grep 'Serial Number'"
-            output = subprocess.check_output(command, shell=True, text=True, stderr=subprocess.DEVNULL)
-            serial_numbers = [line.split(':')[1].strip() for line in output.split('\n') if "Serial Number:" in line]
-            return "".join(sorted(serial_numbers))
-    except Exception:
+        result = subprocess.run(
+            ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        for line in result.stdout.split("\n"):
+            if "IOPlatformUUID" in line:
+                return line.split("=")[-1].strip().replace('"', '')
         return None
-    return None
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
 
 def generate_machine_id():
     """
-    Generates a stable machine ID from a combination of hardware identifiers.
-    This is more stable and secure than relying on a single identifier.
+    Generates a unique and stable machine identifier based on the OS.
+    The ID is then hashed to create a consistent, anonymous identifier.
     """
-    # Use placeholders for unavailable information to ensure a consistent format
-    mac_address = get_mac_address() or "no_mac"
-    ram_info = get_ram_info() or "no_ram"
-    uuid = get_system_uuid() or "no_uuid"
+    os_type = platform.system()
+    machine_id = None
 
-    # Combine all the info, using a separator to prevent collisions
-    machine_info = f"{mac_address}|{ram_info}|{uuid}"
+    if os_type == "Windows":
+        machine_id = _get_windows_machine_id()
+    elif os_type == "Linux":
+        machine_id = _get_linux_machine_id()
+    elif os_type == "Darwin":
+        machine_id = _get_macos_machine_id()
 
-    # Fallback for cases where no hardware identifiers can be retrieved
-    if machine_info == "no_mac|no_ram|no_uuid":
-        # Persist a generated stable id to the user's profile so it survives restarts
-        home_dir = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-        store_path = os.path.join(home_dir, ".sv_machine_id")
-
+    # Fallback if the primary method fails
+    if not machine_id:
+        # A less stable but universal fallback
         try:
-            if os.path.exists(store_path):
-                with open(store_path, 'r') as f:
-                    stored = f.read().strip()
-                    if stored:
-                        return hashlib.sha256(stored.encode()).hexdigest()
-            # Generate and persist a fallback id
-            fallback = uuid.uuid4().hex
-            with open(store_path, 'w') as f:
-                f.write(fallback)
-            return hashlib.sha256(fallback.encode()).hexdigest()
+            import uuid
+            machine_id = str(uuid.getnode())
         except Exception:
-            # As a last resort, fall back to hashing volatile system info
-            system_info = f"{platform.system()}-{platform.node()}-{platform.architecture()}"
-            return hashlib.sha256(system_info.encode()).hexdigest()
-
-    return hashlib.sha256(machine_info.encode()).hexdigest()
+            # Absolute fallback
+            machine_id = "default_machine_id_fallback"
+            
+    # Hash the identifier to ensure it's a consistent format and anonymous
+    return hashlib.sha256(machine_id.encode()).hexdigest()

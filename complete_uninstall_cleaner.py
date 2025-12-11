@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 import ctypes
+import platform
 
 def is_admin():
     try:
@@ -114,7 +115,7 @@ class EnhancedResetTool:
     
     def reset_trial_state(self):
         """Remove all trial state files"""
-        print("\n[1/6] Removing trial state files...")
+        print("\n[1/7] Removing trial state files...")
         logger.info("="*60)
         
         locations = self.get_all_trial_locations()
@@ -130,7 +131,7 @@ class EnhancedResetTool:
     
     def remove_registry_entries(self):
         """Remove Windows Registry entries"""
-        print("\n[2/6] Removing Registry entries...")
+        print("\n[2/7] Removing Registry entries...")
         logger.info("="*60)
         
         if os.name != 'nt':
@@ -189,7 +190,7 @@ class EnhancedResetTool:
     
     def remove_developer_files(self):
         """Remove developer override files"""
-        print("\n[3/6] Removing developer mode files...")
+        print("\n[3/7] Removing developer mode files...")
         logger.info("="*60)
         
         dev_files = [
@@ -205,7 +206,7 @@ class EnhancedResetTool:
     
     def remove_database_files(self):
         """Remove all database files"""
-        print("\n[4/6] Removing database files...")
+        print("\n[4/7] Removing database files...")
         logger.info("="*60)
         
         import glob
@@ -238,7 +239,7 @@ class EnhancedResetTool:
     
     def remove_temp_files(self):
         """Remove temporary files"""
-        print("\n[5/6] Removing temporary files...")
+        print("\n[5/7] Removing temporary files...")
         logger.info("="*60)
         
         temp_paths = [
@@ -267,10 +268,50 @@ class EnhancedResetTool:
         
         logger.info(f"Removed {removed} temporary items")
         return True
+
+    def remove_lockout_state(self):
+        """Removes all redundant lockout state files and registry keys."""
+        print("\n[6/7] Removing lockout state artifacts...")
+        logger.info("="*60)
+
+        paths = []
+        home = Path.home()
+        
+        paths.append('auth_state.json')
+
+        if platform.system() == "Windows":
+            app_data = os.environ.get('APPDATA')
+            if app_data:
+                paths.append(os.path.join(app_data, 'SecVault', 'status.dat'))
+            temp_dir = os.environ.get('TEMP', 'C:\\Temp')
+            paths.append(os.path.join(temp_dir, 'sec_auth_cache.dat'))
+        else:
+            paths.append(os.path.join(home, '.config', 'secvault_status.conf'))
+            paths.append('/var/tmp/sec_auth_cache.dat')
+            paths.append(os.path.join(home, '.auth_status.local'))
+        
+        paths.append(os.path.join(home, '.auth_status.dat')) # Obsolete path
+
+        for path in paths:
+            self.remove_file_safe(path, f"Lockout state file: {path}")
+
+        if platform.system() == "Windows":
+            try:
+                import winreg
+                winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r"Software\SecVault")
+                logger.info("SUCCESS: Removed registry key Software\\SecVault")
+                self.paths_removed.append("Registry Key: Software\\SecVault")
+            except FileNotFoundError:
+                logger.info("SKIP: Registry key Software\\SecVault not found")
+            except Exception as e:
+                logger.error(f"FAILED: Could not remove registry key Software\\SecVault - {e}")
+                self.paths_failed.append(f"Registry Key: Software\\SecVault - {e}")
+        
+        return True
     
     def verify_cleanup(self):
         """Verify cleanup was successful"""
-        print("\n[6/6] Verifying cleanup...")
+        print("\n[7/7] Verifying cleanup...")
         logger.info("="*60)
         
         locations = self.get_all_trial_locations()
@@ -308,14 +349,18 @@ class EnhancedResetTool:
     def run_complete_reset(self):
         """Execute complete reset"""
         try:
-            print("\nWARNING: This will DELETE all program data!")
-            print("Press ENTER to continue or Ctrl+C to cancel...")
-            try:
-                input()
-            except KeyboardInterrupt:
-                print("\n\nReset cancelled")
-                return False
-            
+            # Check for a --force or -y flag to run non-interactively
+            if '--force' not in sys.argv and '-y' not in sys.argv:
+                print("\nWARNING: This will DELETE all program data!")
+                print("Press ENTER to continue or Ctrl+C to cancel...")
+                try:
+                    input()
+                except KeyboardInterrupt:
+                    print("\n\nReset cancelled")
+                    return False
+            else:
+                print("\n--force flag detected. Running non-interactively.")
+
             print("\nStarting complete reset...\n")
             
             # Execute cleanup steps
@@ -324,6 +369,7 @@ class EnhancedResetTool:
             self.remove_developer_files()
             self.remove_database_files()
             self.remove_temp_files()
+            self.remove_lockout_state()
             self.verify_cleanup()
             
             # Print summary
@@ -349,6 +395,10 @@ def main():
         tool = EnhancedResetTool()
         success = tool.run_complete_reset()
         
+        # In non-interactive mode, exit immediately.
+        if '--force' in sys.argv or '-y' in sys.argv:
+            sys.exit(0 if success else 1)
+
         if success:
             print("\nSUCCESS: Press ENTER to exit...")
             input()
@@ -363,8 +413,9 @@ def main():
         logger.error(f"Fatal error: {e}")
         import traceback
         traceback.print_exc()
-        print("\nPress ENTER to exit...")
-        input()
+        if '--force' not in sys.argv and '-y' not in sys.argv:
+            print("\nPress ENTER to exit...")
+            input()
         sys.exit(1)
 
 

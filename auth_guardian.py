@@ -5,8 +5,148 @@ from cryptography.exceptions import InvalidTag
 import secrets
 import base64
 from pathlib import Path
+import os
+import json
+import hmac
+import hashlib
+import platform
+from machine_id_utils import generate_machine_id
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 
 logger = logging.getLogger(__name__)
+
+class MachineKeyCryptoManager:
+    """Handles encryption and decryption using a machine-specific key."""
+    def __init__(self):
+        self._encryption_key = self._get_machine_key()
+
+    def _get_machine_key(self) -> bytes:
+        """Derives a stable 32-byte encryption key from the machine ID."""
+        machine_id = generate_machine_id()
+        # Use a salt to ensure this key is unique to this purpose
+        salted_id = f"lockout-crypto-key-{machine_id}"
+        return hashlib.sha256(salted_id.encode()).digest()
+
+    def encrypt(self, plaintext: str) -> str:
+        """Encrypts data using AES-GCM and returns a base64-encoded string."""
+        iv = os.urandom(12)  # GCM recommended nonce size
+        cipher = Cipher(algorithms.AES(self._encryption_key), modes.GCM(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        ciphertext = encryptor.update(plaintext.encode()) + encryptor.finalize()
+        # Combine iv, tag, and ciphertext for storage
+        encrypted_payload = iv + encryptor.tag + ciphertext
+        return base64.b64encode(encrypted_payload).decode('utf-8')
+
+    def decrypt(self, b64_ciphertext: str) -> str:
+        """Decrypts a base64-encoded AES-GCM payload."""
+        try:
+            encrypted_payload = base64.b64decode(b64_ciphertext)
+            iv = encrypted_payload[:12]
+            tag = encrypted_payload[12:28]
+            ciphertext = encrypted_payload[28:]
+            
+            cipher = Cipher(algorithms.AES(self._encryption_key), modes.GCM(iv, tag), backend=default_backend())
+            decryptor = cipher.decryptor()
+            decrypted_bytes = decryptor.update(ciphertext) + decryptor.finalize()
+            return decrypted_bytes.decode('utf-8')
+        except (InvalidTag, ValueError, IndexError) as e:
+            logger.warning(f"Decryption failed, possibly due to tampering or corruption: {e}")
+            raise ValueError("Decryption failed") from e
+
+class LockoutStateManager:
+    """
+    Manages the saving and loading of encrypted lockout state to multiple 
+    redundant locations to prevent easy tampering or deletion.
+    """
+    def __init__(self):
+        self._crypto = MachineKeyCryptoManager()
+        self._storage_paths = self._get_storage_paths()
+
+    def _get_storage_paths(self) -> list:
+        """Defines multiple, less obvious storage locations for the state."""
+        paths = []
+        home = Path.home()
+        
+        paths.append('auth_state.json')
+
+        if platform.system() == "Windows":
+            app_data = os.environ.get('APPDATA')
+            if app_data:
+                paths.append(os.path.join(app_data, 'SecVault', 'status.dat'))
+            temp_dir = os.environ.get('TEMP', 'C:\\Temp')
+            paths.append(os.path.join(temp_dir, 'sec_auth_cache.dat'))
+        else:
+            paths.append(os.path.join(home, '.config', 'secvault_status.conf'))
+            paths.append('/var/tmp/sec_auth_cache.dat')
+            paths.append(os.path.join(home, '.auth_status.local'))
+
+        return paths
+
+    def load_state(self) -> dict:
+        """
+        Loads the encrypted lockout state from all locations, decrypts them, 
+        and returns the most recent, valid state.
+        """
+        valid_states = []
+        
+        # Load from file paths
+        for path in self._storage_paths:
+            if not os.path.exists(path):
+                continue
+            try:
+                with open(path, 'r') as f:
+                    encrypted_data = f.read()
+                decrypted_str = self._crypto.decrypt(encrypted_data)
+                valid_states.append(json.loads(decrypted_str))
+            except (ValueError, json.JSONDecodeError, OSError):
+                continue
+        
+        # Load from Windows Registry
+        if platform.system() == "Windows":
+            try:
+                import winreg
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\SecVault", 0, winreg.KEY_READ)
+                encrypted_data, _ = winreg.QueryValueEx(key, "AuthState")
+                decrypted_str = self._crypto.decrypt(encrypted_data)
+                valid_states.append(json.loads(decrypted_str))
+                winreg.CloseKey(key)
+            except (ValueError, FileNotFoundError, OSError, json.JSONDecodeError):
+                pass
+        
+        if not valid_states:
+            return {}
+        
+        return max(valid_states, key=lambda s: s.get('guardian_lockout_end_time') or '')
+
+    def save_state(self, state: dict):
+        """Encrypts and saves the lockout state to all defined locations."""
+        try:
+            state_str = json.dumps(state)
+            encrypted_data = self._crypto.encrypt(state_str)
+            
+            # Save to file paths
+            for path in self._storage_paths:
+                try:
+                    dir_path = os.path.dirname(path)
+                    if dir_path:
+                        os.makedirs(dir_path, exist_ok=True)
+                    with open(path, 'w') as f:
+                        f.write(encrypted_data)
+                except OSError as e:
+                    logger.error(f"Failed to save state to {path}: {e}")
+
+            # Save to Windows Registry
+            if platform.system() == "Windows":
+                try:
+                    import winreg
+                    key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\SecVault")
+                    winreg.SetValueEx(key, "AuthState", 0, winreg.REG_SZ, encrypted_data)
+                    winreg.CloseKey(key)
+                except OSError as e:
+                    logger.error(f"Failed to save state to Windows Registry: {e}")
+        except Exception as e:
+            logger.error(f"Failed to prepare encrypted state for saving: {e}")
 
 # Try to import pyotp for TOTP functionality
 try:
@@ -56,6 +196,7 @@ class AuthGuardian:
             settings_manager: An object (like SecureFileManager) that can read/write settings.
         """
         self._settings_manager = settings_manager
+        self.lockout_manager = LockoutStateManager()
         
         # Try to read settings, but only if encryption key is available
         # If no encryption key, start with empty dict and load after authentication
@@ -69,13 +210,14 @@ class AuthGuardian:
         # Load settings (2FA secret is now allowed)
         self._settings = raw_settings.copy()
         
-        # Load master password state from settings
-        self.failed_attempts = self._settings.get('guardian_failed_attempts', 0)
-        self.consecutive_lockouts = self._settings.get('guardian_consecutive_lockouts', 0)
-        lockout_end_iso = self._settings.get('guardian_lockout_end_time')
+        # Load master password state from the robust lockout manager
+        lockout_state = self.lockout_manager.load_state()
+        self.failed_attempts = lockout_state.get('guardian_failed_attempts', 0)
+        self.consecutive_lockouts = lockout_state.get('guardian_consecutive_lockouts', 0)
+        lockout_end_iso = lockout_state.get('guardian_lockout_end_time')
         self.lockout_end_time = datetime.fromisoformat(lockout_end_iso) if lockout_end_iso else None
         
-        # Load 2FA state from settings
+        # Load 2FA state from encrypted settings
         self.tfa_failed_attempts = self._settings.get('guardian_tfa_failed_attempts', 0)
         self.consecutive_tfa_lockouts = self._settings.get('guardian_consecutive_tfa_lockouts', 0)
         tfa_lockout_end_iso = self._settings.get('guardian_tfa_lockout_end_time')
@@ -105,12 +247,7 @@ class AuthGuardian:
         return self._save_state()
 
     def _validate_state(self, save_state=True):
-        """Sanity check and cleanup of the loaded state.
-        
-        Args:
-            save_state: If True, save state after validation. If False, only validate without saving.
-                       This is useful during initialization when encryption key might not be available.
-        """
+        """Sanity check and cleanup of the loaded state."""
         if self.is_locked_out():
             if datetime.now() >= self.lockout_end_time:
                 logger.info("Master password lockout period has expired. Resetting state.")
@@ -121,113 +258,72 @@ class AuthGuardian:
                 logger.info("2FA lockout period has expired. Resetting state.")
                 self._reset_tfa_lockout()
 
-        # Sanity checks for all state variables
         self.failed_attempts = max(0, self.failed_attempts)
         self.consecutive_lockouts = max(0, self.consecutive_lockouts)
         self.tfa_failed_attempts = max(0, self.tfa_failed_attempts)
         self.consecutive_tfa_lockouts = max(0, self.consecutive_tfa_lockouts)
         
-        # Only save state if encryption key is available and save_state is True
-        if save_state and self._settings_manager.encryption_key:
-            self._save_state()
-        elif save_state and not self._settings_manager.encryption_key:
-            logger.info("Skipping state save during validation - encryption key not available yet")
+        if save_state:
+            self._save_lockout_state()
+            if self._settings_manager.encryption_key:
+                self._save_state()
+
+    def _save_lockout_state(self):
+        """Saves the unencrypted lockout state using the robust manager."""
+        state = {
+            'guardian_failed_attempts': self.failed_attempts,
+            'guardian_consecutive_lockouts': self.consecutive_lockouts,
+            'guardian_lockout_end_time': self.lockout_end_time.isoformat() if self.lockout_end_time else None,
+        }
+        self.lockout_manager.save_state(state)
 
     def _save_state(self):
-        """Saves the current state back to the settings file.
-        This method preserves all existing settings and only updates guardian-specific state.
-        
-        Returns:
-            bool: True if settings were successfully saved, False otherwise.
         """
-        # CRITICAL: We MUST have an encryption key to save settings
-        # If we don't have a key, we can't read existing settings, so we can't safely save
+        Saves the ENCRYPTED state (like 2FA settings) back to the settings file.
+        This no longer saves the master password lockout state.
+        """
         if not self._settings_manager.encryption_key:
-            logger.warning("Cannot save state - encryption key is not available. Settings will be saved after authentication.")
+            logger.warning("Cannot save encrypted state - encryption key is not available.")
             return False
         
-        # First, try to load existing settings from disk to preserve them
-        existing_settings = {}
         try:
-            existing_settings = self._settings_manager.read_settings()
-            if existing_settings is None:
-                existing_settings = {}
-                logger.info("No existing settings file found, starting with empty dict")
-            else:
-                logger.info(f"Loaded existing settings before save. Keys: {list(existing_settings.keys())}")
-        except InvalidTag as e:
-            logger.error(f"Failed to decrypt existing settings (InvalidTag) - file may be encrypted with different key: {e}")
-            # If decryption fails, we can't safely save - we might overwrite settings with wrong data
-            logger.error("Cannot save state - failed to decrypt existing settings. This might indicate a key mismatch.")
-            return False
+            existing_settings = self._settings_manager.read_settings() or {}
         except Exception as e:
             logger.error(f"Could not load existing settings before save: {e}")
-            # If we can't read existing settings, we can't safely save
-            logger.error("Cannot save state - failed to read existing settings.")
             return False
         
-        # Start with existing settings from disk to preserve them
-        settings_to_save = {}
-        for key, value in (existing_settings.items() if existing_settings else {}):
-            settings_to_save[key] = value
+        settings_to_save = {**existing_settings, **self._settings}
         
-        # Merge all other settings from self._settings
-        # This preserves any other settings that were updated
-        for key, value in self._settings.items():
-            settings_to_save[key] = value
-        
-        # CRITICAL: Remove 2FA keys that were explicitly deleted (e.g., during disable_tfa)
-        # These keys should NOT exist in settings_to_save if they're not in self._settings
         tfa_keys_to_remove = {'tfa_secret', 'tfa_enabled_at', 'tfa_backup_codes'}
         for key in tfa_keys_to_remove:
             if key not in self._settings and key in settings_to_save:
-                logger.debug(f"Removing 2FA key '{key}' that was deleted but still in disk settings")
                 del settings_to_save[key]
         
-        # Update guardian-specific state (these always override any existing values)
-        settings_to_save['guardian_failed_attempts'] = self.failed_attempts
-        settings_to_save['guardian_consecutive_lockouts'] = self.consecutive_lockouts
-        settings_to_save['guardian_lockout_end_time'] = self.lockout_end_time.isoformat() if self.lockout_end_time else None
-        
-        # 2FA state
         settings_to_save['guardian_tfa_failed_attempts'] = self.tfa_failed_attempts
         settings_to_save['guardian_consecutive_tfa_lockouts'] = self.consecutive_tfa_lockouts
         settings_to_save['guardian_tfa_lockout_end_time'] = self.tfa_lockout_end_time.isoformat() if self.tfa_lockout_end_time else None
         
-        # Update all other settings from settings_to_save (except guardian state keys)
-        for key, value in settings_to_save.items():
-            if key not in ['guardian_failed_attempts', 'guardian_consecutive_lockouts', 'guardian_lockout_end_time',
-                          'guardian_tfa_failed_attempts', 'guardian_consecutive_tfa_lockouts', 'guardian_tfa_lockout_end_time']:
-                # Guardian state keys are managed separately
-                self._settings[key] = value
-        
         try:
-            # Log what we're about to save
-            logger.info(f"About to save settings. Keys to save: {list(settings_to_save.keys())}")
-            
             success = self._settings_manager.write_settings(settings_to_save)
             if not success:
-                logger.error("Failed to save guardian state, most likely because the vault is locked.")
+                logger.error("Failed to save encrypted guardian state.")
                 return False
-            
-            logger.info(f"Successfully saved settings. Keys: {list(settings_to_save.keys())}")
+            logger.info("Successfully saved encrypted settings.")
             return True
         except Exception as e:
-            logger.error(f"An unexpected error occurred while saving guardian state: {e}")
+            logger.error(f"An unexpected error occurred while saving encrypted state: {e}")
             return False
 
     def record_login_attempt(self, success: bool):
         """
         Records the result of a master password login attempt and updates the security state.
-        
-        Args:
-            success (bool): True if the login was successful, False otherwise.
         """
         if success:
-            logger.info("Successful master password login recorded. Resetting guardian state.")
+            logger.info("Successful master password login recorded. Resetting lockout state.")
             self.failed_attempts = 0
             self.consecutive_lockouts = 0
-            # Reset 2FA lockout on successful master password login
+            self.lockout_end_time = None
+            self._save_lockout_state()
             self._reset_tfa_lockout()
         else:
             self.failed_attempts += 1
@@ -243,15 +339,12 @@ class AuthGuardian:
                 
                 self.lockout_end_time = datetime.now() + timedelta(minutes=lockout_minutes)
                 logger.warning(f"Max master password attempts reached. Account locked for {lockout_minutes} minutes.")
-
-        self._save_state()
+            
+            self._save_lockout_state()
 
     def is_locked_out(self) -> bool:
         """
         Checks if the account is currently in a hard lockout state.
-
-        Returns:
-            bool: True if locked out, False otherwise.
         """
         if not self.lockout_end_time:
             return False
@@ -259,16 +352,12 @@ class AuthGuardian:
         if datetime.now() < self.lockout_end_time:
             return True
         else:
-            # Lockout has just expired, so reset and report not locked.
             self._reset_lockout()
             return False
 
     def get_remaining_lockout_time(self) -> int:
         """
         Gets the remaining lockout time in seconds.
-
-        Returns:
-            int: The number of seconds remaining, or 0 if not locked out.
         """
         if not self.is_locked_out():
             return 0
@@ -279,8 +368,8 @@ class AuthGuardian:
     def _reset_lockout(self):
         """Resets the state after a lockout expires."""
         self.lockout_end_time = None
-        self.failed_attempts = 0 # Reset attempts after a lockout
-        self._save_state()
+        self.failed_attempts = 0
+        self._save_lockout_state()
     
     def is_tfa_enabled(self) -> bool:
         """Check if 2FA is enabled for this account."""
@@ -673,4 +762,3 @@ class AuthGuardian:
         self._validate_state(save_state=False)
         logger.info(f"After reload, _settings has: {list(self._settings.keys())}")
         logger.info(f"After reload, is_tfa_enabled(): {self.is_tfa_enabled()}")
-

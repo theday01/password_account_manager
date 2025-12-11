@@ -2850,14 +2850,12 @@ class ModernPasswordManagerGUI:
                 return
 
             if self.auth_guardian.is_locked_out():
-                self.show_message("error", "Account locked", msg_type="error")
-                self.root.quit()
+                self.show_lockout_screen()
             else:
                 remaining_attempts = self.auth_guardian.MAX_ATTEMPTS_BEFORE_LOCKOUT - self.auth_guardian.failed_attempts
                 self.show_message("error", "invalid_master_password_error", msg_type="error", attempts=remaining_attempts)
                 if self.auth_guardian.is_locked_out(): # Re-check after message
-                    self.show_message("error", "Account locked", msg_type="error")
-                    self.root.quit()
+                    self.show_lockout_screen()
 
     def _block_copy_paste_comprehensive(self, widget, include_cut=True):
         """
@@ -2917,25 +2915,28 @@ class ModernPasswordManagerGUI:
     def disable_login_button_with_countdown(self):
         if hasattr(self, 'login_btn'):
             self.login_btn.configure(state="disabled")
-            self.update_lockout_countdown()
+        self.show_lockout_screen()
 
     def update_lockout_countdown(self):
+        """Periodically updates the lockout timer on the screen."""
+        # Safety check to ensure the label widget still exists
+        if not hasattr(self, 'lockout_countdown_label') or not self.lockout_countdown_label.winfo_exists():
+            return
+
         if self.auth_guardian.is_locked_out():
             remaining_time = self.auth_guardian.get_remaining_lockout_time()
             minutes, seconds = divmod(remaining_time, 60)
             
-            lockout_text = f"🔒 Locked ({minutes:02d}:{seconds:02d})"
-            if hasattr(self, 'login_btn'):
-                self.login_btn.configure(text=lockout_text, state="disabled")
-            if hasattr(self, 'lockout_countdown_label'):
-                self.lockout_countdown_label.configure(text=f"Time remaining: {minutes:02d}:{seconds:02d}")
+            # Format the countdown string MM:SS
+            countdown_text = f"{minutes:02d}:{seconds:02d}"
+            self.lockout_countdown_label.configure(text=countdown_text)
             
+            # Reschedule the update every second
             self.root.after(1000, self.update_lockout_countdown)
         else:
-            if hasattr(self, 'lockout_countdown_label'): # If we were on the lockout screen
-                self.show_login_screen()
-            elif hasattr(self, 'login_btn'):
-                self.login_btn.configure(text="🔓 Login", state="normal")
+            # When the timer runs out, go back to the normal login screen
+            logger.info("Lockout expired. Returning to login screen.")
+            self.show_login_screen()
 
     def update_login_button_states(self):
         if hasattr(self, 'login_btn') and hasattr(self, 'setup_btn'):
@@ -7678,70 +7679,68 @@ class ModernPasswordManagerGUI:
 
     def check_startup_lockout(self):
         if self.is_currently_locked_out():
-            remaining_time = self.get_remaining_lockout_time()
-            minutes, seconds = divmod(remaining_time, 60)
-            logger.info(f"User is locked out on startup - {minutes:02d}:{seconds:02d} remaining")
-            self.show_message("error", "Account locked", msg_type="error")
-            self.root.quit()
+            self.show_lockout_screen()
             return True
         return False
 
     def show_lockout_screen(self):
+        """Displays a dedicated screen with a countdown timer when the account is locked."""
         for widget in self.main_frame.winfo_children():
             widget.destroy()
-        lockout_container = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        lockout_container.place(relx=0.5, rely=0.5, anchor="center")
-        lockout_card = ctk.CTkFrame(lockout_container, corner_radius=15)
-        lockout_card.pack(padx=20, pady=20)
+        
+        # Configure window for the lockout screen
         self.root.resizable(False, False)
         self.root.update_idletasks()
-        width = 800
-        height = 500
+        width, height = 500, 400
         x = (self.root.winfo_screenwidth() // 2) - (width // 2)
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
-        title = ctk.CTkLabel(
-            lockout_card, 
-            text="🔒 Account Locked", 
-            font=ctk.CTkFont(size=28, weight="bold"),
-            text_color="#ff4444"
-        )
-        title.pack(pady=(30, 20), padx=40)
-        subtitle = ctk.CTkLabel(
-            lockout_card,
-            text="Too many failed login attempts",
-            font=ctk.CTkFont(size=16),
-            text_color="#888888"
-        )
-        subtitle.pack(pady=(0, 30), padx=40)
-        self.lockout_countdown_label = ctk.CTkLabel(
-            lockout_card,
-            text="",
-            font=ctk.CTkFont(size=24, weight="bold"),
-            text_color="#ff4444"
-        )
-        self.lockout_countdown_label.pack(pady=20, padx=40)
-        self.update_lockout_countdown()
+
+        lockout_container = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        lockout_container.place(relx=0.5, rely=0.5, anchor="center")
         
-        info_text = ctk.CTkLabel(
-            lockout_card,
-            text="Please wait until the lockout period expires.\nThe program will automatically unlock when ready.",
+        # Lock icon
+        ctk.CTkLabel(
+            lockout_container,
+            text="🔒",
+            font=ctk.CTkFont(size=72)
+        ).pack(pady=(0, 10))
+
+        # Title
+        ctk.CTkLabel(
+            lockout_container, 
+            text="Account Locked", 
+            font=ctk.CTkFont(size=28, weight="bold"),
+            text_color="#EF4444" # Red color for emphasis
+        ).pack(pady=(10, 5))
+
+        # Subtitle
+        ctk.CTkLabel(
+            lockout_container,
+            text="Too many failed login attempts.",
             font=ctk.CTkFont(size=14),
-            text_color="#888888",
-            justify="center"
+            text_color=("gray60", "gray40")
+        ).pack()
+
+        # Countdown timer label
+        self.lockout_countdown_label = ctk.CTkLabel(
+            lockout_container,
+            text="--:--",
+            font=ctk.CTkFont(size=48, weight="bold", family="monospace"),
+            text_color=("#3B82F6", "#60A5FA") # Blueish color
         )
-        info_text.pack(pady=20, padx=40)
-        exit_btn = ctk.CTkButton(
-            lockout_card,
-            text="Exit Program",
-            command=self.root.quit,
-            width=200,
-            height=45,
-            font=ctk.CTkFont(size=16),
-            fg_color="#666666",
-            hover_color="#555555"
-        )
-        exit_btn.pack(pady=20)
+        self.lockout_countdown_label.pack(pady=20)
+        
+        # Info text
+        ctk.CTkLabel(
+            lockout_container,
+            text="The application will unlock automatically.",
+            font=ctk.CTkFont(size=12),
+            text_color=("gray50", "gray50")
+        ).pack(pady=(10, 20))
+
+        # Start the countdown
+        self.update_lockout_countdown()
 
     def secure_logout(self):
         """Securely logout: sync data, clear memory, close application safely"""

@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureVault Pro - مدير كلمات المرور الأكثر أماناً</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            color: #ffffff;
+            line-height: 1.8;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 12px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1a2e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4a4a8a;
+            border-radius: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #5a5a9a;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            padding: 20px 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 30px;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+        }
+
+        .nav-links a {
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 16px;
+            transition: color 0.3s;
+            position: relative;
+        }
+
+        .nav-links a:hover {
+            color: #667eea;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: -5px;
+            right: 0;
+            background: #667eea;
+            transition: width 0.3s;
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 180px 0 100px;
+            text-align: center;
+            background: radial-gradient(circle at center, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+        }
+
+        .hero h1 {
+            font-size: 64px;
+            font-weight: 900;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.2;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        .hero .tagline {
+            font-size: 32px;
+            color: #a0a0d0;
+            margin-bottom: 20px;
+            font-weight: 300;
+            animation: fadeInUp 1.2s ease-out;
+        }
+
+        .hero .subtitle {
+            font-size: 20px;
+            color: #c0c0e0;
+            max-width: 800px;
+            margin: 0 auto 50px;
+            line-height: 1.8;
+            animation: fadeInUp 1.4s ease-out;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 18px 50px;
+            font-size: 20px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 50px;
+            transition: all 0.3s;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            animation: fadeInUp 1.6s ease-out;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+        }
+
+        .cta-button.secondary {
+            background: transparent;
+            border: 2px solid #667eea;
+            margin-right: 20px;
+        }
+
+        .cta-button.secondary:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        /* Features Section */
+        .features {
+            padding: 100px 0;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 48px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 20px;
+            color: #a0a0d0;
+            margin-bottom: 70px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 40px;
+            margin-top: 60px;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transform: scaleX(0);
+            transition: transform 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 50px rgba(102, 126, 234, 0.3);
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+
+        .feature-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 25px;
+            display: block;
+        }
+
+        .feature-card h3 {
+            font-size: 24px;
+            margin-bottom: 15px;
+            color: #ffffff;
+        }
+
+        .feature-card p {
+            color: #c0c0e0;
+            font-size: 16px;
+            line-height: 1.8;
+        }
+
+        /* Security Section */
+        .security {
+            padding: 100px 0;
+            background: linear-gradient(135deg, rgba(15, 12, 41, 0.9) 0%, rgba(48, 43, 99, 0.9) 100%);
+        }
+
+        .security-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 60px;
+        }
+
+        .security-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            border-radius: 15px;
+            border-right: 4px solid #667eea;
+            transition: all 0.3s;
+        }
+
+        .security-item:hover {
+            background: rgba(102, 126, 234, 0.1);
+            transform: translateX(-10px);
+        }
+
+        .security-item h4 {
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .security-item p {
+            color: #c0c0e0;
+            font-size: 15px;
+        }
+
+        /* How It Works */
+        .how-it-works {
+            padding: 100px 0;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            max-width: 900px;
+            margin: 60px auto 0;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .step-number {
+            font-size: 48px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            min-width: 80px;
+        }
+
+        .step-content h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .step-content p {
+            color: #c0c0e0;
+            font-size: 16px;
+            line-height: 1.8;
+        }
+
+        /* Stats Section */
+        .stats {
+            padding: 80px 0;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 40px;
+            text-align: center;
+        }
+
+        .stat-item {
+            padding: 30px;
+        }
+
+        .stat-number {
+            font-size: 56px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 18px;
+            color: #a0a0d0;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            padding: 100px 0;
+            text-align: center;
+            background: radial-gradient(circle at center, rgba(102, 126, 234, 0.2) 0%, transparent 70%);
+        }
+
+        .cta-section h2 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .cta-section p {
+            font-size: 20px;
+            color: #c0c0e0;
+            margin-bottom: 40px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Footer */
+        .footer {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 50px 0 30px;
+            text-align: center;
+        }
+
+        .footer-content {
+            margin-bottom: 30px;
+        }
+
+        .footer h3 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .footer p {
+            color: #a0a0d0;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .footer-copyright {
+            padding-top: 30px;
+            border-top: 1px solid rgba(102, 126, 234, 0.2);
+            color: #808080;
+            font-size: 14px;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 40px;
+            }
+
+            .hero .tagline {
+                font-size: 24px;
+            }
+
+            .hero .subtitle {
+                font-size: 18px;
+            }
+
+            .section-title {
+                font-size: 36px;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .step {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+
+        /* Highlight Box */
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+            border-right: 4px solid #667eea;
+            padding: 30px;
+            border-radius: 15px;
+            margin: 40px 0;
+        }
+
+        .highlight-box h3 {
+            font-size: 22px;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+
+        .highlight-box ul {
+            list-style: none;
+            padding-right: 20px;
+        }
+
+        .highlight-box li {
+            padding: 10px 0;
+            color: #c0c0e0;
+            position: relative;
+            padding-right: 30px;
+        }
+
+        .highlight-box li::before {
+            content: '✓';
+            position: absolute;
+            right: 0;
+            color: #667eea;
+            font-weight: bold;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">🔐 SecureVault Pro</div>
+                <nav class="nav-links">
+                    <a href="#features">الميزات</a>
+                    <a href="#security">الأمان</a>
+                    <a href="#how-it-works">كيف يعمل</a>
+                    <a href="#purchase">الشراء</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>SecureVault Pro</h1>
+            <p class="tagline">~ فقط أنت تفتحه ~</p>
+            <p class="subtitle">
+                الحل الأكثر أماناً وإتقاناً لحماية وإدارة كلمات مرورك الحساسة. 
+                بنظام تشفير عسكري متقدم وحماية متعددة الطبقات، أصبح أمانك الرقمي في يديك.
+            </p>
+            <div>
+                <a href="#purchase" class="cta-button">اشترِ الآن</a>
+                <a href="#features" class="cta-button secondary">اكتشف الميزات</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <h2 class="section-title">ميزات قوية لحماية استثنائية</h2>
+            <p class="section-subtitle">
+                SecureVault Pro ليس مجرد مدير كلمات مرور عادي - إنه قلعة محصنة لحماية معلوماتك الأكثر حساسية
+            </p>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <span class="feature-icon">🔒</span>
+                    <h3>تشفير AES-256-GCM</h3>
+                    <p>
+                        معيار التشفير العسكري الأقوى في العالم. جميع بياناتك مشفرة بتقنية AES-256-GCM 
+                        المعتمدة من NIST والتي تستخدمها الحكومات والبنوك الكبرى. مستحيل الاختراق.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🎲</span>
+                    <h3>مولد كلمات مرور ذكي</h3>
+                    <p>
+                        أنشئ كلمات مرور قوية وعشوائية بشكل فوري. قابل للتخصيص بالكامل: اختر الطول، 
+                        أنواع الأحرف، واستبعد الأحرف المشابهة. كل كلمة مرور فريدة وقوية بشكل استثنائي.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🛡️</span>
+                    <h3>تقرير الأمان الشامل</h3>
+                    <p>
+                        احصل على تحليل شامل لأمان كلمات مرورك. اكتشف الكلمات الضعيفة، المكررة، 
+                        القديمة، واحصل على توصيات فورية لتحسين مستوى الأمان العام.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🔐</span>
+                    <h3>المصادقة الثنائية (2FA)</h3>
+                    <p>
+                        طبقة حماية إضافية مع المصادقة الثنائية عبر TOTP. ارتبط بتطبيق المصادقة 
+                        المفضل لديك (Google Authenticator، Microsoft Authenticator، وغيرها) لحماية مضاعفة.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">📋</span>
+                    <h3>حماية الحافظة الذكية</h3>
+                    <p>
+                        عند نسخ كلمة المرور، تُمسح تلقائياً من الحافظة بعد 30 ثانية (قابل للتعديل). 
+                        منع تلقائي لسرقة كلمات المرور عبر برامج مراقبة الحافظة.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🔍</span>
+                    <h3>كشف التلاعب الفوري</h3>
+                    <p>
+                        مراقبة مباشرة على مدار الساعة لاكتشاف أي محاولة تلاعب بالملفات. نظام متعدد 
+                        الطبقات يعتمد على HMAC-SHA256 للتحقق من سلامة البيانات في كل لحظة.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">💾</span>
+                    <h3>نسخ احتياطي واستعادة</h3>
+                    <p>
+                        أنشئ نسخ احتياطية مشفرة بسهولة واحفظها بأمان. استعد بياناتك في أي وقت 
+                        بضغطة واحدة. جميع النسخ الاحتياطية مشفرة ومحمية.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">📊</span>
+                    <h3>سجل التدقيق الشامل</h3>
+                    <p>
+                        تتبع كل إجراء وكل عملية دخول. سجل مفصل لجميع العمليات الأمنية، محاولات 
+                        الدخول، والأنشطة المشبوهة. كل شيء موثق ومشفر.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🔐</span>
+                    <h3>كلمة مرور رئيسية محصنة</h3>
+                    <p>
+                        كلمة المرور الرئيسية لا تُخزن أبداً. يتم توليد مفتاح التشفير ديناميكياً باستخدام 
+                        PBKDF2 (480,000 تكرار) أو Argon2id. حتى لو سُرق جهازك، بياناتك محمية.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🎯</span>
+                    <h3>تحليل القوة الذكي</h3>
+                    <p>
+                        كل كلمة مرور تُحلل فوراً لتحديد قوتها (من 0 إلى 100). احصل على توصيات 
+                        محددة لتحسين كل كلمة مرور وتحصين حساباتك بالكامل.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🔒</span>
+                    <h3>تخزين محلي 100%</h3>
+                    <p>
+                        جميع بياناتك مخزنة محلياً على جهازك فقط. لا توجد اتصالات سحابية، لا توجد 
+                        خوادم خارجية. أنت الوحيد الذي يمتلك بياناتك - تماماً كما يجب أن يكون.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">⚡</span>
+                    <h3>واجهة حديثة وسريعة</h3>
+                    <p>
+                        واجهة مستخدم عصرية وسلسة مصممة لتجربة استخدام استثنائية. تصميم داكن 
+                        أنيق، تنقل سهل، وبحث فوري. كل شيء في متناول يدك.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Security Section -->
+    <section class="security" id="security">
+        <div class="container">
+            <h2 class="section-title">أمان متعدد الطبقات</h2>
+            <p class="section-subtitle">
+                طبقات حماية متعددة تعمل معاً لحماية بياناتك من جميع أنواع التهديدات
+            </p>
+
+            <div class="security-grid">
+                <div class="security-item">
+                    <h4>🔐 التشفير القوي</h4>
+                    <p>AES-256-GCM - معيار التشفير العسكري الأعلى في العالم</p>
+                </div>
+                <div class="security-item">
+                    <h4>🔑 اشتقاق المفاتيح</h4>
+                    <p>PBKDF2 مع 480,000 تكرار أو Argon2id للدفاع ضد هجمات القوة الغاشمة</p>
+                </div>
+                <div class="security-item">
+                    <h4>✅ التحقق من السلامة</h4>
+                    <p>HMAC-SHA256 للتحقق من عدم التلاعب بالملفات في أي وقت</p>
+                </div>
+                <div class="security-item">
+                    <h4>🔍 كشف التلاعب</h4>
+                    <p>مراقبة مباشرة لاكتشاف أي محاولة تعديل على ملفات القبو</p>
+                </div>
+                <div class="security-item">
+                    <h4>🔒 تخزين مخفي</h4>
+                    <p>ملفات القبو مخزنة في موقع مخفي وآمن بعيداً عن أعين المتطفلين</p>
+                </div>
+                <div class="security-item">
+                    <h4>⏱️ انتهاء الجلسة</h4>
+                    <p>إغلاق تلقائي بعد 15 دقيقة من عدم النشاط لحماية إضافية</p>
+                </div>
+                <div class="security-item">
+                    <h4>🚫 قفل الحساب</h4>
+                    <p>قفل تلقائي بعد 3 محاولات دخول خاطئة مع مهلة زمنية متدرجة</p>
+                </div>
+                <div class="security-item">
+                    <h4>📝 سجل الأحداث</h4>
+                    <p>تسجيل شامل لجميع الأحداث الأمنية والأنشطة المشبوهة</p>
+                </div>
+            </div>
+
+            <div class="highlight-box" style="margin-top: 50px;">
+                <h3>🔒 معايير الأمان المطبقة</h3>
+                <ul>
+                    <li><strong>AES-256:</strong> معتمد من NIST (FIPS 197)</li>
+                    <li><strong>SHA-256:</strong> معتمد من NIST (FIPS 180-4)</li>
+                    <li><strong>PBKDF2:</strong> معتمد من NIST (SP 800-132)</li>
+                    <li><strong>HMAC:</strong> معتمد من NIST (FIPS 198)</li>
+                    <li><strong>Argon2id:</strong> خوارزمية اشتقاق المفاتيح الأكثر تطوراً</li>
+                    <li><strong>GCM Mode:</strong> التشفير المصادق عليه لمنع التلاعب</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="container">
+            <h2 class="section-title">كيف يعمل SecureVault Pro؟</h2>
+            <p class="section-subtitle">
+                عملية بسيطة وآمنة لحماية بياناتك بكل سهولة
+            </p>
+
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>إنشاء كلمة المرور الرئيسية</h3>
+                        <p>
+                            عند أول استخدام، تقوم بإنشاء كلمة مرور رئيسية قوية (16 حرفاً على الأقل). 
+                            هذه الكلمة لا تُخزن أبداً - يتم استخدامها فقط لتوليد مفتاح التشفير ديناميكياً.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>توليد مفتاح التشفير</h3>
+                        <p>
+                            يتم دمج كلمة المرور الرئيسية مع "ملح" عشوائي فريد (256 بت) لتوليد مفتاح 
+                            تشفير قوي باستخدام PBKDF2 أو Argon2id. هذا المفتاح غير قابل للكسر.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>تشفير البيانات</h3>
+                        <p>
+                            جميع بياناتك (أسماء المستخدمين، كلمات المرور، الملاحظات) تُشفّر 
+                            باستخدام AES-256-GCM قبل حفظها. كل سجل مشفر بشكل منفصل.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h3>التحقق من السلامة</h3>
+                        <p>
+                            يتم إنشاء توقيع HMAC-SHA256 لكل ملف للتحقق من عدم التلاعب. 
+                            في كل عملية فتح، يتم التحقق من صحة جميع الملفات.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <h3>استخدام آمن</h3>
+                        <p>
+                            عند الحاجة إلى كلمة مرور، يتم فك التشفير في الذاكرة فقط أثناء الاستخدام. 
+                            بعد النسخ أو الاستخدام، تُمسح البيانات من الذاكرة فوراً.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <h3>مراقبة مستمرة</h3>
+                        <p>
+                            يعمل نظام المراقبة الأمنية على مدار الساعة لاكتشاف أي محاولة تلاعب، 
+                            تسجيل جميع الأحداث، وتحليل الأنماط المشبوهة.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number">256</div>
+                    <div class="stat-label">بت - قوة التشفير</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">480K</div>
+                    <div class="stat-label">تكرار - اشتقاق المفاتيح</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">تخزين محلي - لا سحابة</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">∞</div>
+                    <div class="stat-label">حسابات - عدد غير محدود</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section" id="purchase">
+        <div class="container">
+            <h2>جاهز لحماية بياناتك؟</h2>
+            <p>
+                انضم إلى آلاف المستخدمين الذين يثقون بـ SecureVault Pro لحماية معلوماتهم الحساسة. 
+                استثمر في أمانك الرقمي اليوم.
+            </p>
+            <a href="#purchase" class="cta-button" style="font-size: 24px; padding: 20px 60px;">
+                🛒 اشترِ SecureVault Pro الآن
+            </a>
+            
+            <div class="highlight-box" style="max-width: 800px; margin: 50px auto 0;">
+                <h3>✨ ما الذي تحصل عليه؟</h3>
+                <ul>
+                    <li>تشفير AES-256-GCM - معيار التشفير العسكري</li>
+                    <li>مولد كلمات مرور ذكي وقابل للتخصيص بالكامل</li>
+                    <li>تقرير أمان شامل وتحليل لقوة كلمات المرور</li>
+                    <li>المصادقة الثنائية (2FA) لحماية إضافية</li>
+                    <li>نسخ احتياطي واستعادة مشفر</li>
+                    <li>كشف التلاعب الفوري ومراقبة أمنية مستمرة</li>
+                    <li>واجهة مستخدم حديثة وسهلة الاستخدام</li>
+                    <li>تخزين محلي 100% - بدون اتصالات سحابية</li>
+                    <li>سجل تدقيق شامل لجميع الأنشطة</li>
+                    <li>حماية الحافظة الذكية من السرقة</li>
+                    <li>تحديثات أمنية مستمرة</li>
+                    <li>دعم فني متاح</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <h3>SecureVault Pro</h3>
+                <p>~ فقط أنت تفتحه ~</p>
+                <p style="margin-top: 20px;">
+                    نظام محلي متقدم لحماية وإدارة كلمات المرور<br>
+                    تم التطوير بواسطة <strong>EAGLESHADOW</strong> - 2025
+                </p>
+                <p style="margin-top: 15px; color: #667eea;">
+                    🔐 أمانك الرقمي في يديك
+                </p>
+            </div>
+            <div class="footer-copyright">
+                <p>&copy; 2025 SecureVault Pro - جميع الحقوق محفوظة</p>
+                <p style="margin-top: 10px; font-size: 12px;">
+                    هذا المنتج محمي بمعايير التشفير العسكرية ويضمن أقصى مستويات الحماية لبياناتك الحساسة.
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Header scroll effect
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('.header');
+            if (window.scrollY > 100) {
+                header.style.background = 'rgba(0, 0, 0, 0.8)';
+            } else {
+                header.style.background = 'rgba(0, 0, 0, 0.4)';
+            }
+        });
+
+        // Fade in animation on scroll
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('fade-in');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.feature-card, .security-item, .step').forEach(el => {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>
