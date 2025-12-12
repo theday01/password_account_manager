@@ -501,10 +501,10 @@
 
         .pricing-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
-            gap: 50px;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 40px;
             margin-top: 60px;
-            max-width: 1100px;
+            max-width: 1200px;
             margin-left: auto;
             margin-right: auto;
         }
@@ -1045,8 +1045,33 @@
             </p>
 
             <div class="pricing-grid">
-                <!-- Standard Plan -->
+                <!-- Free Trial Plan -->
                 <div class="pricing-card">
+                    <div class="pricing-header">
+                        <span class="pricing-icon">⏳</span>
+                        <h3 class="pricing-title">تجربة مجانية</h3>
+                        <p class="pricing-description">جرّب البرنامج مجاناً لمدة 7 أيام</p>
+                        <div class="pricing-price">مجانًا</div>
+                        <div class="pricing-period">لمدة 7 أيام</div>
+                    </div>
+
+                    <ul class="pricing-features">
+                        <li>تشفير AES-256-GCM العسكري</li>
+                        <li>مولد كلمات مرور ذكي</li>
+                        <li>تقرير أمان (محدود)</li>
+                        <li>تخزين حتى 10 حسابات</li>
+                        <li>دعم فني محدود</li>
+                        <li style="opacity: 0.5;">المصادقة الثنائية (2FA)</li>
+                        <li style="opacity: 0.5;">نسخ احتياطي واستعادة</li>
+                        <li style="opacity: 0.5;">كشف التلاعب الفوري</li>
+                    </ul>
+
+                    <a href="https://wa.me/212700979284?text=مرحباً، أريد تجربة SecureVault Pro" class="pricing-button">ابدأ التجربة المجانية</a>
+                </div>
+
+                <!-- Standard Plan -->
+                <div class="pricing-card featured">
+                    <div class="pricing-badge">⭐ الأكثر شعبية</div>
                     <div class="pricing-header">
                         <span class="pricing-icon">👤</span>
                         <h3 class="pricing-title">النسخة القياسية</h3>
@@ -1074,8 +1099,7 @@
                 </div>
 
                 <!-- Developer Plan -->
-                <div class="pricing-card featured">
-                    <div class="pricing-badge">⭐ الأكثر شعبية</div>
+                <div class="pricing-card">
                     <div class="pricing-header">
                         <span class="pricing-icon">👨‍💻</span>
                         <h3 class="pricing-title">نسخة المطورين</h3>
