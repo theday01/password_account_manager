@@ -2631,9 +2631,9 @@ class ModernPasswordManagerGUI:
             contact_info = [
                 ("Developer:", "Hamza Saadi"),
                 ("Company:", "EAGLESHADOW"),
-                ("Email:", "support@eagleshadow.com"),
-                ("WhatsApp:", "(+212) 6234222858"),
-                ("Website:", "www.eagleshadow.com")
+                ("Email:", "contactus24h24h@gmail.com"),
+                ("WhatsApp:", "(+212) 700979284"),
+                ("Website:", "https://eagleshadow.great-site.net")
             ]
             
             # Items that should have copy buttons (Email, WhatsApp, Website)
