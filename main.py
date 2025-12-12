@@ -6122,6 +6122,25 @@ class ModernPasswordManagerGUI:
             "adobe": "icons/adobe.png",
             "ادوبي": "icons/adobe.png",
             "ادوبى": "icons/adobe.png",
+            "chatgpt": "icons/chatgpt.png",
+            "openai": "icons/chatgpt.png",
+            "emergent": "icons/emergent.png",
+            "perplexity": "icons/perplexity.png",
+            "midjourney": "icons/midjourney.png",
+            "claude": "icons/claude.png",
+            "anthropic": "icons/claude.png",
+            "poe": "icons/poe.png",
+            "huggingface": "icons/huggingface.png",
+            "replicate": "icons/replicate.png",
+            "stability": "icons/stability.png",
+            "runpod": "icons/runpod.png",
+            "openrouter": "icons/openrouter.png",
+            "cohere": "icons/cohere.png",
+            "groq": "icons/groq.png",
+            "mistral": "icons/mistral.png",
+            "gemini": "icons/gemini.png",
+            "bard": "icons/gemini.png",
+            "nvidia": "icons/nvidia.png"
         }
         
         logo_path = None
