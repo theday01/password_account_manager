@@ -32,3 +32,8 @@ backups
 *.dat
 *.log
 *.txt
+
+auth_state.json
+.auth_state.json
+/auth_state.json
+/auth_state.json/

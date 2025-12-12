@@ -1,22 +1,17 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@200;300;400;500;700;800;900&display=swap" rel="stylesheet">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SecureVault Pro - مدير كلمات المرور الأكثر أماناً</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
 
         body {
-            font-family: 'Segoe UI', 'Tahoma', 'Arial', sans-serif;
             background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
             color: #ffffff;
-            line-height: 1.8;
-            overflow-x: hidden;
         }
 
         /* Scrollbar Styling */
@@ -37,71 +32,11 @@
             background: #5a5a9a;
         }
 
-        /* Header */
-        .header {
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(10px);
-            padding: 20px 0;
-            position: fixed;
-            width: 100%;
-            top: 0;
-            z-index: 1000;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }
-
-        .container {
+        .container45 {
             max-width: 1200px;
             margin: 0 auto;
             padding: 0 30px;
         }
-
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            font-size: 28px;
-            font-weight: bold;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 30px;
-        }
-
-        .nav-links a {
-            color: #ffffff;
-            text-decoration: none;
-            font-size: 16px;
-            transition: color 0.3s;
-            position: relative;
-        }
-
-        .nav-links a:hover {
-            color: #667eea;
-        }
-
-        .nav-links a::after {
-            content: '';
-            position: absolute;
-            width: 0;
-            height: 2px;
-            bottom: -5px;
-            right: 0;
-            background: #667eea;
-            transition: width 0.3s;
-        }
-
-        .nav-links a:hover::after {
-            width: 100%;
-        }
-
         /* Hero Section */
         .hero {
             padding: 180px 0 100px;
@@ -173,7 +108,7 @@
             background: rgba(0, 0, 0, 0.2);
         }
 
-        .section-title {
+        .section45-title {
             text-align: center;
             font-size: 48px;
             font-weight: 800;
@@ -184,7 +119,7 @@
             background-clip: text;
         }
 
-        .section-subtitle {
+        .section45-subtitle {
             text-align: center;
             font-size: 20px;
             color: #a0a0d0;
@@ -335,23 +270,23 @@
         }
 
         /* Stats Section */
-        .stats {
+        .statsaza {
             padding: 80px 0;
             background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
         }
 
-        .stats-grid {
+        .stats-gridaza {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 40px;
             text-align: center;
         }
 
-        .stat-item {
+        .stat-itemaza {
             padding: 30px;
         }
 
-        .stat-number {
+        .stat-numberaza {
             font-size: 56px;
             font-weight: 900;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -361,19 +296,19 @@
             margin-bottom: 10px;
         }
 
-        .stat-label {
+        .stat-labelaza {
             font-size: 18px;
             color: #a0a0d0;
         }
 
         /* CTA Section */
-        .cta-section {
+        .cta-section45 {
             padding: 100px 0;
             text-align: center;
             background: radial-gradient(circle at center, rgba(102, 126, 234, 0.2) 0%, transparent 70%);
         }
 
-        .cta-section h2 {
+        .cta-section45 h2 {
             font-size: 48px;
             margin-bottom: 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -382,7 +317,7 @@
             background-clip: text;
         }
 
-        .cta-section p {
+        .cta-section45 p {
             font-size: 20px;
             color: #c0c0e0;
             margin-bottom: 40px;
@@ -392,17 +327,17 @@
         }
 
         /* Footer */
-        .footer {
+        .footeraza {
             background: rgba(0, 0, 0, 0.6);
             padding: 50px 0 30px;
             text-align: center;
         }
 
-        .footer-content {
+        .footer-contentaza {
             margin-bottom: 30px;
         }
 
-        .footer h3 {
+        .footeraza h3 {
             font-size: 24px;
             margin-bottom: 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -411,13 +346,13 @@
             background-clip: text;
         }
 
-        .footer p {
+        .footeraza p {
             color: #a0a0d0;
             font-size: 16px;
             margin-bottom: 10px;
         }
 
-        .footer-copyright {
+        .footer-copyrightaza {
             padding-top: 30px;
             border-top: 1px solid rgba(102, 126, 234, 0.2);
             color: #808080;
@@ -454,11 +389,11 @@
                 font-size: 18px;
             }
 
-            .section-title {
+            .section45-title {
                 font-size: 36px;
             }
 
-            .features-grid {
+            .features-gridaza {
                 grid-template-columns: 1fr;
             }
 
@@ -466,7 +401,7 @@
                 display: none;
             }
 
-            .step {
+            .stepaza {
                 flex-direction: column;
                 text-align: center;
             }
@@ -507,27 +442,307 @@
             font-weight: bold;
             font-size: 20px;
         }
+        
+        .cta-button {
+            display: inline-block;
+            padding: 18px 50px;
+            font-size: 20px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 50px;
+            transition: all 0.3s;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            animation: fadeInUp 1.6s ease-out;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+        }
+
+        .cta-button.secondary {
+            background: transparent;
+            border: 2px solid #667eea;
+            margin-right: 20px;
+        }
+
+        .cta-button.secondary:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .section45-title {
+            text-align: center;
+            font-size: 48px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 20px;
+            color: #a0a0d0;
+            margin-bottom: 70px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Pricing Section */
+        .pricing-section45 {
+            padding: 100px 0;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 50px;
+            margin-top: 60px;
+            max-width: 1100px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .pricing-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            padding: 50px 40px;
+            border-radius: 30px;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            transition: all 0.4s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pricing-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transform: scaleX(0);
+            transition: transform 0.4s;
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-15px);
+            box-shadow: 0 25px 60px rgba(102, 126, 234, 0.4);
+            border-color: rgba(102, 126, 234, 0.6);
+        }
+
+        .pricing-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .pricing-card.featured {
+            border: 3px solid #667eea;
+            background: rgba(102, 126, 234, 0.08);
+            transform: scale(1.02);
+        }
+
+        .pricing-badge {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .pricing-header {
+            text-align: center;
+            margin-bottom: 35px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .pricing-icon {
+            font-size: 56px;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .pricing-title {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            color: #ffffff;
+        }
+
+        .pricing-description {
+            font-size: 16px;
+            color: #a0a0d0;
+            margin-bottom: 25px;
+        }
+
+        .pricing-price {
+            font-size: 56px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 5px;
+        }
+
+        .pricing-period {
+            font-size: 18px;
+            color: #808090;
+        }
+
+        .pricing-features {
+            list-style: none;
+            padding: 0;
+            margin: 30px 0;
+        }
+
+        .pricing-features li {
+            padding: 15px 0;
+            color: #c0c0e0;
+            font-size: 16px;
+            position: relative;
+            padding-right: 35px;
+            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .pricing-features li:last-child {
+            border-bottom: none;
+        }
+
+        .pricing-features li::before {
+            content: '✓';
+            position: absolute;
+            right: 0;
+            color: #667eea;
+            font-weight: bold;
+            font-size: 22px;
+        }
+
+        .pricing-button {
+            display: block;
+            width: 100%;
+            padding: 18px;
+            font-size: 20px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 15px;
+            text-align: center;
+            transition: all 0.3s;
+            margin-top: 30px;
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .pricing-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(102, 126, 234, 0.5);
+        }
+
+        .pricing-card.featured .pricing-button {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 10px 25px rgba(245, 87, 108, 0.3);
+        }
+
+        .pricing-card.featured .pricing-button:hover {
+            box-shadow: 0 15px 35px rgba(245, 87, 108, 0.5);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .footeraza {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 50px 0 30px;
+            text-align: center;
+        }
+
+        .footer-contentaza {
+            margin-bottom: 30px;
+        }
+
+        .footeraza h3 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .footeraza p {
+            color: #a0a0d0;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .footer-copyrightaza {
+            padding-top: 30px;
+            border-top: 1px solid rgba(102, 126, 234, 0.2);
+            color: #808080;
+            font-size: 14px;
+        }
+
+        @media (max-width: 1024px) {
+            .pricing-grid {
+                grid-template-columns: 1fr;
+                max-width: 600px;
+            }
+            
+            .pricing-card.featured {
+                transform: scale(1);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 40px;
+            }
+
+            .hero .tagline {
+                font-size: 24px;
+            }
+
+            .section-title {
+                font-size: 36px;
+            }
+
+            .pricing-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .pricing-price {
+                font-size: 48px;
+            }
+        }
     </style>
 </head>
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="container">
-            <div class="header-content">
-                <div class="logo">🔐 SecureVault Pro</div>
-                <nav class="nav-links">
-                    <a href="#features">الميزات</a>
-                    <a href="#security">الأمان</a>
-                    <a href="#how-it-works">كيف يعمل</a>
-                    <a href="#purchase">الشراء</a>
-                </nav>
-            </div>
-        </div>
-    </header>
+    <div id="header"></div>    
 
     <!-- Hero Section -->
     <section class="hero">
-        <div class="container">
+        <div class="container45">
             <h1>SecureVault Pro</h1>
             <p class="tagline">~ فقط أنت تفتحه ~</p>
             <p class="subtitle">
@@ -535,7 +750,7 @@
                 بنظام تشفير عسكري متقدم وحماية متعددة الطبقات، أصبح أمانك الرقمي في يديك.
             </p>
             <div>
-                <a href="#purchase" class="cta-button">اشترِ الآن</a>
+                <a href="https://wa.me/212700979284?text=مرحباً، أريد شراء SecureVault Pro" class="cta-button">اشتر الآن</a>
                 <a href="#features" class="cta-button secondary">اكتشف الميزات</a>
             </div>
         </div>
@@ -543,9 +758,9 @@
 
     <!-- Features Section -->
     <section class="features" id="features">
-        <div class="container">
-            <h2 class="section-title">ميزات قوية لحماية استثنائية</h2>
-            <p class="section-subtitle">
+        <div class="container45">
+            <h2 class="section45-title">ميزات قوية لحماية استثنائية</h2>
+            <p class="section45-subtitle">
                 SecureVault Pro ليس مجرد مدير كلمات مرور عادي - إنه قلعة محصنة لحماية معلوماتك الأكثر حساسية
             </p>
 
@@ -663,9 +878,9 @@
 
     <!-- Security Section -->
     <section class="security" id="security">
-        <div class="container">
-            <h2 class="section-title">أمان متعدد الطبقات</h2>
-            <p class="section-subtitle">
+        <div class="container45">
+            <h2 class="section45-title">أمان متعدد الطبقات</h2>
+            <p class="section45-subtitle">
                 طبقات حماية متعددة تعمل معاً لحماية بياناتك من جميع أنواع التهديدات
             </p>
 
@@ -720,9 +935,9 @@
 
     <!-- How It Works -->
     <section class="how-it-works" id="how-it-works">
-        <div class="container">
-            <h2 class="section-title">كيف يعمل SecureVault Pro؟</h2>
-            <p class="section-subtitle">
+        <div class="container45">
+            <h2 class="section45-title">كيف يعمل SecureVault Pro؟</h2>
+            <p class="section45-subtitle">
                 عملية بسيطة وآمنة لحماية بياناتك بكل سهولة
             </p>
 
@@ -797,65 +1012,136 @@
     </section>
 
     <!-- Stats Section -->
-    <section class="stats">
-        <div class="container">
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-number">256</div>
-                    <div class="stat-label">بت - قوة التشفير</div>
+    <section class="statsaza">
+        <div class="containeraza">
+            <div class="stats-gridaza">
+                <div class="stat-itemaza">
+                    <div class="stat-numberaza">256</div>
+                    <div class="stat-labelaza">بت - قوة التشفير</div>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-number">480K</div>
-                    <div class="stat-label">تكرار - اشتقاق المفاتيح</div>
+                <div class="stat-itemaza">
+                    <div class="stat-numberaza">480K</div>
+                    <div class="stat-labelaza">تكرار - اشتقاق المفاتيح</div>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-number">100%</div>
-                    <div class="stat-label">تخزين محلي - لا سحابة</div>
+                <div class="stat-itemaza">
+                    <div class="stat-numberaza">100%</div>
+                    <div class="stat-labelaza">تخزين محلي - لا سحابة</div>
                 </div>
-                <div class="stat-item">
-                    <div class="stat-number">∞</div>
-                    <div class="stat-label">حسابات - عدد غير محدود</div>
+                <div class="stat-itemaza">
+                    <div class="stat-numberaza">∞</div>
+                    <div class="stat-labelaza">حسابات - عدد غير محدود</div>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- CTA Section -->
-    <section class="cta-section" id="purchase">
-        <div class="container">
-            <h2>جاهز لحماية بياناتك؟</h2>
-            <p>
+    
+    <section class="pricing-section45" id="pricing">
+        <div class="container45">
+            <h2 class="section45-title">اختر الخطة المناسبة لك</h2>
+            <p class="section45-subtitle">
+                حلول احترافية لجميع المستخدمين - من الأفراد إلى المطورين المحترفين
+            </p>
+
+            <div class="pricing-grid">
+                <!-- Standard Plan -->
+                <div class="pricing-card">
+                    <div class="pricing-header">
+                        <span class="pricing-icon">👤</span>
+                        <h3 class="pricing-title">النسخة القياسية</h3>
+                        <p class="pricing-description">للاستخدام الشخصي والعائلي</p>
+                        <div class="pricing-price">$20</div>
+                        <div class="pricing-period">دفعة واحدة - مدى الحياة</div>
+                    </div>
+
+                    <ul class="pricing-features">
+                        <li>تشفير AES-256-GCM العسكري</li>
+                        <li>مولد كلمات مرور ذكي وقابل للتخصيص</li>
+                        <li>تقرير أمان شامل وتحليل القوة</li>
+                        <li>المصادقة الثنائية (2FA) لحماية إضافية</li>
+                        <li>نسخ احتياطي واستعادة مشفر</li>
+                        <li>كشف التلاعب الفوري ومراقبة أمنية</li>
+                        <li>واجهة مستخدم حديثة وسهلة الاستخدام</li>
+                        <li>تخزين محلي 100% - بدون اتصالات سحابية</li>
+                        <li>سجل تدقيق شامل لجميع الأنشطة</li>
+                        <li>حماية الحافظة الذكية من السرقة</li>
+                        <li>تحديثات أمنية مستمرة</li>
+                        <li>دعم فني متاح</li>
+                    </ul>
+
+                    <a href="https://wa.me/212700979284?text=مرحباً، أريد شراء SecureVault Pro" class="pricing-button">🛒 اشترِ النسخة القياسية</a>
+                </div>
+
+                <!-- Developer Plan -->
+                <div class="pricing-card featured">
+                    <div class="pricing-badge">⭐ الأكثر شعبية</div>
+                    <div class="pricing-header">
+                        <span class="pricing-icon">👨‍💻</span>
+                        <h3 class="pricing-title">نسخة المطورين</h3>
+                        <p class="pricing-description">للمطورين والمحترفين والشركات</p>
+                        <div class="pricing-price">تواصل معنا</div>
+                        <div class="pricing-period">دفعة واحدة - مدى الحياة</div>
+                    </div>
+
+                    <ul class="pricing-features">
+                        <li><strong>كل ميزات النسخة القياسية مع امتيازات استثنائية</strong></li>
+                        <li>📂 الكود المصدري الكامل (Full Source Code)</li>
+                        <li>🔧 إمكانية التعديل والتخصيص الكامل</li>
+                        <li>🏢 ترخيص استخدام تجاري غير محدود</li>
+                        <li>🔌 API متقدمة للتكامل مع أنظمتك</li>
+                        <li>📚 وثائق تقنية شاملة للمطورين</li>
+                        <li>🛠️ إمكانية إضافة ميزات مخصصة</li>
+                        <li>🔐 مكتبات التشفير المتقدمة القابلة للتوسع</li>
+                        <li>⚙️ تخصيص واجهات المستخدم بالكامل</li>
+                        <li>🌐 دعم نشر التطبيق باسمك الخاص</li>
+                        <li>💼 دعم فني مخصص للمطورين</li>
+                        <li>🔄 تحديثات الكود المصدري المستمرة</li>
+                        <li>📖 أمثلة وحالات استخدام متقدمة</li>
+                        <li>🎓 دورة تدريبية شاملة للتطوير</li>
+                        <li>🤝 استشارات فنية مباشرة</li>
+                    </ul>
+
+                    <a href="https://wa.me/212700979284?text=مرحباً، أريد شراء SecureVault Pro نسخة المطورين من فضلك معلومات اكتر" class="pricing-button">🚀 احصل على نسخة المطورين</a>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 60px; padding: 40px; background: rgba(102, 126, 234, 0.1); border-radius: 20px; border: 2px solid rgba(102, 126, 234, 0.3);">
+                <h3 style="font-size: 28px; margin-bottom: 15px; color: #667eea;">💳 طرق الدفع المتاحة</h3>
+                <p style="font-size: 18px; color: #c0c0e0; margin-bottom: 20px;">
+                    نقبل جميع طرق الدفع الرئيسية لراحتك
+                </p>
+                <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; font-size: 16px; color: #a0a0d0;">
+                    <span>💳 بطاقات الائتمان</span>
+                    <span>🏦 التحويل البنكي</span>
+                    <span>💰 PayPal</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="purchase" style="padding: 100px 0; background: radial-gradient(circle at center, rgba(102, 126, 234, 0.2) 0%, transparent 70%); text-align: center;">
+        <div class="container45">
+            <h2 class="section45-title">جاهز لحماية بياناتك؟</h2>
+            <p style="font-size: 20px; color: #c0c0e0; margin-bottom: 40px; max-width: 700px; margin-left: auto; margin-right: auto;">
                 انضم إلى آلاف المستخدمين الذين يثقون بـ SecureVault Pro لحماية معلوماتهم الحساسة. 
                 استثمر في أمانك الرقمي اليوم.
             </p>
-            <a href="#purchase" class="cta-button" style="font-size: 24px; padding: 20px 60px;">
-                🛒 اشترِ SecureVault Pro الآن
-            </a>
-            
-            <div class="highlight-box" style="max-width: 800px; margin: 50px auto 0;">
-                <h3>✨ ما الذي تحصل عليه؟</h3>
-                <ul>
-                    <li>تشفير AES-256-GCM - معيار التشفير العسكري</li>
-                    <li>مولد كلمات مرور ذكي وقابل للتخصيص بالكامل</li>
-                    <li>تقرير أمان شامل وتحليل لقوة كلمات المرور</li>
-                    <li>المصادقة الثنائية (2FA) لحماية إضافية</li>
-                    <li>نسخ احتياطي واستعادة مشفر</li>
-                    <li>كشف التلاعب الفوري ومراقبة أمنية مستمرة</li>
-                    <li>واجهة مستخدم حديثة وسهلة الاستخدام</li>
-                    <li>تخزين محلي 100% - بدون اتصالات سحابية</li>
-                    <li>سجل تدقيق شامل لجميع الأنشطة</li>
-                    <li>حماية الحافظة الذكية من السرقة</li>
-                    <li>تحديثات أمنية مستمرة</li>
-                    <li>دعم فني متاح</li>
-                </ul>
+            <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+                <a href="https://wa.me/212700979284?text=مرحباً، أريد شراء SecureVault Pro" class="cta-button" style="font-size: 22px; padding: 20px 50px;">
+                    👤 اشترِ النسخة القياسية - $20
+                </a>
+                <a href="https://wa.me/212700979284?text=مرحباً، أريد شراء SecureVault Pro نسخة المطورين من فضلك معلومات اكتر" class="cta-button" style="font-size: 22px; padding: 20px 50px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    👨‍💻 احصل على نسخة المطورين
+                </a>
             </div>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-content">
+    <footer class="footeraza">
+        <div class="container45">
+            <div class="footer-contentaza">
                 <h3>SecureVault Pro</h3>
                 <p>~ فقط أنت تفتحه ~</p>
                 <p style="margin-top: 20px;">
@@ -866,7 +1152,7 @@
                     🔐 أمانك الرقمي في يديك
                 </p>
             </div>
-            <div class="footer-copyright">
+            <div class="footer-copyrightaza">
                 <p>&copy; 2025 SecureVault Pro - جميع الحقوق محفوظة</p>
                 <p style="margin-top: 10px; font-size: 12px;">
                     هذا المنتج محمي بمعايير التشفير العسكرية ويضمن أقصى مستويات الحماية لبياناتك الحساسة.
@@ -874,6 +1160,34 @@
             </div>
         </div>
     </footer>
+
+    
+<div id="footer"></div>    
+    
+<script>
+    function loadHeaderAndFooter() {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "/nav_foot/header.html", true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                document.getElementById("header").innerHTML = xhr.responseText;
+            }
+        };
+        xhr.send();
+
+        var xhr2 = new XMLHttpRequest();
+        xhr2.open("GET", "/nav_foot/footer.html", true);
+        xhr2.onreadystatechange = function() {
+            if (xhr2.readyState === 4 && xhr2.status === 200) {
+                document.getElementById("footer").innerHTML = xhr2.responseText;
+            }
+        };
+        xhr2.send();
+    }
+
+    // Call the function to load header and footer
+    loadHeaderAndFooter();
+</script>
 
     <script>
         // Smooth scrolling
@@ -920,3 +1234,4 @@
     </script>
 </body>
 </html>
+
