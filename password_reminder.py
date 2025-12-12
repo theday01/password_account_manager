@@ -2,6 +2,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(
@@ -13,6 +14,12 @@ class PasswordReminder:
     def __init__(self, database_manager, parent_ui):
         self.database = database_manager
         self.parent_ui = parent_ui
+        self.db_manager = database_manager
+        self.parent_window = parent_ui
+        self.logger = logging.getLogger(__name__)
+        self.reminded_accounts = set()
+        self.timer = None
+        self.REMINDER_INTERVAL = 3600
         
         # ✅ Store reminder data in separate location from trial files
         self.reminder_data_file = os.path.join(

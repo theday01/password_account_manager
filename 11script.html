@@ -6,7 +6,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@200;300;400;500;700;800;900&display=swap" rel="stylesheet">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecureVault Pro - مدير كلمات المرور الأكثر أماناً</title>
+    <title>SecureVault Pro - مدير كلمات المرور بتشفير عسكري AES-256</title>
     <style>
 
         body {
@@ -37,6 +37,182 @@
             margin: 0 auto;
             padding: 0 30px;
         }
+
+        /* Image Container Styles */
+        .image-showcase {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin: 60px auto;
+            border-radius: 30px;
+            overflow: hidden;
+            box-shadow: 0 30px 80px rgba(102, 126, 234, 0.4);
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .image-showcase::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .image-showcase img {
+            width: 100%;
+            height: auto;
+            display: block;
+            position: relative;
+            z-index: 0;
+        }
+
+        .image-glow {
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(102, 126, 234, 0.3) 0%, transparent 70%);
+            animation: glow-pulse 4s ease-in-out infinite;
+            z-index: -1;
+        }
+
+        @keyframes glow-pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.1); }
+        }
+
+        /* Feature Image Styles */
+        .feature-image-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+            margin: 80px 0;
+            padding: 60px 0;
+        }
+
+        .feature-image-section.reverse {
+            direction: ltr;
+        }
+
+        .feature-image-content h3 {
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .feature-image-content p {
+            font-size: 18px;
+            color: #c0c0e0;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+
+        .feature-image-content ul {
+            list-style: none;
+            padding: 0;
+            margin-top: 25px;
+        }
+
+        .feature-image-content ul li {
+            padding: 12px 0;
+            padding-right: 35px;
+            position: relative;
+            color: #c0c0e0;
+            font-size: 17px;
+        }
+
+        .feature-image-content ul li::before {
+            content: '✓';
+            position: absolute;
+            right: 0;
+            color: #667eea;
+            font-weight: bold;
+            font-size: 22px;
+        }
+
+        .feature-image-box {
+            position: relative;
+            border-radius: 25px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.3);
+            border: 2px solid rgba(102, 126, 234, 0.2);
+            transition: all 0.4s;
+        }
+
+        .feature-image-box:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 30px 80px rgba(102, 126, 234, 0.5);
+        }
+
+        .feature-image-box img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Security Visual Section */
+        .security-visual {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 50px;
+            align-items: center;
+            margin: 60px 0;
+        }
+
+        .security-visual-image {
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 25px 70px rgba(102, 126, 234, 0.4);
+        }
+
+        .security-visual-image img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* How It Works Images */
+        .step-with-image {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 40px;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            margin-bottom: 40px;
+        }
+
+        .step-with-image.reverse {
+            grid-template-columns: 1.5fr 1fr;
+        }
+
+        .step-image-box {
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.3);
+            border: 2px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .step-image-box img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
         /* Hero Section */
         .hero {
             padding: 180px 0 100px;
@@ -405,6 +581,16 @@
                 flex-direction: column;
                 text-align: center;
             }
+
+            .feature-image-section,
+            .security-visual,
+            .step-with-image {
+                grid-template-columns: 1fr;
+            }
+
+            .feature-image-section.reverse {
+                direction: rtl;
+            }
         }
 
         /* Highlight Box */
@@ -441,46 +627,6 @@
             color: #667eea;
             font-weight: bold;
             font-size: 20px;
-        }
-        
-        .cta-button {
-            display: inline-block;
-            padding: 18px 50px;
-            font-size: 20px;
-            font-weight: bold;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #ffffff;
-            text-decoration: none;
-            border-radius: 50px;
-            transition: all 0.3s;
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-            animation: fadeInUp 1.6s ease-out;
-        }
-
-        .cta-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
-        }
-
-        .cta-button.secondary {
-            background: transparent;
-            border: 2px solid #667eea;
-            margin-right: 20px;
-        }
-
-        .cta-button.secondary:hover {
-            background: rgba(102, 126, 234, 0.1);
-        }
-
-        .section45-title {
-            text-align: center;
-            font-size: 48px;
-            font-weight: 800;
-            margin-bottom: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
         }
 
         .section-subtitle {
@@ -660,49 +806,6 @@
             box-shadow: 0 15px 35px rgba(245, 87, 108, 0.5);
         }
 
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .footeraza {
-            background: rgba(0, 0, 0, 0.6);
-            padding: 50px 0 30px;
-            text-align: center;
-        }
-
-        .footer-contentaza {
-            margin-bottom: 30px;
-        }
-
-        .footeraza h3 {
-            font-size: 24px;
-            margin-bottom: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .footeraza p {
-            color: #a0a0d0;
-            font-size: 16px;
-            margin-bottom: 10px;
-        }
-
-        .footer-copyrightaza {
-            padding-top: 30px;
-            border-top: 1px solid rgba(102, 126, 234, 0.2);
-            color: #808080;
-            font-size: 14px;
-        }
-
         @media (max-width: 1024px) {
             .pricing-grid {
                 grid-template-columns: 1fr;
@@ -713,26 +816,36 @@
                 transform: scale(1);
             }
         }
+        /* Section decorative image (large, not in small cards) */
+        .section-decor {
+            display: flex;
+            justify-content: center;
+            margin: 30px 0 50px;
+            pointer-events: none;
+        }
 
-        @media (max-width: 768px) {
-            .hero h1 {
-                font-size: 40px;
-            }
+        .section-decor img {
+            width: 90%;
+            max-width: 1000px;
+            height: auto;
+            border-radius: 24px;
+            box-shadow: 0 30px 80px rgba(102,126,234,0.25);
+            border: 3px solid rgba(102,126,234,0.12);
+            opacity: 0.98;
+            transform: translateY(0);
+            transition: transform 0.5s ease, box-shadow 0.3s ease;
+        }
 
-            .hero .tagline {
-                font-size: 24px;
-            }
+        .section-decor img:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 40px 120px rgba(102,126,234,0.35);
+        }
 
-            .section-title {
-                font-size: 36px;
-            }
-
-            .pricing-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .pricing-price {
-                font-size: 48px;
+        @media (max-width: 900px) {
+            .section-decor img {
+                width: 100%;
+                border-radius: 16px;
+                box-shadow: 0 20px 50px rgba(102,126,234,0.18);
             }
         }
     </style>
@@ -753,12 +866,19 @@
                 <a href="https://wa.me/212700979284?text=مرحباً، أريد شراء SecureVault Pro" class="cta-button">اشتر الآن</a>
                 <a href="#features" class="cta-button secondary">اكتشف الميزات</a>
             </div>
+            <div class="image-showcase">
+                <div class="image-glow"></div>
+                <img src="img/image.png" alt="SecureVault Pro Interface">
+            </div>
         </div>
     </section>
 
     <!-- Features Section -->
     <section class="features" id="features">
         <div class="container45">
+            <div class="section-decor" aria-hidden="true">
+                <img src="img/image.png" alt="features decorative" />
+            </div>
             <h2 class="section45-title">ميزات قوية لحماية استثنائية</h2>
             <p class="section45-subtitle">
                 SecureVault Pro ليس مجرد مدير كلمات مرور عادي - إنه قلعة محصنة لحماية معلوماتك الأكثر حساسية
@@ -879,6 +999,9 @@
     <!-- Security Section -->
     <section class="security" id="security">
         <div class="container45">
+            <div class="section-decor" aria-hidden="true">
+                <img src="img/image.png" alt="security decorative" />
+            </div>
             <h2 class="section45-title">أمان متعدد الطبقات</h2>
             <p class="section45-subtitle">
                 طبقات حماية متعددة تعمل معاً لحماية بياناتك من جميع أنواع التهديدات
@@ -936,6 +1059,9 @@
     <!-- How It Works -->
     <section class="how-it-works" id="how-it-works">
         <div class="container45">
+            <div class="section-decor" aria-hidden="true">
+                <img src="img/image.png" alt="how it works decorative" />
+            </div>
             <h2 class="section45-title">كيف يعمل SecureVault Pro؟</h2>
             <p class="section45-subtitle">
                 عملية بسيطة وآمنة لحماية بياناتك بكل سهولة
@@ -1014,6 +1140,9 @@
     <!-- Stats Section -->
     <section class="statsaza">
         <div class="containeraza">
+            <div class="section-decor" aria-hidden="true">
+                <img src="img/image.png" alt="stats decorative" />
+            </div>
             <div class="stats-gridaza">
                 <div class="stat-itemaza">
                     <div class="stat-numberaza">256</div>
@@ -1059,7 +1188,7 @@
                         <li>تشفير AES-256-GCM العسكري</li>
                         <li>مولد كلمات مرور ذكي</li>
                         <li>تقرير أمان (محدود)</li>
-                        <li>تخزين حتى 10 حسابات</li>
+                        <li>تخزين حتى 20 حساب</li>
                         <li>دعم فني محدود</li>
                         <li style="opacity: 0.5;">المصادقة الثنائية (2FA)</li>
                         <li style="opacity: 0.5;">نسخ احتياطي واستعادة</li>
@@ -1146,6 +1275,9 @@
 
     <section id="purchase" style="padding: 100px 0; background: radial-gradient(circle at center, rgba(102, 126, 234, 0.2) 0%, transparent 70%); text-align: center;">
         <div class="container45">
+            <div class="section-decor" aria-hidden="true">
+                <img src="img/image.png" alt="purchase decorative" />
+            </div>
             <h2 class="section45-title">جاهز لحماية بياناتك؟</h2>
             <p style="font-size: 20px; color: #c0c0e0; margin-bottom: 40px; max-width: 700px; margin-left: auto; margin-right: auto;">
                 انضم إلى آلاف المستخدمين الذين يثقون بـ SecureVault Pro لحماية معلوماتهم الحساسة. 
@@ -1165,6 +1297,9 @@
     <!-- Footer -->
     <footer class="footeraza">
         <div class="container45">
+            <div class="section-decor" aria-hidden="true">
+                <img src="img/image.png" alt="footer decorative" style="max-width:340px; width:60%; box-shadow: none; border: none; opacity:0.9;" />
+            </div>
             <div class="footer-contentaza">
                 <h3>SecureVault Pro</h3>
                 <p>~ فقط أنت تفتحه ~</p>
@@ -1174,6 +1309,9 @@
                 </p>
                 <p style="margin-top: 15px; color: #667eea;">
                     🔐 أمانك الرقمي في يديك
+                </p>
+                <p id="version" class="updatecheck" style="color: #495cb1;">
+                    "version": "1.0.0"
                 </p>
             </div>
             <div class="footer-copyrightaza">

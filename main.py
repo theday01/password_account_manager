@@ -27,7 +27,6 @@ from ui_utils import set_icon, ThemedToplevel, CustomMessageBox, ask_string
 from secure_file_manager import SecureFileManager, SecureVaultSetup, SecurityMonitor, setup_secure_vault
 from PIL import Image, ImageTk
 import logging
-from audit_logger import setup_logging
 from tutorial import TutorialManager
 from localization import LanguageManager
 import threading
@@ -48,6 +47,13 @@ from encrypted_db import get_encrypted_connection, create_encrypted_database, Ro
 from enhanced_loading_screen import EnhancedLoadingScreen
 from enhanced_trial_manager import get_trial_manager
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 logger = logging.getLogger(__name__)
 
 log = ctk.CTkImage(
@@ -88,6 +94,10 @@ info = ctk.CTkImage(
 )
 activation_icon = ctk.CTkImage(
     light_image=Image.open("icons/activation.png"),
+    size=(24, 24)
+)
+contact_us_icon = ctk.CTkImage(
+    light_image=Image.open("icons/contactus.png"),
     size=(24, 24)
 )
 class ToolTip:
@@ -4273,7 +4283,6 @@ class ModernPasswordManagerGUI:
         icon_accounts   = ctk.CTkImage(Image.open("icons/user.png"), size=(24, 24))
         icon_generator  = ctk.CTkImage(Image.open("icons/password.png"), size=(24, 24))
         icon_report     = ctk.CTkImage(Image.open("icons/security.png"), size=(24, 24))
-        icon_update     = ctk.CTkImage(Image.open("icons/upload.png"), size=(24, 24))
 
         top_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         top_frame.pack(side="top", fill="x", anchor="n")
@@ -4311,8 +4320,8 @@ class ModernPasswordManagerGUI:
         )
         credits_label.pack(side="bottom", fill="x", padx=15, pady=(10, 20))
         
-        update_config = (self.lang_manager.get_string("check_for_updates"), icon_update, self.show_update_checker)
-        text, icon, command = update_config
+        contact_config = ("Contact Us", contact_us_icon, self.show_contact_us)
+        text, icon, command = contact_config
         btn = ctk.CTkButton(
             self.sidebar,
             text=text,
@@ -4328,7 +4337,7 @@ class ModernPasswordManagerGUI:
         )
         btn.pack(side="bottom", fill="x", padx=15, pady=10)
         self.sidebar_buttons.append(btn)
-
+        
         settings_config = (self.lang_manager.get_string("settings"), settings, self.show_settings)
         text, icon, command = settings_config
         btn = ctk.CTkButton(
@@ -5664,29 +5673,27 @@ class ModernPasswordManagerGUI:
         
         def animate_loading():
             """Smooth progress animation"""
+            if not progress_bar.winfo_exists() or not status_label.winfo_exists() or not self.main_panel.winfo_exists():
+                return
             current_progress = progress_bar.get()
-            
             if current_progress < 0.95:
-                # Increment progress
                 increment = 0.15 if current_progress < 0.5 else 0.10
                 new_progress = min(current_progress + increment, 0.95)
-                progress_bar.set(new_progress)
-                
-                # Update message
+                if progress_bar.winfo_exists():
+                    progress_bar.set(new_progress)
                 msg_idx = int(new_progress * len(loading_messages))
-                if msg_idx < len(loading_messages) and msg_idx != message_index[0]:
+                if msg_idx < len(loading_messages) and msg_idx != message_index[0] and status_label.winfo_exists():
                     message_index[0] = msg_idx
                     status_label.configure(text=loading_messages[msg_idx])
-                
-                # Schedule next update
-                self.root.after(300, animate_loading)
+                if self.root.winfo_exists():
+                    self.root.after(300, animate_loading)
             else:
-                # Loading complete
-                status_label.configure(text="✅ Ready!")
-                progress_bar.set(1.0)
-                
-                # Show actual content after brief delay
-                self.root.after(200, show_actual_content)
+                if status_label.winfo_exists():
+                    status_label.configure(text="✅ Ready!")
+                if progress_bar.winfo_exists():
+                    progress_bar.set(1.0)
+                if self.root.winfo_exists():
+                    self.root.after(200, show_actual_content)
         
         def show_actual_content():
             """Display the actual accounts interface"""
@@ -6335,6 +6342,14 @@ class ModernPasswordManagerGUI:
     def show_account_dialog(self, account: Optional[dict] = None):
         is_edit = account is not None
         
+        if not is_edit:
+            trial_status = self.trial_manager.get_trial_status()
+            if trial_status.get('is_trial_active'):
+                all_accounts = self.database.get_all_decrypted_accounts()
+                if len(all_accounts) >= 20:
+                    self.show_message("trial_limit_title", "trial_limit_message", msg_type="warning")
+                    return
+
         # Require master password verification before showing edit dialog
         if is_edit:
             if not self.verify_master_password_dialog():
@@ -7603,63 +7618,48 @@ class ModernPasswordManagerGUI:
         
         
     def show_update_checker(self):
-        for widget in self.main_panel.winfo_children():
-            widget.destroy()
-
-        header = ctk.CTkFrame(self.main_panel)
-        header.pack(fill="x", padx=15, pady=15)
-        
-        ctk.CTkLabel(header, text=self.lang_manager.get_string("check_for_updates_title"), 
-                    font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", padx=25, pady=15)
-
-        content = ctk.CTkFrame(self.main_panel)
-        content.pack(fill="both", expand=True, padx=15, pady=15)
-
-        info_label = ctk.CTkLabel(content, text=f"Current Version: {self.version_data.get('version', 'N/A')}",
-                                font=ctk.CTkFont(size=14))
-        info_label.pack(pady=20)
-
-        update_button = ctk.CTkButton(content, text=self.lang_manager.get_string("check_updates_now"),
-                                    command=self.check_for_updates_action,
-                                    width=200, height=50, font=ctk.CTkFont(size=16))
-        update_button.pack(pady=10)
-
-        url_entry = ctk.CTkEntry(content, width=350)
-        url_entry.insert(0, self.lang_manager.get_string("update_url_placeholder"))
-        url_entry.configure(state="readonly")
-        url_entry.pack(pady=10)
-
-
-        contact_button = ctk.CTkButton(content, text=self.lang_manager.get_string("contact_developer"),
-                                    command=self.contact_developer,
-                                    width=200, height=50, font=ctk.CTkFont(size=16))
-        contact_button.pack(pady=10)
-
-        self.update_status_label = ctk.CTkLabel(content, text="", font=ctk.CTkFont(size=14))
-        self.update_status_label.pack(pady=20)
+        pass
 
     def check_for_updates_action(self):
-        self.update_status_label.configure(text=self.lang_manager.get_string("checking_for_updates"), text_color=("#3B82F6", "#1E40AF"))
-        
-        # --- Simulated Update Check ---
-        hardcoded_latest_version = "1.0.1" 
-        current_version = self.version_data.get("version", "0.0.0")
-
-        def perform_check():
-            if hardcoded_latest_version > current_version:
-                update_message = self.lang_manager.get_string("update_available", latest_version=hardcoded_latest_version)
-                update_color = "#FFA500"  # Orange for "update available"
-            else:
-                update_message = self.lang_manager.get_string("no_updates_available")
-                update_color = "#44FF44" # Green for "up-to-date"
-            
-            self.update_status_label.configure(text=update_message, text_color=update_color)
-
-        # Simulate a network request delay
-        self.root.after(2000, perform_check)
+        pass
 
     def contact_developer(self):
-        webbrowser.open_new_tab("https://wa.me/212623422858")
+        pass
+    
+    def show_contact_us(self):
+        dialog = ThemedToplevel(self.root)
+        dialog.title("Contact Us")
+        dialog.grab_set()
+        dialog.resizable(False, False)
+        self.center_window(dialog, 600, 520)
+        main_frame = ctk.CTkFrame(dialog)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        header = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header.pack(fill="x")
+        ctk.CTkLabel(header, text="Contact Us", font=ctk.CTkFont(size=24, weight="bold")).pack(side="left", pady=(0, 10))
+        content = ctk.CTkFrame(main_frame, fg_color=("gray90", "gray20"), corner_radius=10)
+        content.pack(fill="both", expand=True, pady=10)
+        inner = ctk.CTkFrame(content, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=20, pady=20)
+        rows = [
+            ("Developer", "Hamza Saadi - EAGLE SHADOW"),
+            ("Date", datetime.now().strftime("%Y-%m-%d")),
+            ("Website", "https://eagleshadow.great-site.net"),
+            ("WhatsApp", "https://wa.me/212700979284"),
+            ("Facebook", "https://www.facebook.com/eagleshadowteam"),
+            ("Telegram", "https://t.me/eagleshadow16"),
+            ("Instagram", "https://www.instagram.com/eagleshadow_team")
+        ]
+        for label_text, value in rows:
+            row = ctk.CTkFrame(inner, fg_color="transparent")
+            row.pack(fill="x", pady=6)
+            ctk.CTkLabel(row, text=label_text + ":", width=150, anchor="w", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left")
+            if value.startswith("http"):
+                link_btn = ctk.CTkButton(row, text=value, command=lambda url=value: webbrowser.open_new_tab(url), height=32, anchor="w", fg_color=("gray80", "gray30"), hover_color=("gray70", "gray40"))
+                link_btn.pack(side="left", fill="x", expand=True)
+            else:
+                ctk.CTkLabel(row, text=value, anchor="w", font=ctk.CTkFont(size=12)).pack(side="left", fill="x", expand=True)
+        ctk.CTkButton(main_frame, text="Close", command=dialog.destroy, width=120, height=40).pack(pady=(10, 0))
 
     def get_remaining_lockout_time(self) -> int:
         return self.auth_guardian.get_remaining_lockout_time()
@@ -8020,7 +8020,6 @@ def main():
         return
 
     try:
-        setup_logging()
         logger.info("Starting SecureVault Pro...")
         app = ModernPasswordManagerGUI()
         app.root.app = app  # Attach app instance to root
