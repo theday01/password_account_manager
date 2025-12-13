@@ -1,23 +1,36 @@
 import asyncio
 import logging
-from desktop_notifier import DesktopNotifier, Icon, Notification
 from pathlib import Path
 import os
 import sys
 
+try:
+    from desktop_notifier import DesktopNotifier, Icon, Notification
+    DESKTOP_NOTIFIER_AVAILABLE = True
+except Exception:
+    DESKTOP_NOTIFIER_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # Create notifier with custom app name and error handling
-notifier = DesktopNotifier(
-    app_name="SecureVault Pro",
-    notification_limit=10  # Limit concurrent notifications
-)
+notifier = None
+if DESKTOP_NOTIFIER_AVAILABLE and not getattr(sys, "frozen", False):
+    try:
+        notifier = DesktopNotifier(
+            app_name="SecureVault Pro",
+            notification_limit=10
+        )
+    except Exception as e:
+        logger.warning(f"DesktopNotifier initialization failed: {e}")
+        notifier = None
 
 async def send_safe_notification(title: str, message: str, icon_path: Path = None):
     """
     Send a notification with comprehensive error handling and fallbacks.
     """
     try:
+        if not DESKTOP_NOTIFIER_AVAILABLE or notifier is None or getattr(sys, "frozen", False):
+            return show_system_notification_fallback(title, message)
         # Prepare icon if available and valid
         icon = None
         if icon_path and icon_path.exists() and icon_path.suffix.lower() in ['.ico', '.png', '.jpg', '.jpeg']:

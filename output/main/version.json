@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "release_date": "2024-07-29",
+  "author": "EAGLESHADOW",
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2024-07-29",
+      "changes": [
+        "Initial release of SecureVault Pro."
+      ]
+    }
+  ]
+}

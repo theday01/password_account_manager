@@ -31,7 +31,6 @@ from tutorial import TutorialManager
 from localization import LanguageManager
 import threading
 from notification_manager import _periodic_sender, notifier, send_safe_notification
-from desktop_notifier import Icon
 from password_reminder import PasswordReminder
 from asyncio_manager import asyncio_manager
 from tamper_manager import TamperManager
