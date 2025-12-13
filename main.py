@@ -1868,7 +1868,7 @@ class ModernPasswordManagerGUI:
         # --- DISABLE COPY/PASTE FOR LOGIN ---
         # Returns "break" to stop the event from propagating, effectively blocking the action
         # DEVELOPMENT/TESTING: Commented out to allow copy/paste for testing purposes
-        # self._block_copy_paste_comprehensive(self.master_password_entry)
+        self._block_copy_paste_comprehensive(self.master_password_entry)
         # ------------------------------------
 
         def toggle_password_visibility():
@@ -3113,7 +3113,7 @@ class ModernPasswordManagerGUI:
         self._block_copy_paste_comprehensive(self.setup_full_name_entry, include_cut=False)
         self._block_copy_paste_comprehensive(self.setup_email_entry, include_cut=False)
         # DEVELOPMENT/DEBUGGING: Temporarily commented out to allow copy/paste for testing
-        # self._block_copy_paste_comprehensive(self.setup_master_password, include_cut=True)
+        self._block_copy_paste_comprehensive(self.setup_master_password, include_cut=True)
         # -------------------------------------------
 
         self.toggle_master_password_btn = ctk.CTkButton(
@@ -3156,7 +3156,7 @@ class ModernPasswordManagerGUI:
 
         # --- DISABLE COPY/PASTE FOR CONFIRM PASSWORD ---
         # DEVELOPMENT/DEBUGGING: Temporarily commented out to allow copy/paste for testing
-        # self._block_copy_paste_comprehensive(self.setup_confirm_password, include_cut=True)
+        self._block_copy_paste_comprehensive(self.setup_confirm_password, include_cut=True)
         # -----------------------------------------------
 
         self.toggle_confirm_password_btn = ctk.CTkButton(
